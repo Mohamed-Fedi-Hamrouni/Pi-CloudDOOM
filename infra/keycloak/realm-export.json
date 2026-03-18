@@ -1,0 +1,13 @@
+{
+  "realm": "myapp-realm",
+  "enabled": true,
+  "registrationAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "ROLE_USER" },
+      { "name": "ROLE_ADMIN" },
+      { "name": "ROLE_MANAGER" }
+    ]
+  },
+  "clients": []
+}
