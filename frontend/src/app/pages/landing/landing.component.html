@@ -1,0 +1,387 @@
+<div class="landing">
+
+  <!-- ── Navbar ── -->
+  <nav class="landing-nav">
+    <div class="nav-container">
+      <a routerLink="/" class="nav-logo">
+        <div class="nav-logo-icon">i</div>
+        <span>inter<strong>V</strong></span>
+      </a>
+      <div class="nav-links">
+        <a href="#modules">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a routerLink="/mentorship">Mentors</a>
+        <a routerLink="/pricing">Pricing</a>
+      </div>
+      <div class="nav-ctas">
+        <a routerLink="/dashboard" class="btn btn-secondary btn-sm">Log in</a>
+        <a routerLink="/dashboard" class="btn btn-primary btn-sm">Start Free →</a>
+      </div>
+      <button class="nav-menu-btn">☰</button>
+    </div>
+  </nav>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-bg-orb orb-1"></div>
+    <div class="hero-bg-orb orb-2"></div>
+    <div class="hero-bg-orb orb-3"></div>
+    <div class="container hero-container">
+      <div class="hero-label">
+        <span class="label-dot"></span>
+        AI-Powered Interview Preparation
+      </div>
+      <h1 class="hero-headline">
+        Prepare smarter.<br>
+        <em>Interview better.</em><br>
+        Land your dream role.
+      </h1>
+      <p class="hero-sub">
+        interV is the all-in-one platform that helps students and graduates
+        build interview confidence through AI mock sessions, expert mentorship,
+        gamified training, and a supportive career community.
+      </p>
+      <div class="hero-ctas">
+        <a routerLink="/dashboard" class="btn btn-primary btn-lg">
+          Start Preparing Free
+          <span>→</span>
+        </a>
+        <a routerLink="/interviews" class="btn btn-secondary btn-lg">
+          Watch Demo
+          <span>▶</span>
+        </a>
+      </div>
+      <div class="hero-social-proof">
+        <div class="sp-avatars">
+          <div class="sp-avatar" style="background:linear-gradient(135deg,var(--teal-300),var(--cyan-300));">K</div>
+          <div class="sp-avatar" style="background:linear-gradient(135deg,var(--peach-100),var(--warning-500));color:#c2410c;">P</div>
+          <div class="sp-avatar" style="background:linear-gradient(135deg,var(--purple-100),var(--purple-500));color:white;">C</div>
+          <div class="sp-avatar" style="background:linear-gradient(135deg,var(--mint-100),var(--success-500));color:white;">A</div>
+        </div>
+        <span>Joined by <strong>50,000+ candidates</strong> this year</span>
+      </div>
+    </div>
+
+    <!-- Hero Product Card Preview -->
+    <div class="hero-product-preview">
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="preview-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span class="preview-title">Mock Interview Session</span>
+          <span class="chip chip-teal" style="font-size:0.65rem;">Live</span>
+        </div>
+        <div class="preview-card-body">
+          <div class="preview-question">
+            <div class="pq-label">Question 3 of 8 · Behavioral</div>
+            <div class="pq-text">"Tell me about a time you had to deliver a project under tight deadline pressure. How did you handle it?"</div>
+          </div>
+          <div class="preview-answer-area">
+            <div class="pa-header">
+              <span>Your Answer</span>
+              <span class="pa-timer">⏱ 1:42</span>
+            </div>
+            <div class="pa-lines">
+              <div class="pa-line long"></div>
+              <div class="pa-line medium"></div>
+              <div class="pa-line short"></div>
+            </div>
+          </div>
+          <div class="preview-scores">
+            <div class="ps-item">
+              <span>Clarity</span>
+              <div class="ps-bar"><div class="ps-fill" style="width:82%"></div></div>
+              <span>82%</span>
+            </div>
+            <div class="ps-item">
+              <span>Structure</span>
+              <div class="ps-bar"><div class="ps-fill" style="width:75%"></div></div>
+              <span>75%</span>
+            </div>
+            <div class="ps-item">
+              <span>Confidence</span>
+              <div class="ps-bar"><div class="ps-fill" style="width:88%"></div></div>
+              <span>88%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating cards -->
+      <div class="float-card float-badge">
+        <span>🏅</span>
+        <div>
+          <div class="fc-title">Badge Earned!</div>
+          <div class="fc-sub">Consistent Learner · +200 XP</div>
+        </div>
+      </div>
+      <div class="float-card float-score">
+        <div class="fs-score">78</div>
+        <div class="fs-label">Readiness<br>Score</div>
+      </div>
+      <div class="float-card float-streak">
+        <span>🔥</span>
+        <span><strong>7</strong> day streak</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Stats ── -->
+  <section class="stats-section">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item" *ngFor="let s of stats">
+          <div class="stat-number">{{ s.value }}</div>
+          <div class="stat-label">{{ s.label }}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Modules ── -->
+  <section class="modules-section section" id="modules">
+    <div class="container">
+      <div class="section-tag">Everything you need</div>
+      <h2 class="section-heading">Seven modules, one mission</h2>
+      <p class="section-body">From practice to placement — every tool you need to go from anxious candidate to confident hire.</p>
+      <div class="modules-grid">
+        <div class="module-card" *ngFor="let m of modules" [class]="'module-card--' + m.color">
+          <div class="module-icon">{{ m.icon }}</div>
+          <h3 class="module-title">{{ m.title }}</h3>
+          <p class="module-desc">{{ m.desc }}</p>
+          <a routerLink="/dashboard" class="module-link">Explore →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How it Works ── -->
+  <section class="hiw-section section" id="how-it-works">
+    <div class="container">
+      <div class="hiw-inner">
+        <div class="hiw-left">
+          <div class="section-tag">Simple process</div>
+          <h2 class="section-heading" style="text-align:left;">Four steps to your next role</h2>
+          <p class="section-body" style="text-align:left;">A structured, supportive journey from your first practice session to your offer letter.</p>
+          <div class="steps-list">
+            <div class="step-item" *ngFor="let s of steps">
+              <div class="step-number">{{ s.step }}</div>
+              <div class="step-body">
+                <div class="step-title">{{ s.title }}</div>
+                <div class="step-desc">{{ s.desc }}</div>
+              </div>
+            </div>
+          </div>
+          <a routerLink="/dashboard" class="btn btn-primary btn-lg" style="margin-top:var(--space-8);">Get Started Free →</a>
+        </div>
+        <div class="hiw-right">
+          <div class="journey-visual">
+            <div class="journey-node completed">
+              <div class="jn-icon">✓</div>
+              <div class="jn-label">Profile Setup</div>
+            </div>
+            <div class="journey-line completed"></div>
+            <div class="journey-node completed">
+              <div class="jn-icon">✓</div>
+              <div class="jn-label">First Mock Session</div>
+            </div>
+            <div class="journey-line active"></div>
+            <div class="journey-node active">
+              <div class="jn-icon">⚡</div>
+              <div class="jn-label">Training Path</div>
+            </div>
+            <div class="journey-line"></div>
+            <div class="journey-node">
+              <div class="jn-icon">🎯</div>
+              <div class="jn-label">Mentor Session</div>
+            </div>
+            <div class="journey-line"></div>
+            <div class="journey-node">
+              <div class="jn-icon">🏆</div>
+              <div class="jn-label">Offer Received</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Testimonials ── -->
+  <section class="testimonials-section section">
+    <div class="container">
+      <div class="section-tag">Success stories</div>
+      <h2 class="section-heading">Real candidates. Real results.</h2>
+      <p class="section-body">Thousands of students and graduates have used interV to land roles at top companies worldwide.</p>
+      <div class="testimonials-grid">
+        <app-testimonial-card
+          *ngFor="let t of testimonials"
+          [name]="t.name"
+          [initials]="t.initials"
+          [role]="t.role"
+          [text]="t.text"
+          [rating]="t.rating"
+        ></app-testimonial-card>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Mentors Teaser ── -->
+  <section class="mentors-teaser section">
+    <div class="container">
+      <div class="mentor-teaser-inner">
+        <div class="mt-content">
+          <div class="section-tag">Expert Mentors</div>
+          <h2 class="section-heading" style="text-align:left;">Learn from those who've done it</h2>
+          <p class="section-body" style="text-align:left;">Book 1:1 sessions with verified professionals from Google, Stripe, Meta, and more. Get personalized guidance that transforms your performance.</p>
+          <div class="mt-avatars">
+            <div class="mt-avatar-item" *ngFor="let item of mentorAvatars">
+              <div class="avatar-placeholder" style="width:48px;height:48px;font-size:0.9rem;">{{ item.initials }}</div>
+              <div class="mt-avatar-info">
+                <div class="mt-avatar-name">{{ item.name }}</div>
+                <div class="mt-avatar-co">{{ item.company }}</div>
+              </div>
+            </div>
+          </div>
+          <a routerLink="/mentorship" class="btn btn-primary btn-lg" style="margin-top:var(--space-6);">Browse All Mentors →</a>
+        </div>
+        <div class="mt-visual">
+          <div class="mt-card">
+            <div class="mt-card-header">
+              <div class="avatar-placeholder" style="width:52px;height:52px;font-size:1rem;">PK</div>
+              <div>
+                <div class="mt-card-name">Dr. Priya Kapoor</div>
+                <div class="mt-card-role">Senior EM &#64; Google</div>
+                <div class="stars" style="margin-top:4px;">★★★★★</div>
+              </div>
+            </div>
+            <p style="font-size:var(--text-sm);color:var(--color-text-muted);line-height:var(--leading-relaxed);">"Amara walked in nervous and walked out with an offer. That's exactly why I do this."</p>
+            <div class="mt-card-slots">
+              <div class="slot available">Tomorrow · 10:00 AM</div>
+              <div class="slot">Thu · 2:00 PM</div>
+              <div class="slot">Fri · 11:00 AM</div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;">Book Session · $80</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Pricing Preview ── -->
+  <section class="pricing-preview section">
+    <div class="container">
+      <div class="section-tag">Flexible plans</div>
+      <h2 class="section-heading">Start free. Upgrade when ready.</h2>
+      <p class="section-body">No credit card required. Cancel anytime. Built for students on a budget.</p>
+      <div class="pricing-preview-grid">
+        <div class="pp-card" *ngFor="let plan of pricing" [class.recommended]="plan.recommended">
+          <div class="ppc-badge" *ngIf="plan.recommended">Most Popular</div>
+          <div class="ppc-name">{{ plan.name }}</div>
+          <div class="ppc-price">
+            <span *ngIf="plan.price === 0">Free</span>
+            <span *ngIf="plan.price > 0">${{ plan.price }}<small>/mo</small></span>
+          </div>
+          <p class="ppc-desc">{{ plan.description }}</p>
+          <a routerLink="/pricing" class="btn btn-sm" [class]="plan.recommended ? 'btn-primary' : 'btn-secondary'">
+            {{ plan.ctaLabel }}
+          </a>
+        </div>
+      </div>
+      <p class="pricing-note">Want to see all features? <a routerLink="/pricing" style="color:var(--teal-600);font-weight:500;">View full pricing →</a></p>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="faq-section section">
+    <div class="container">
+      <div class="faq-inner">
+        <div class="faq-header">
+          <div class="section-tag">FAQ</div>
+          <h2 class="section-heading" style="text-align:left;">Questions? We've got you.</h2>
+        </div>
+        <div class="faq-list">
+          <div class="faq-item" *ngFor="let item of faqItems; let i = index">
+            <button class="faq-question" (click)="toggleFaq(i)">
+              <span>{{ item.q }}</span>
+              <span class="faq-icon">{{ openFaq === i ? '−' : '+' }}</span>
+            </button>
+            <div class="faq-answer" [class.open]="openFaq === i">
+              <p>{{ item.a }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Final CTA ── -->
+  <section class="final-cta section">
+    <div class="container">
+      <div class="cta-inner">
+        <div class="cta-bg-orb"></div>
+        <div class="section-tag" style="color:var(--teal-100);border-color:rgba(255,255,255,0.2);">Start today</div>
+        <h2 class="cta-headline">Your next interview<br>starts here.</h2>
+        <p class="cta-sub">Join 50,000+ candidates preparing smarter with interV. Free forever to get started.</p>
+        <div class="cta-buttons">
+          <a routerLink="/dashboard" class="btn btn-lg" style="background:white;color:var(--teal-700);">Create Free Account →</a>
+          <a routerLink="/dashboard" class="btn btn-lg btn-outline" style="border-color:rgba(255,255,255,0.4);color:white;">See the Platform</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer class="landing-footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <div class="nav-logo-icon">i</div>
+            <span>inter<strong>V</strong></span>
+          </div>
+          <p class="footer-brand-desc">The AI-powered interview preparation platform for students and early-career professionals.</p>
+          <div class="footer-socials">
+            <span>🐦</span><span>💼</span><span>📸</span>
+          </div>
+        </div>
+        <div class="footer-links-grid">
+          <div class="footer-col">
+            <div class="footer-col-title">Platform</div>
+            <a routerLink="/dashboard">Dashboard</a>
+            <a routerLink="/interviews">Mock Interviews</a>
+            <a routerLink="/quiz-assessment">Quizzes</a>
+            <a routerLink="/training-gamification">Training</a>
+            <a routerLink="/reports">Reports</a>
+          </div>
+          <div class="footer-col">
+            <div class="footer-col-title">Connect</div>
+            <a routerLink="/mentorship">Mentors</a>
+            <a routerLink="/community">Community</a>
+            <a routerLink="/library">Library</a>
+          </div>
+          <div class="footer-col">
+            <div class="footer-col-title">Company</div>
+            <a href="#">About interV</a>
+            <a href="#">Blog</a>
+            <a href="#">Careers</a>
+            <a href="#">Press</a>
+          </div>
+          <div class="footer-col">
+            <div class="footer-col-title">Legal</div>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Use</a>
+            <a href="#">Cookie Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 interV. All rights reserved.</span>
+        <span>Made with 💙 for job seekers everywhere</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- Define mentorAvatars inline-helper ref -->
+<ng-template #noop let-mentorAvatars></ng-template>
