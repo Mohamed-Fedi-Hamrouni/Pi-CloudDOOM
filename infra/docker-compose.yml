@@ -134,6 +134,7 @@ services:
             KC_HTTP_ENABLED: "true"
         volumes:
             - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+            - ./keycloak/themes/interv:/opt/keycloak/themes/interv
         command:
             - start-dev
             - --import-realm
