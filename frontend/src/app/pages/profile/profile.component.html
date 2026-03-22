@@ -1,0 +1,443 @@
+<div class="profile-page animate-fade" *ngIf="user">
+    <!-- Profile Header -->
+    <div class="profile-header card">
+        <div class="ph-cover"></div>
+        <div class="ph-body">
+            <div class="ph-avatar-wrap">
+                <div
+                    class="avatar-placeholder"
+                    style="
+                        width: 88px;
+                        height: 88px;
+                        font-size: 1.5rem;
+                        border: 4px solid white;
+                        box-shadow: var(--shadow-md);
+                    "
+                >
+                    {{ getInitials() }}
+                </div>
+                <div class="ph-online-dot"></div>
+            </div>
+            <div class="ph-info">
+                <div class="ph-name-row">
+                    <h1 class="ph-name">
+                        {{ user.firstName }} {{ user.lastName }}
+                    </h1>
+                    <span
+                        class="plan-badge plan-free"
+                        *ngIf="user.plan === 'FREE'"
+                        >Free</span
+                    >
+                    <span
+                        class="plan-badge plan-premium"
+                        *ngIf="user.plan === 'PREMIUM'"
+                        >⭐ Premium</span
+                    >
+                    <span
+                        class="plan-badge plan-student"
+                        *ngIf="user.plan === 'STUDENT'"
+                        >🎓 Student</span
+                    >
+                    <span class="badge-verified" *ngIf="user.isVerified"
+                        >✓ Verified</span
+                    >
+                    <span class="badge-unverified" *ngIf="!user.isVerified"
+                        >⚠ Unverified</span
+                    >
+                </div>
+                <div class="ph-role">
+                    {{ user.preferredIndustry || "Job Seeker" }}
+                </div>
+                <div class="ph-location" *ngIf="user.city">
+                    📍 {{ user.city }}
+                </div>
+                <div class="ph-stats">
+                    <div class="ph-stat">
+                        <span class="ph-stat-val">{{ user.karmaPoints }}</span>
+                        <span class="ph-stat-label">Karma Points</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-val"
+                            >{{ user.simulationsUsedThisMonth }} /
+                            {{ user.simulationsLimit }}</span
+                        >
+                        <span class="ph-stat-label">Sessions Used</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-val">{{ user.role }}</span>
+                        <span class="ph-stat-label">Role</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-val">{{
+                            user.createdAt | date: "MMM y"
+                        }}</span>
+                        <span class="ph-stat-label">Member since</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ph-actions">
+                <button class="btn btn-primary" (click)="toggleEdit()">
+                    {{ editing ? "✓ Save Profile" : "✏️ Edit Profile" }}
+                </button>
+                <button class="btn btn-secondary">Share Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Completeness -->
+    <div class="card completion-card">
+        <div class="cc-header">
+            <div>
+                <div class="cc-title">Profile Completeness</div>
+                <div class="cc-sub">
+                    A complete profile helps us personalise your experience and
+                    recommendations.
+                </div>
+            </div>
+            <div class="cc-pct">{{ getCompleteness() }}%</div>
+        </div>
+        <div class="progress-bar" style="height: 8px">
+            <div
+                class="progress-fill"
+                [style.width]="getCompleteness() + '%'"
+            ></div>
+        </div>
+        <div class="cc-todos">
+            <div
+                class="cc-todo"
+                [class.done]="user.firstName && user.lastName"
+                [class.pending]="!user.firstName || !user.lastName"
+            >
+                {{
+                    user.firstName && user.lastName
+                        ? "✓ Set target role"
+                        : "+ Set target role"
+                }}
+            </div>
+            <div
+                class="cc-todo"
+                [class.done]="user.simulationsUsedThisMonth > 0"
+                [class.pending]="user.simulationsUsedThisMonth === 0"
+            >
+                {{
+                    user.simulationsUsedThisMonth > 0
+                        ? "✓ Complete first session"
+                        : "+ Complete first session"
+                }}
+            </div>
+            <div class="cc-todo done">✓ Add skills</div>
+            <div
+                class="cc-todo"
+                [class.done]="!!user.bio"
+                [class.pending]="!user.bio"
+            >
+                {{ user.bio ? "✓ Bio added" : "+ Add bio" }}
+            </div>
+            <div
+                class="cc-todo"
+                [class.done]="!!user.city"
+                [class.pending]="!user.city"
+            >
+                {{ user.city ? "✓ City added" : "+ Add city" }}
+            </div>
+            <div
+                class="cc-todo"
+                [class.done]="user.isVerified"
+                [class.pending]="!user.isVerified"
+            >
+                {{ user.isVerified ? "✓ Email verified" : "+ Verify email" }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Form -->
+    <div class="card" *ngIf="editing">
+        <app-section-header
+            title="Edit Profile"
+            icon="✏️"
+            actionLabel=""
+        ></app-section-header>
+        <div class="edit-section">
+            <label class="edit-label">Bio</label>
+            <textarea
+                class="input"
+                rows="4"
+                style="width: 100%"
+                [(ngModel)]="editForm.bio"
+                placeholder="Write something about yourself..."
+            ></textarea>
+        </div>
+        <div class="edit-grid">
+            <div class="edit-field">
+                <label class="edit-label">First Name</label>
+                <input
+                    class="input"
+                    type="text"
+                    [(ngModel)]="editForm.firstName"
+                />
+            </div>
+            <div class="edit-field">
+                <label class="edit-label">Last Name</label>
+                <input
+                    class="input"
+                    type="text"
+                    [(ngModel)]="editForm.lastName"
+                />
+            </div>
+            <div class="edit-field">
+                <label class="edit-label">Phone Number</label>
+                <input
+                    class="input"
+                    type="tel"
+                    [(ngModel)]="editForm.phoneNumber"
+                    placeholder="+216..."
+                />
+            </div>
+            <div class="edit-field">
+                <label class="edit-label">City</label>
+                <input
+                    class="input"
+                    type="text"
+                    [(ngModel)]="editForm.city"
+                    placeholder="e.g. Tunis"
+                />
+            </div>
+            <div class="edit-field">
+                <label class="edit-label">Preferred Industry</label>
+                <select class="input" [(ngModel)]="editForm.preferredIndustry">
+                    <option value="">Select industry</option>
+                    <option value="TECHNOLOGY">Technology</option>
+                    <option value="FINANCE">Finance</option>
+                    <option value="HEALTHCARE">Healthcare</option>
+                    <option value="EDUCATION">Education</option>
+                    <option value="MARKETING">Marketing</option>
+                    <option value="ENGINEERING">Engineering</option>
+                    <option value="CONSULTING">Consulting</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+            <div class="edit-field">
+                <label class="edit-label">Preferred Language</label>
+                <select class="input" [(ngModel)]="editForm.preferredLanguage">
+                    <option value="fr">Francais</option>
+                    <option value="en">English</option>
+                    <option value="ar">Arabic</option>
+                </select>
+            </div>
+        </div>
+        <div class="edit-section">
+            <label
+                class="edit-label"
+                style="display: block; margin-bottom: var(--space-3)"
+                >Notifications</label
+            >
+            <div class="notif-row">
+                <label class="toggle-label">
+                    <input
+                        type="checkbox"
+                        [(ngModel)]="editForm.emailNotificationsEnabled"
+                    />
+                    <span>Email Notifications</span>
+                </label>
+                <label class="toggle-label">
+                    <input
+                        type="checkbox"
+                        [(ngModel)]="editForm.pushNotificationsEnabled"
+                    />
+                    <span>Push Notifications</span>
+                </label>
+                <label class="toggle-label">
+                    <input
+                        type="checkbox"
+                        [(ngModel)]="editForm.profileVisible"
+                    />
+                    <span>Public Profile</span>
+                </label>
+            </div>
+        </div>
+        <div class="edit-actions">
+            <button
+                class="btn btn-primary"
+                (click)="saveProfile()"
+                [disabled]="saving"
+            >
+                {{ saving ? "Saving..." : "✓ Save Changes" }}
+            </button>
+            <button class="btn btn-secondary" (click)="cancelEdit()">
+                Cancel
+            </button>
+        </div>
+        <div *ngIf="saveError" class="save-error">{{ saveError }}</div>
+        <div *ngIf="saveSuccess" class="save-success">
+            ✓ Profile updated successfully!
+        </div>
+    </div>
+
+    <!-- Main Grid (view mode) -->
+    <div class="profile-grid" *ngIf="!editing">
+        <div class="profile-main">
+            <!-- About -->
+            <div class="card">
+                <app-section-header
+                    title="About"
+                    icon="👤"
+                    actionLabel="Edit"
+                ></app-section-header>
+                <div class="about-text">
+                    {{
+                        user.bio ||
+                            "Add a bio to tell mentors and the community about yourself, your goals, and what you are looking for."
+                    }}
+                </div>
+            </div>
+
+            <!-- Skills -->
+            <div class="card">
+                <app-section-header
+                    title="Skills and Strengths"
+                    icon="💪"
+                    actionLabel="Add"
+                ></app-section-header>
+                <div class="empty-mini">
+                    <span style="font-size: 2rem">💪</span>
+                    <p>
+                        Upload your CV to automatically extract your skills, or
+                        add them manually.
+                    </p>
+                    <button class="btn btn-ghost btn-sm">+ Add Skill</button>
+                </div>
+            </div>
+
+            <!-- Work Experience -->
+            <div class="card">
+                <app-section-header
+                    title="Work Experience"
+                    icon="💼"
+                    actionLabel="Add"
+                ></app-section-header>
+                <div class="empty-mini">
+                    <span style="font-size: 2rem">💼</span>
+                    <p>Add your work experience to strengthen your profile</p>
+                    <button class="btn btn-ghost btn-sm">
+                        + Add Experience
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interview Preferences -->
+            <div class="card">
+                <app-section-header
+                    title="Interview Preferences"
+                    icon="⚙️"
+                    actionLabel="Edit"
+                ></app-section-header>
+                <div class="pref-list">
+                    <div class="pref-item" *ngFor="let pref of preferences">
+                        <div class="pref-label">{{ pref.label }}</div>
+                        <div class="pref-value">{{ pref.value }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="profile-side">
+            <!-- CV Upload -->
+            <div class="card">
+                <app-section-header
+                    title="CV / Resume"
+                    icon="📄"
+                    actionLabel=""
+                ></app-section-header>
+                <div
+                    class="cv-upload-area"
+                    [class.has-file]="cvUploaded"
+                    (click)="triggerCvUpload()"
+                >
+                    <div class="cva-icon">{{ cvUploaded ? "📄" : "⬆️" }}</div>
+                    <div class="cva-title">
+                        {{ cvUploaded ? "CV Uploaded" : "Upload your CV" }}
+                    </div>
+                    <div class="cva-sub">PDF or DOCX - Max 5MB</div>
+                    <button class="btn btn-ghost btn-sm">
+                        {{ cvUploaded ? "Replace" : "Upload" }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Subscription -->
+            <div class="card">
+                <app-section-header
+                    title="Subscription"
+                    icon="⭐"
+                    actionLabel=""
+                ></app-section-header>
+                <div class="sub-plan-badge">
+                    <span class="chip chip-teal">{{ user.plan }} Plan</span>
+                </div>
+                <div class="sub-details">
+                    <div class="sub-row">
+                        <span>Sessions used</span>
+                        <span
+                            >{{ user.simulationsUsedThisMonth }} /
+                            {{ user.simulationsLimit }}</span
+                        >
+                    </div>
+                    <div class="sub-row">
+                        <span>Status</span>
+                        <span>{{
+                            user.subscriptionActive ? "Active" : "Inactive"
+                        }}</span>
+                    </div>
+                    <div class="sub-row">
+                        <span>Member since</span>
+                        <span>{{ user.createdAt | date: "MMM y" }}</span>
+                    </div>
+                </div>
+                <button
+                    class="btn btn-secondary btn-sm"
+                    style="width: 100%; margin-top: var(--space-4)"
+                >
+                    Manage Subscription
+                </button>
+            </div>
+
+            <!-- Preferences -->
+            <div class="card">
+                <app-section-header
+                    title="Preferences"
+                    icon="⚙️"
+                    actionLabel=""
+                ></app-section-header>
+                <div class="pref-list">
+                    <div class="pref-item">
+                        <span class="pref-label">Email notifications</span>
+                        <span class="pref-value">{{
+                            user.emailNotificationsEnabled ? "On" : "Off"
+                        }}</span>
+                    </div>
+                    <div class="pref-item">
+                        <span class="pref-label">Push notifications</span>
+                        <span class="pref-value">{{
+                            user.pushNotificationsEnabled ? "On" : "Off"
+                        }}</span>
+                    </div>
+                    <div class="pref-item">
+                        <span class="pref-label">Public profile</span>
+                        <span class="pref-value">{{
+                            user.profileVisible ? "Visible" : "Hidden"
+                        }}</span>
+                    </div>
+                    <div class="pref-item">
+                        <span class="pref-label">Language</span>
+                        <span class="pref-value">{{
+                            getLanguageLabel(user.preferredLanguage)
+                        }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div *ngIf="!user" class="loading-profile">Loading your profile...</div>

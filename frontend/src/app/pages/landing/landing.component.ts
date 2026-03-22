@@ -1,59 +1,131 @@
-import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { TestimonialCardComponent } from '../../shared/components/testimonial-card/testimonial-card.component';
-import { MOCK_TESTIMONIALS, MOCK_PRICING } from '../../core/data/mock-data';
+import { Component, inject } from "@angular/core";
+import { RouterLink } from "@angular/router";
+import { CommonModule } from "@angular/common";
+import { TestimonialCardComponent } from "../../shared/components/testimonial-card/testimonial-card.component";
+import { MOCK_TESTIMONIALS, MOCK_PRICING } from "../../core/data/mock-data";
+import { AuthService } from "../../core/auth/auth.service";
 
 @Component({
-  selector: 'app-landing',
-  standalone: true,
-  imports: [RouterLink, CommonModule, TestimonialCardComponent],
-  templateUrl: './landing.component.html',
-  styleUrls: ['./landing.component.css']
+    selector: "app-landing",
+    standalone: true,
+    imports: [RouterLink, CommonModule, TestimonialCardComponent],
+    templateUrl: "./landing.component.html",
+    styleUrls: ["./landing.component.css"],
 })
 export class LandingComponent {
-  testimonials = MOCK_TESTIMONIALS;
-  pricing = MOCK_PRICING;
+    private authService = inject(AuthService);
 
-  stats = [
-    { value: '50,000+', label: 'Students Prepared' },
-    { value: '92%',     label: 'Interview Success Rate' },
-    { value: '500+',    label: 'Curated Resources' },
-    { value: '120+',    label: 'Expert Mentors' },
-  ];
+    testimonials = MOCK_TESTIMONIALS;
+    pricing = MOCK_PRICING;
 
-  modules = [
-    { icon: '🎙️', title: 'Mock Interviews',    desc: 'AI-powered practice sessions with real-time scoring and detailed feedback on every answer.', color: 'teal' },
-    { icon: '📝', title: 'Quiz & Assessments', desc: 'Topic-based quizzes across technical, behavioral, and product thinking domains.', color: 'cyan' },
-    { icon: '🚀', title: 'Training Paths',     desc: 'Gamified learning journeys with XP, streaks, badges, and daily challenges.', color: 'mint' },
-    { icon: '📊', title: 'Performance Reports',desc: 'Deep analytics on your communication, confidence, clarity, and readiness scores.', color: 'sky' },
-    { icon: '🤝', title: 'Expert Mentors',     desc: 'Book 1:1 sessions with industry professionals from Google, Meta, Stripe, and more.', color: 'peach' },
-    { icon: '💬', title: 'Community',          desc: 'Join a vibrant community of candidates sharing tips, success stories, and motivation.', color: 'purple' },
-    { icon: '📚', title: 'Resource Library',   desc: 'Curated articles, videos, podcasts, templates and exercises for every career stage.', color: 'sand' },
-  ];
+    stats = [
+        { value: "50,000+", label: "Students Prepared" },
+        { value: "92%", label: "Interview Success Rate" },
+        { value: "500+", label: "Curated Resources" },
+        { value: "120+", label: "Expert Mentors" },
+    ];
 
-  steps = [
-    { step: '01', title: 'Build Your Profile', desc: 'Set your target roles, skills, and interview goals to get a personalized experience.' },
-    { step: '02', title: 'Practice & Assess',  desc: 'Complete mock interviews, quizzes, and training modules at your own pace.' },
-    { step: '03', title: 'Get Feedback',       desc: 'Receive detailed AI reports scoring your communication, confidence, and structure.' },
-    { step: '04', title: 'Land the Role',      desc: 'Connect with mentors, refine your approach, and walk into interviews with confidence.' },
-  ];
+    modules = [
+        {
+            icon: "🎙️",
+            title: "Mock Interviews",
+            desc: "AI-powered practice sessions with real-time scoring and detailed feedback on every answer.",
+            color: "teal",
+        },
+        {
+            icon: "📝",
+            title: "Quiz & Assessments",
+            desc: "Topic-based quizzes across technical, behavioral, and product thinking domains.",
+            color: "cyan",
+        },
+        {
+            icon: "🚀",
+            title: "Training Paths",
+            desc: "Gamified learning journeys with XP, streaks, badges, and daily challenges.",
+            color: "mint",
+        },
+        {
+            icon: "📊",
+            title: "Performance Reports",
+            desc: "Deep analytics on your communication, confidence, clarity, and readiness scores.",
+            color: "sky",
+        },
+        {
+            icon: "🤝",
+            title: "Expert Mentors",
+            desc: "Book 1:1 sessions with industry professionals from Google, Meta, Stripe, and more.",
+            color: "peach",
+        },
+        {
+            icon: "💬",
+            title: "Community",
+            desc: "Join a vibrant community of candidates sharing tips, success stories, and motivation.",
+            color: "purple",
+        },
+        {
+            icon: "📚",
+            title: "Resource Library",
+            desc: "Curated articles, videos, podcasts, templates and exercises for every career stage.",
+            color: "sand",
+        },
+    ];
 
-  faqItems = [
-    { q: 'How is interV different from other prep platforms?', a: 'interV combines AI-powered feedback, structured training paths, live mentorship, and community — all in one platform designed specifically for students and early-career candidates.' },
-    { q: 'Do I need to pay to start?', a: 'No. Our Free plan gives you 5 mock sessions, 3 quizzes, and access to community and library resources — forever. Upgrade when you\'re ready for unlimited access.' },
-    { q: 'Are the mock interviews like real interviews?', a: 'Yes. Our question bank is curated from real interview experiences at top companies. The AI evaluates your answers on communication, structure, confidence, and relevance.' },
-  ];
+    steps = [
+        {
+            step: "01",
+            title: "Build Your Profile",
+            desc: "Set your target roles, skills, and interview goals to get a personalized experience.",
+        },
+        {
+            step: "02",
+            title: "Practice & Assess",
+            desc: "Complete mock interviews, quizzes, and training modules at your own pace.",
+        },
+        {
+            step: "03",
+            title: "Get Feedback",
+            desc: "Receive detailed AI reports scoring your communication, confidence, and structure.",
+        },
+        {
+            step: "04",
+            title: "Land the Role",
+            desc: "Connect with mentors, refine your approach, and walk into interviews with confidence.",
+        },
+    ];
 
-  mentorAvatars = [
-    { initials: 'PK', name: 'Dr. Priya Kapoor',  company: 'Google' },
-    { initials: 'JO', name: 'James Okafor',       company: 'Stripe' },
-    { initials: 'SR', name: 'Sofia Reyes',         company: 'Spotify' },
-    { initials: 'RM', name: 'Raj Malhotra',        company: 'McKinsey' },
-  ];
+    faqItems = [
+        {
+            q: "How is interV different from other prep platforms?",
+            a: "interV combines AI-powered feedback, structured training paths, live mentorship, and community — all in one platform designed specifically for students and early-career candidates.",
+        },
+        {
+            q: "Do I need to pay to start?",
+            a: "No. Our Free plan gives you 5 mock sessions, 3 quizzes, and access to community and library resources — forever. Upgrade when you're ready for unlimited access.",
+        },
+        {
+            q: "Are the mock interviews like real interviews?",
+            a: "Yes. Our question bank is curated from real interview experiences at top companies. The AI evaluates your answers on communication, structure, confidence, and relevance.",
+        },
+    ];
 
-  openFaq: number | null = null;
-  toggleFaq(i: number) {
-    this.openFaq = this.openFaq === i ? null : i;
-  }
+    mentorAvatars = [
+        { initials: "PK", name: "Dr. Priya Kapoor", company: "Google" },
+        { initials: "JO", name: "James Okafor", company: "Stripe" },
+        { initials: "SR", name: "Sofia Reyes", company: "Spotify" },
+        { initials: "RM", name: "Raj Malhotra", company: "McKinsey" },
+    ];
+
+    openFaq: number | null = null;
+
+    toggleFaq(i: number): void {
+        this.openFaq = this.openFaq === i ? null : i;
+    }
+
+    login(): void {
+        this.authService.login();
+    }
+
+    register(): void {
+        this.authService.register();
+    }
 }

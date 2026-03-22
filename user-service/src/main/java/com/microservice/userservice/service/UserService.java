@@ -1,5 +1,17 @@
 package com.microservice.userservice.service;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
 import com.microservice.userservice.dto.UserResponse;
@@ -11,19 +23,9 @@ import com.microservice.userservice.mapper.UserMapper;
 import com.microservice.userservice.messaging.producer.UserEventProducer;
 import com.microservice.userservice.model.User;
 import com.microservice.userservice.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -240,4 +242,26 @@ public class UserService {
 
         log.info("User soft deleted successfully with id: {}", id);
     }
+
+    public Page<UserResponse> findDeleted(Pageable pageable) {
+    return userRepository.findByDeletedAtIsNotNull(pageable)
+        .map(userMapper::toResponse);
+}
+
+@Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users", key = "#id"),
+    @CacheEvict(value = "users-by-keycloak", allEntries = true),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+public UserResponse restoreUser(UUID id) {
+    log.info("Restoring user with id: {}", id);
+    User user = userRepository.findById(id)
+        .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+    user.setDeletedAt(null);
+    user.setStatus(UserStatus.ACTIVE);
+    User saved = userRepository.save(user);
+    log.info("User restored successfully with id: {}", saved.getId());
+    return userMapper.toResponse(saved);
+}
 }

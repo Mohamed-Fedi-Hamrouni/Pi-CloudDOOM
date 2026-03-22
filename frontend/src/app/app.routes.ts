@@ -1,13 +1,17 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./pages/landing/landing.component').then(m => m.LandingComponent)
+    loadComponent: () => import('./pages/landing/landing.component')
+      .then(m => m.LandingComponent)
   },
   {
     path: '',
-    loadComponent: () => import('./layout/shell/shell.component').then(m => m.ShellComponent),
+    loadComponent: () => import('./layout/shell/shell.component')
+      .then(m => m.ShellComponent),
+    canActivate: [authGuard],
     children: [
       { path: 'dashboard',             loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'profile',               loadComponent: () => import('./pages/profile/profile.component').then(m => m.ProfileComponent) },
@@ -22,5 +26,10 @@ export const routes: Routes = [
       { path: 'settings',              loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent) },
     ]
   },
+{
+  path: 'complete-profile',
+  loadComponent: () => import('./pages/complete-profile/complete-profile.component')
+    .then(m => m.CompleteProfileComponent)
+},
   { path: '**', redirectTo: '' }
 ];

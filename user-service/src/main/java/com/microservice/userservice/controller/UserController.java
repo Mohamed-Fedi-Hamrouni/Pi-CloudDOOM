@@ -139,4 +139,15 @@ public class UserController {
     public ResponseEntity<UserResponse> verifyUser(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.verifyUser(id));
     }
+    @GetMapping("/deleted")
+@PreAuthorize("hasRole('ROLE_ADMIN')")
+public ResponseEntity<Page<UserResponse>> getDeletedUsers(Pageable pageable) {
+    return ResponseEntity.ok(userService.findDeleted(pageable));
+}
+
+@PatchMapping("/{id}/restore")
+@PreAuthorize("hasRole('ROLE_ADMIN')")
+public ResponseEntity<UserResponse> restoreUser(@PathVariable UUID id) {
+    return ResponseEntity.ok(userService.restoreUser(id));
+}
 }
