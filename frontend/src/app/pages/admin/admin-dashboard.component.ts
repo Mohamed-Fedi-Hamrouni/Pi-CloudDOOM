@@ -93,7 +93,9 @@ interface PageResponse {
                     >
                         <option value="">All roles</option>
                         <option value="USER">User</option>
+                        <option value="STUDENT">Student</option>
                         <option value="MENTOR">Mentor</option>
+                        <option value="MANAGER">Manager</option>
                         <option value="ADMIN">Admin</option>
                     </select>
                 </div>
@@ -174,7 +176,9 @@ interface PageResponse {
                                         (change)="changeRole(user, $event)"
                                     >
                                         <option value="USER">USER</option>
+                                        <option value="STUDENT">STUDENT</option>
                                         <option value="MENTOR">MENTOR</option>
+                                        <option value="MANAGER">MANAGER</option>
                                         <option value="ADMIN">ADMIN</option>
                                     </select>
 

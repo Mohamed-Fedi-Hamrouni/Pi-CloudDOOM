@@ -10,12 +10,14 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.microservice.userservice.security.JwtAuthConverter;
+import com.microservice.userservice.security.KeycloakRoleSyncFilter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,8 +28,9 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final JwtAuthConverter jwtAuthConverter;
+    private final KeycloakRoleSyncFilter keycloakRoleSyncFilter;
 
-   @Bean
+@Bean
 public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -37,12 +40,15 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/actuator/health").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
             .requestMatchers("/api/public/**").permitAll()
             .anyRequest().authenticated()
         )
         .oauth2ResourceServer(oauth2 -> oauth2
             .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
-        );
+        )
+        .addFilterAfter(keycloakRoleSyncFilter, BearerTokenAuthenticationFilter.class);
+
     return http.build();
 }
 

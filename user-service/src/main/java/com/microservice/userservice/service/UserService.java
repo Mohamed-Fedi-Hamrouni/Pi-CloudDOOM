@@ -219,6 +219,28 @@ public class UserService {
         });
     }
 
+    @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "users", allEntries = true),
+        @CacheEvict(value = "users-by-keycloak", key = "#keycloakId"),
+        @CacheEvict(value = "users-by-email", allEntries = true)
+    })
+    public void syncAdminRoleFromKeycloak(String keycloakId, boolean hasAdminRoleInKeycloak) {
+        if (!hasAdminRoleInKeycloak) {
+            return;
+        }
+
+        userRepository.findByKeycloakId(keycloakId)
+            .filter(user -> user.getDeletedAt() == null)
+            .filter(user -> user.getRole() != RoleEnum.ADMIN)
+            .ifPresent(user -> {
+                user.setRole(RoleEnum.ADMIN);
+                User saved = userRepository.save(user);
+                eventProducer.publishUserRoleChanged(saved);
+                log.info("Synchronized Keycloak admin role for user id: {}", saved.getId());
+            });
+    }
+
     // ── DELETE ────────────────────────────────────────────────────────────────
 
     @Transactional

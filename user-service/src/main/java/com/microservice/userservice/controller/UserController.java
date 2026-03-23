@@ -68,13 +68,13 @@ public class UserController {
     // ── ADMIN ENDPOINTS ───────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
         return ResponseEntity.ok(userService.findAll(pageable));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> searchUsers(
             @RequestParam String query,
             Pageable pageable) {
@@ -82,13 +82,13 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or @userSecurity.isOwner(authentication, #id)")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userSecurity.isOwner(authentication, #id)")
     public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.findById(id));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or @userSecurity.isOwner(authentication, #id)")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userSecurity.isOwner(authentication, #id)")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -96,7 +96,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/role")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UserResponse> updateRole(
             @PathVariable UUID id,
             @RequestParam RoleEnum role) {
@@ -104,7 +104,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UserResponse> updateStatus(
             @PathVariable UUID id,
             @RequestParam UserStatus status) {
@@ -112,14 +112,14 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
         userService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/by-status")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getUsersByStatus(
             @RequestParam UserStatus status,
             Pageable pageable) {
@@ -127,7 +127,7 @@ public class UserController {
     }
 
     @GetMapping("/by-role")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getUsersByRole(
             @RequestParam RoleEnum role,
             Pageable pageable) {
@@ -135,18 +135,18 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/verify")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<UserResponse> verifyUser(@PathVariable UUID id) {
         return ResponseEntity.ok(userService.verifyUser(id));
     }
     @GetMapping("/deleted")
-@PreAuthorize("hasRole('ROLE_ADMIN')")
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public ResponseEntity<Page<UserResponse>> getDeletedUsers(Pageable pageable) {
     return ResponseEntity.ok(userService.findDeleted(pageable));
 }
 
 @PatchMapping("/{id}/restore")
-@PreAuthorize("hasRole('ROLE_ADMIN')")
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public ResponseEntity<UserResponse> restoreUser(@PathVariable UUID id) {
     return ResponseEntity.ok(userService.restoreUser(id));
 }

@@ -1,5 +1,5 @@
 server:
-    port: 8081
+    port: ${SERVER_PORT:8081}
 
 spring:
     application:
@@ -9,13 +9,13 @@ spring:
         oauth2:
             resourceserver:
                 jwt:
-                    issuer-uri: http://localhost:8080/realms/myapp-realm
-                    jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
+                    issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/myapp-realm}
+                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs}
 
     datasource:
-        url: jdbc:postgresql://localhost:5432/userdb
-        username: postgres
-        password: "0000"
+        url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/userdb}
+        username: ${SPRING_DATASOURCE_USERNAME:postgres}
+        password: ${SPRING_DATASOURCE_PASSWORD:0000}
         driver-class-name: org.postgresql.Driver
 
     jpa:
@@ -36,11 +36,11 @@ spring:
 
     data:
         redis:
-            host: localhost
-            port: 6379
-            password: "0000"
+            host: ${SPRING_REDIS_HOST:localhost}
+            port: ${SPRING_REDIS_PORT:6379}
+            password: ${SPRING_REDIS_PASSWORD:0000}
     kafka:
-        bootstrap-servers: localhost:9092
+        bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
         producer:
             key-serializer: org.apache.kafka.common.serialization.StringSerializer
             value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -54,10 +54,10 @@ spring:
             properties:
                 spring.json.trusted.packages: "com.microservice.userservice.messaging.event"
 keycloak:
-    server-url: http://localhost:8080
-    realm: myapp-realm
-    client-id: user-service
-    client-secret: user-service-secret-change-in-prod
+    server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_REALM:myapp-realm}
+    client-id: ${KEYCLOAK_CLIENT_ID:user-service}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:user-service-secret-change-in-prod}
 
 management:
     endpoints:
@@ -67,3 +67,6 @@ management:
     endpoint:
         health:
             show-details: always
+logging:
+    level:
+        org.springframework.security: INFO

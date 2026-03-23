@@ -38,11 +38,25 @@ public class JwtAuthConverter implements Converter<Jwt, AbstractAuthenticationTo
             return List.of();
         }
 
-        List<String> roles = (List<String>) realmAccess.get("roles");
+        Object rolesClaim = realmAccess.get("roles");
+        if (!(rolesClaim instanceof List<?> roles)) {
+            return List.of();
+        }
 
         return roles.stream()
-            .filter(role -> role.startsWith("ROLE_"))
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .map(this::normalizeRole)
+            .filter(role -> !role.isBlank())
             .map(SimpleGrantedAuthority::new)
             .collect(Collectors.toSet());
+    }
+
+    private String normalizeRole(String role) {
+        String normalized = role == null ? "" : role.trim().toUpperCase();
+        if (normalized.isBlank()) {
+            return "";
+        }
+        return normalized.startsWith("ROLE_") ? normalized : "ROLE_" + normalized;
     }
 }
