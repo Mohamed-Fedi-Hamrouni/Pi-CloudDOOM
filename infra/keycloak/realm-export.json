@@ -398,6 +398,65 @@
   "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister" : false,
   "webAuthnPolicyPasswordlessAcceptableAaguids" : [ ],
   "webAuthnPolicyPasswordlessExtraOrigins" : [ ],
+  "users" : [ {
+    "id" : "3397e1f0-3d74-47f8-82de-18910fdd45a3",
+    "username" : "admin@test.com",
+    "firstName" : "Admin",
+    "lastName" : "Test",
+    "email" : "admin@test.com",
+    "emailVerified" : false,
+    "createdTimestamp" : 1774290206537,
+    "enabled" : true,
+    "totp" : false,
+    "credentials" : [ {
+      "id" : "75964372-a503-439d-b083-99367ec153ba",
+      "type" : "password",
+      "createdDate" : 1774290206692,
+      "secretData" : "{\"value\":\"x/HAOjZMLjTcii3Ro/nJIB/Jr3cF+mW8A/2XZEkidG3Gzj4SQ0jcBqZkrJTrD6a58DYnXqIWZ88indUdHlHFeA==\",\"salt\":\"8zKjHJrEpyIo4ObEEltO5g==\",\"additionalParameters\":{}}",
+      "credentialData" : "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+    } ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-myapp-realm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  }, {
+    "id" : "103c5ee6-f8f7-41be-856c-db9ec2eb8600",
+    "username" : "service-account-user-service",
+    "emailVerified" : false,
+    "createdTimestamp" : 1774289927993,
+    "enabled" : true,
+    "totp" : false,
+    "serviceAccountClientId" : "user-service",
+    "credentials" : [ ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-myapp-realm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  }, {
+    "id" : "d2a81740-e779-4f6c-947c-80b4723de135",
+    "username" : "user@test.com",
+    "firstName" : "Regular",
+    "lastName" : "User",
+    "email" : "user@test.com",
+    "emailVerified" : true,
+    "createdTimestamp" : 1774290192887,
+    "enabled" : true,
+    "totp" : false,
+    "credentials" : [ {
+      "id" : "a7c02248-77f9-426e-ac5f-fe07c624e433",
+      "type" : "password",
+      "createdDate" : 1774290193041,
+      "secretData" : "{\"value\":\"9vJmC0aQG1YED354YFrIRNf6iciVYw3JF4btJuk8B3CpyZfc423aAKfmL2neaMuu33oNF0cVG/03iYUaaTqaGQ==\",\"salt\":\"z+MMSmgw2jOJlMlHDpxO1A==\",\"additionalParameters\":{}}",
+      "credentialData" : "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+    } ],
+    "disableableCredentialTypes" : [ ],
+    "requiredActions" : [ ],
+    "realmRoles" : [ "default-roles-myapp-realm" ],
+    "notBefore" : 0,
+    "groups" : [ ]
+  } ],
   "scopeMappings" : [ {
     "clientScope" : "offline_access",
     "roles" : [ "offline_access" ]
@@ -695,6 +754,7 @@
       "config" : {
         "user.session.note" : "client_id",
         "introspection.token.claim" : "true",
+        "userinfo.token.claim" : "true",
         "id.token.claim" : "true",
         "access.token.claim" : "true",
         "claim.name" : "client_id",
@@ -709,6 +769,7 @@
       "config" : {
         "user.session.note" : "clientAddress",
         "introspection.token.claim" : "true",
+        "userinfo.token.claim" : "true",
         "id.token.claim" : "true",
         "access.token.claim" : "true",
         "claim.name" : "clientAddress",
@@ -723,6 +784,7 @@
       "config" : {
         "user.session.note" : "clientHost",
         "introspection.token.claim" : "true",
+        "userinfo.token.claim" : "true",
         "id.token.claim" : "true",
         "access.token.claim" : "true",
         "claim.name" : "clientHost",
@@ -1294,7 +1356,7 @@
       "subType" : "authenticated",
       "subComponents" : { },
       "config" : {
-        "allowed-protocol-mapper-types" : [ "oidc-address-mapper", "oidc-usermodel-property-mapper", "saml-user-attribute-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-user-property-mapper", "saml-role-list-mapper", "oidc-usermodel-attribute-mapper", "oidc-full-name-mapper" ]
+        "allowed-protocol-mapper-types" : [ "oidc-full-name-mapper", "oidc-sha256-pairwise-sub-mapper", "oidc-usermodel-property-mapper", "saml-user-property-mapper", "oidc-address-mapper", "saml-role-list-mapper", "oidc-usermodel-attribute-mapper", "saml-user-attribute-mapper" ]
       }
     }, {
       "id" : "8c27ae04-cb28-48a8-809c-1c9e4bd94859",
@@ -1319,7 +1381,7 @@
       "subType" : "anonymous",
       "subComponents" : { },
       "config" : {
-        "allowed-protocol-mapper-types" : [ "oidc-usermodel-attribute-mapper", "oidc-usermodel-property-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-user-attribute-mapper", "oidc-address-mapper", "saml-role-list-mapper", "saml-user-property-mapper", "oidc-full-name-mapper" ]
+        "allowed-protocol-mapper-types" : [ "saml-user-attribute-mapper", "oidc-full-name-mapper", "oidc-address-mapper", "oidc-usermodel-attribute-mapper", "oidc-usermodel-property-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-user-property-mapper", "saml-role-list-mapper" ]
       }
     }, {
       "id" : "45a6c7ec-0454-4283-93e2-9a7717cc9651",
