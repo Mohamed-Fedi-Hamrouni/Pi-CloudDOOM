@@ -4,18 +4,19 @@ import {
     Output,
     EventEmitter,
     inject,
-    OnInit,
+    OnChanges,
+    SimpleChanges,
 } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
 import { AuthService } from "../../core/auth/auth.service";
 import { RouterLink, RouterLinkActive } from "@angular/router";
 import { CommonModule } from "@angular/common";
-import { MOCK_USER } from "../../core/data/mock-data";
+import { UserProfile } from "../../core/services/user-api.service";
 
 interface NavItem {
     label: string;
     icon: string;
     route: string;
+    queryParams?: Record<string, any>;
 }
 
 @Component({
@@ -24,7 +25,6 @@ interface NavItem {
     imports: [RouterLink, RouterLinkActive, CommonModule],
     template: `
         <aside class="sidebar" [class.collapsed]="collapsed">
-            <!-- Logo -->
             <div class="sidebar-logo">
                 <a routerLink="/dashboard" class="logo-link">
                     <div class="logo-icon">
@@ -34,6 +34,7 @@ interface NavItem {
                         >inter<strong>V</strong></span
                     >
                 </a>
+
                 <button
                     class="collapse-btn"
                     (click)="toggleSidebar.emit()"
@@ -43,9 +44,9 @@ interface NavItem {
                 </button>
             </div>
 
-            <!-- Nav -->
             <nav class="sidebar-nav">
                 <div class="nav-section-label" *ngIf="!collapsed">Prepare</div>
+
                 <a
                     *ngFor="let item of mainNav"
                     [routerLink]="item.route"
@@ -63,6 +64,7 @@ interface NavItem {
                 <div class="nav-divider"></div>
 
                 <div class="nav-section-label" *ngIf="!collapsed">Connect</div>
+
                 <a
                     *ngFor="let item of connectNav"
                     [routerLink]="item.route"
@@ -80,9 +82,11 @@ interface NavItem {
                 <div class="nav-divider"></div>
 
                 <div class="nav-section-label" *ngIf="!collapsed">Account</div>
+
                 <a
                     *ngFor="let item of accountNav"
                     [routerLink]="item.route"
+                    [queryParams]="item.queryParams || null"
                     routerLinkActive="active"
                     class="nav-item"
                     [title]="item.label"
@@ -95,40 +99,89 @@ interface NavItem {
                 </a>
             </nav>
 
-            <!-- User profile at bottom -->
-            <div class="sidebar-user" *ngIf="!collapsed">
+            <div class="sidebar-user" *ngIf="!collapsed && isAuthenticated()">
                 <a routerLink="/profile" class="user-link">
-                    <div
-                        class="avatar-placeholder avatar-sm"
-                        style="font-size:0.75rem;"
-                    >
-                        {{ user.initials }}
+                    <div class="sidebar-avatar-wrap">
+                        <ng-container *ngIf="avatarUrl; else sidebarInitials">
+                            <img
+                                [src]="avatarUrl"
+                                alt="Profile avatar"
+                                class="sidebar-avatar-img"
+                                (error)="onAvatarError()"
+                            />
+                        </ng-container>
+
+                        <ng-template #sidebarInitials>
+                            <div
+                                class="avatar-placeholder avatar-sm"
+                                style="font-size:0.75rem;"
+                            >
+                                {{ initials }}
+                            </div>
+                        </ng-template>
                     </div>
+
                     <div class="user-info">
-                        <div class="user-name">{{ user.name }}</div>
-                        <div class="user-plan">
+                        <div class="user-name">{{ displayName }}</div>
+
+                        <div class="user-meta">
                             <span
                                 class="chip"
                                 [ngClass]="
-                                    user.plan === 'FREE'
+                                    displayPlan === 'FREE'
                                         ? 'chip-neutral'
                                         : 'chip-teal'
                                 "
                                 style="font-size:0.6rem; padding:2px 6px;"
-                                >{{ user.plan | titlecase }}</span
                             >
+                                {{ displayPlan | titlecase }}
+                            </span>
+
+                            <span
+                                *ngIf="isAdmin && displayRole"
+                                class="chip chip-teal"
+                                style="font-size:0.6rem; padding:2px 6px;"
+                            >
+                                {{ displayRole | titlecase }}
+                            </span>
+
+                            <span
+                                *ngIf="isVerified"
+                                class="chip chip-success"
+                                style="font-size:0.6rem; padding:2px 6px;"
+                            >
+                                Verified
+                            </span>
                         </div>
                     </div>
                 </a>
             </div>
 
-            <div class="sidebar-user sidebar-user-mini" *ngIf="collapsed">
-                <a routerLink="/profile" title="{{ user.name }}">
-                    <div
-                        class="avatar-placeholder avatar-sm"
-                        style="font-size:0.75rem;"
-                    >
-                        {{ user.initials }}
+            <div
+                class="sidebar-user sidebar-user-mini"
+                *ngIf="collapsed && isAuthenticated()"
+            >
+                <a routerLink="/profile" title="{{ displayName }}">
+                    <div class="sidebar-avatar-wrap">
+                        <ng-container
+                            *ngIf="avatarUrl; else sidebarMiniInitials"
+                        >
+                            <img
+                                [src]="avatarUrl"
+                                alt="Profile avatar"
+                                class="sidebar-avatar-img"
+                                (error)="onAvatarError()"
+                            />
+                        </ng-container>
+
+                        <ng-template #sidebarMiniInitials>
+                            <div
+                                class="avatar-placeholder avatar-sm"
+                                style="font-size:0.75rem;"
+                            >
+                                {{ initials }}
+                            </div>
+                        </ng-template>
                     </div>
                 </a>
             </div>
@@ -155,7 +208,6 @@ interface NavItem {
                 width: 72px;
             }
 
-            /* Logo */
             .sidebar-logo {
                 display: flex;
                 align-items: center;
@@ -233,7 +285,6 @@ interface NavItem {
                 margin: 0 auto;
             }
 
-            /* Nav */
             .sidebar-nav {
                 flex: 1;
                 padding: var(--space-4) var(--space-3);
@@ -313,7 +364,6 @@ interface NavItem {
                 margin: var(--space-3) 0;
             }
 
-            /* Sidebar user */
             .sidebar-user {
                 padding: var(--space-4);
                 border-top: 1px solid var(--color-border-light);
@@ -346,6 +396,33 @@ interface NavItem {
                 text-overflow: ellipsis;
             }
 
+            .sidebar-avatar-wrap {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 36px;
+                height: 36px;
+                flex-shrink: 0;
+            }
+
+            .sidebar-avatar-img {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                object-fit: cover;
+                display: block;
+                border: 2px solid var(--color-surface);
+                box-shadow: var(--shadow-sm);
+            }
+
+            .user-meta {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                flex-wrap: wrap;
+                margin-top: 0.2rem;
+            }
+
             .sidebar-user-mini {
                 display: flex;
                 justify-content: center;
@@ -375,37 +452,80 @@ interface NavItem {
         `,
     ],
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnChanges {
     @Input() collapsed = false;
+    @Input() currentUser: UserProfile | null = null;
     @Output() toggleSidebar = new EventEmitter<void>();
 
     private authService = inject(AuthService);
-    private http = inject(HttpClient);
 
-    user = {
-        name: this.authService.getFullName() || MOCK_USER.name,
-        initials: this.getInitials(),
-        plan: "FREE",
-    };
+    avatarFailed = false;
 
-    ngOnInit(): void {
-        this.http.get<any>("http://localhost:8081/api/users/me").subscribe({
-            next: (profile) => {
-                this.user = {
-                    name: `${profile.firstName} ${profile.lastName}`,
-                    initials: (
-                        (profile.firstName?.[0] || "") +
-                        (profile.lastName?.[0] || "")
-                    ).toUpperCase(),
-                    plan: profile.plan || "FREE",
-                };
-            },
-        });
+    ngOnChanges(changes: SimpleChanges): void {
+        if ("currentUser" in changes) {
+            this.avatarFailed = false;
+        }
     }
 
-    private getInitials(): string {
+    isAuthenticated(): boolean {
+        return this.authService.isAuthenticated();
+    }
+
+    get displayName(): string {
+        if (this.currentUser) {
+            return (
+                `${this.currentUser.firstName || ""} ${this.currentUser.lastName || ""}`.trim() ||
+                this.authService.getFullName() ||
+                "User"
+            );
+        }
+        return this.authService.getFullName() || "User";
+    }
+
+    get initials(): string {
+        if (this.currentUser) {
+            const first = this.currentUser.firstName?.[0] || "";
+            const last = this.currentUser.lastName?.[0] || "";
+            return (first + last).toUpperCase() || this.getInitialsFromAuth();
+        }
+        return this.getInitialsFromAuth();
+    }
+
+    get avatarUrl(): string {
+        if (this.avatarFailed) return "";
+        return this.currentUser?.avatarUrl?.trim() || "";
+    }
+
+    get displayPlan(): string {
+        return this.currentUser?.plan || "FREE";
+    }
+
+    get displayRole(): string {
+        const role = this.currentUser?.role || "";
+        return role.replace(/^ROLE_/, "").replace(/_/g, " ");
+    }
+
+    get isVerified(): boolean {
+        return !!this.currentUser?.isVerified;
+    }
+
+    get isAdmin(): boolean {
+        const role = (this.currentUser?.role || "").toUpperCase();
+        return (
+            role === "ADMIN" ||
+            role === "ROLE_ADMIN" ||
+            this.authService.hasRole("ROLE_ADMIN")
+        );
+    }
+
+    onAvatarError(): void {
+        this.avatarFailed = true;
+    }
+
+    private getInitialsFromAuth(): string {
         const name = this.authService.getFullName();
-        if (!name) return MOCK_USER.initials;
+        if (!name) return "U";
+
         return name
             .split(" ")
             .map((n: string) => n[0])
@@ -413,6 +533,7 @@ export class SidebarComponent implements OnInit {
             .toUpperCase()
             .slice(0, 2);
     }
+
     mainNav: NavItem[] = [
         { label: "Dashboard", icon: "⊞", route: "/dashboard" },
         { label: "Interviews", icon: "🎙️", route: "/interviews" },
@@ -427,9 +548,25 @@ export class SidebarComponent implements OnInit {
         { label: "Community", icon: "💬", route: "/community" },
     ];
 
-    accountNav: NavItem[] = [
-        { label: "Profile", icon: "👤", route: "/profile" },
-        { label: "Pricing", icon: "✦", route: "/pricing" },
-        { label: "Settings", icon: "⚙️", route: "/settings" },
-    ];
+    get accountNav(): NavItem[] {
+        const base: NavItem[] = [
+            { label: "Profile", icon: "👤", route: "/profile" },
+            { label: "Pricing", icon: "✦", route: "/pricing" },
+            { label: "Settings", icon: "⚙️", route: "/settings" },
+        ];
+
+        if (this.isAdmin) {
+            return [
+                {
+                    label: "Admin Panel",
+                    icon: "🛠️",
+                    route: "/dashboard",
+                    queryParams: { tab: "admin" },
+                },
+                ...base,
+            ];
+        }
+
+        return base;
+    }
 }

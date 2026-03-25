@@ -4,18 +4,26 @@
         <div class="ph-cover"></div>
         <div class="ph-body">
             <div class="ph-avatar-wrap">
-                <div
-                    class="avatar-placeholder"
-                    style="
-                        width: 88px;
-                        height: 88px;
-                        font-size: 1.5rem;
-                        border: 4px solid white;
-                        box-shadow: var(--shadow-md);
-                    "
-                >
-                    {{ getInitials() }}
-                </div>
+                <img
+                    *ngIf="user.avatarUrl; else initialsAvatar"
+                    [src]="user.avatarUrl"
+                    alt="Profile avatar"
+                    class="ph-avatar-image"
+                />
+                <ng-template #initialsAvatar>
+                    <div
+                        class="avatar-placeholder"
+                        style="
+                            width: 88px;
+                            height: 88px;
+                            font-size: 1.5rem;
+                            border: 4px solid white;
+                            box-shadow: var(--shadow-md);
+                        "
+                    >
+                        {{ getInitials() }}
+                    </div>
+                </ng-template>
                 <div class="ph-online-dot"></div>
             </div>
             <div class="ph-info">
@@ -39,10 +47,10 @@
                         >🎓 Student</span
                     >
                     <span class="badge-verified" *ngIf="user.isVerified"
-                        >✓ Verified</span
+                        >✓ Admin Verified</span
                     >
                     <span class="badge-unverified" *ngIf="!user.isVerified"
-                        >⚠ Unverified</span
+                        >⚠ Pending Verification</span
                     >
                 </div>
                 <div class="ph-role">
@@ -102,50 +110,37 @@
                 [style.width]="getCompleteness() + '%'"
             ></div>
         </div>
-        <div class="cc-todos">
-            <div
-                class="cc-todo"
-                [class.done]="user.firstName && user.lastName"
-                [class.pending]="!user.firstName || !user.lastName"
-            >
-                {{
-                    user.firstName && user.lastName
-                        ? "✓ Set target role"
-                        : "+ Set target role"
-                }}
-            </div>
-            <div
-                class="cc-todo"
-                [class.done]="user.simulationsUsedThisMonth > 0"
-                [class.pending]="user.simulationsUsedThisMonth === 0"
-            >
-                {{
-                    user.simulationsUsedThisMonth > 0
-                        ? "✓ Complete first session"
-                        : "+ Complete first session"
-                }}
-            </div>
-            <div class="cc-todo done">✓ Add skills</div>
-            <div
-                class="cc-todo"
-                [class.done]="!!user.bio"
-                [class.pending]="!user.bio"
-            >
-                {{ user.bio ? "✓ Bio added" : "+ Add bio" }}
-            </div>
-            <div
-                class="cc-todo"
-                [class.done]="!!user.city"
-                [class.pending]="!user.city"
-            >
-                {{ user.city ? "✓ City added" : "+ Add city" }}
-            </div>
-            <div
-                class="cc-todo"
-                [class.done]="user.isVerified"
-                [class.pending]="!user.isVerified"
-            >
-                {{ user.isVerified ? "✓ Email verified" : "+ Verify email" }}
+        <div class="cc-sections">
+            <div class="cc-section" *ngFor="let section of completionSections">
+                <div class="cc-section-header">
+                    <span>{{ section.title }}</span>
+                    <span
+                        >{{ section.earnedPoints }}/{{
+                            section.totalPoints
+                        }}
+                        pts</span
+                    >
+                </div>
+
+                <div class="cc-todos">
+                    <div
+                        class="cc-todo"
+                        [class.complete]="item.state === 'complete'"
+                        [class.incomplete]="item.state === 'incomplete'"
+                        [class.pending]="item.state === 'pending'"
+                        [class.rejected]="item.state === 'rejected'"
+                        *ngFor="let item of section.items"
+                    >
+                        <span *ngIf="item.state === 'complete'">✓</span>
+                        <span *ngIf="item.state === 'incomplete'">+</span>
+                        <span *ngIf="item.state === 'pending'">⏳</span>
+                        <span *ngIf="item.state === 'rejected'">✕</span>
+                        {{ item.label }}
+                        <span class="cc-item-points"
+                            >{{ item.points }} pts</span
+                        >
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -157,6 +152,80 @@
             icon="✏️"
             actionLabel=""
         ></app-section-header>
+        <div class="edit-section">
+            <label class="edit-label" style="display: block"
+                >Profile Photo</label
+            >
+
+            <div class="avatar-mode-switch">
+                <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    [class.selected-mode]="avatarInputMode === 'upload'"
+                    (click)="setAvatarInputMode('upload')"
+                >
+                    Upload Photo
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    [class.selected-mode]="avatarInputMode === 'url'"
+                    (click)="setAvatarInputMode('url')"
+                >
+                    Use Image URL
+                </button>
+            </div>
+
+            <div
+                class="avatar-preview"
+                *ngIf="avatarPreviewUrl; else emptyAvatarPreview"
+            >
+                <img [src]="avatarPreviewUrl" alt="Avatar preview" />
+            </div>
+            <ng-template #emptyAvatarPreview>
+                <div class="empty-mini avatar-empty-mini">
+                    <span style="font-size: 1.5rem">🖼️</span>
+                    <p>No avatar selected yet.</p>
+                </div>
+            </ng-template>
+
+            <div
+                *ngIf="avatarInputMode === 'upload'"
+                class="avatar-input-block"
+            >
+                <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    (change)="onAvatarFileSelected($event)"
+                />
+                <div class="avatar-upload-status" *ngIf="avatarUploadLoading">
+                    Uploading avatar...
+                </div>
+            </div>
+
+            <div *ngIf="avatarInputMode === 'url'" class="avatar-input-block">
+                <input
+                    class="input"
+                    type="url"
+                    [(ngModel)]="editForm.avatarUrl"
+                    (ngModelChange)="onAvatarUrlChange()"
+                    placeholder="https://example.com/avatar.jpg"
+                />
+            </div>
+
+            <div class="save-error" *ngIf="avatarUploadError">
+                {{ avatarUploadError }}
+            </div>
+
+            <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="removeAvatar()"
+                [disabled]="!avatarPreviewUrl && !editForm.avatarUrl"
+            >
+                Remove Photo
+            </button>
+        </div>
         <div class="edit-section">
             <label class="edit-label">Bio</label>
             <textarea
@@ -255,6 +324,359 @@
                 </label>
             </div>
         </div>
+        <div class="edit-section">
+            <label
+                class="edit-label"
+                style="display: block; margin-bottom: var(--space-3)"
+            >
+                Skills
+            </label>
+
+            <div class="skills-suggested-grid">
+                <button
+                    type="button"
+                    class="skill-chip"
+                    *ngFor="let skill of suggestedSkills"
+                    [class.selected]="hasSkill(skill)"
+                    (click)="toggleSuggestedSkill(skill)"
+                >
+                    {{ skill }}
+                </button>
+            </div>
+
+            <div class="custom-skill-row">
+                <input
+                    class="input"
+                    type="text"
+                    [(ngModel)]="customSkill"
+                    placeholder="Add custom skill"
+                    (keydown.enter)="addSkill($event)"
+                />
+                <button
+                    type="button"
+                    class="btn btn-ghost"
+                    (click)="addSkill()"
+                >
+                    Add
+                </button>
+            </div>
+
+            <div class="skills-badges" *ngIf="selectedSkills.length">
+                <span class="skill-badge" *ngFor="let skill of selectedSkills">
+                    {{ skill }}
+                    <button type="button" (click)="removeSkill(skill)">
+                        ×
+                    </button>
+                </span>
+            </div>
+        </div>
+        <div class="edit-section">
+            <div class="experience-header-row">
+                <label class="edit-label">Work Experience</label>
+                <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="startAddExperience()"
+                >
+                    + Add Experience
+                </button>
+            </div>
+
+            <div
+                class="experience-list"
+                *ngIf="experiences.length; else emptyEditExperiences"
+            >
+                <div
+                    class="experience-card"
+                    *ngFor="let exp of experiences; let i = index"
+                >
+                    <div class="experience-card-top">
+                        <div>
+                            <h4>{{ exp.title }}</h4>
+                            <p class="experience-company">{{ exp.company }}</p>
+                            <p class="experience-date">
+                                {{ exp.startDate }} -
+                                {{
+                                    exp.current ? "Present" : exp.endDate || ""
+                                }}
+                            </p>
+                        </div>
+                        <div class="experience-actions">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                (click)="startEditExperience(i)"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                (click)="removeExperience(i)"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <ng-template #emptyEditExperiences>
+                <div class="empty-mini">
+                    <span style="font-size: 1.5rem">💼</span>
+                    <p>No work experience added yet.</p>
+                </div>
+            </ng-template>
+
+            <div class="experience-form" *ngIf="showExperienceForm">
+                <div class="edit-grid">
+                    <div class="edit-field">
+                        <label class="edit-label">Title *</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="experienceForm.title"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Company *</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="experienceForm.company"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Location</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="experienceForm.location"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Employment Type</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="experienceForm.employmentType"
+                            placeholder="Full-time, Internship..."
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Start Date *</label>
+                        <input
+                            class="input"
+                            type="month"
+                            [(ngModel)]="experienceForm.startDate"
+                        />
+                    </div>
+                    <div class="edit-field" *ngIf="!experienceForm.current">
+                        <label class="edit-label">End Date *</label>
+                        <input
+                            class="input"
+                            type="month"
+                            [(ngModel)]="experienceForm.endDate"
+                        />
+                    </div>
+                </div>
+
+                <label class="toggle-label" style="margin-top: var(--space-2)">
+                    <input
+                        type="checkbox"
+                        [(ngModel)]="experienceForm.current"
+                    />
+                    <span>I currently work here</span>
+                </label>
+
+                <label class="edit-label" style="margin-top: var(--space-3)">
+                    Description
+                </label>
+                <textarea
+                    class="input"
+                    rows="3"
+                    style="width: 100%"
+                    [(ngModel)]="experienceForm.description"
+                ></textarea>
+
+                <div class="experience-form-actions">
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        [disabled]="
+                            !experienceForm.title ||
+                            !experienceForm.company ||
+                            !experienceForm.startDate ||
+                            (!experienceForm.current && !experienceForm.endDate)
+                        "
+                        (click)="saveExperience()"
+                    >
+                        {{
+                            editingExperienceIndex === null
+                                ? "Add Experience"
+                                : "Save Experience"
+                        }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        (click)="cancelExperienceEdit()"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="edit-section">
+            <div class="experience-header-row">
+                <label class="edit-label">Education</label>
+                <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="startAddEducation()"
+                >
+                    + Add Education
+                </button>
+            </div>
+
+            <div
+                class="experience-list"
+                *ngIf="educations.length; else emptyEditEducations"
+            >
+                <div
+                    class="experience-card"
+                    *ngFor="let edu of educations; let i = index"
+                >
+                    <div class="experience-card-top">
+                        <div>
+                            <h4>{{ edu.degree }}</h4>
+                            <p class="experience-company">{{ edu.school }}</p>
+                            <p class="experience-date">
+                                {{ edu.startDate }} -
+                                {{
+                                    edu.current ? "Present" : edu.endDate || ""
+                                }}
+                            </p>
+                            <p class="experience-meta" *ngIf="edu.fieldOfStudy">
+                                {{ edu.fieldOfStudy }}
+                            </p>
+                        </div>
+                        <div class="experience-actions">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                (click)="startEditEducation(i)"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                (click)="removeEducation(i)"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <ng-template #emptyEditEducations>
+                <div class="empty-mini">
+                    <span style="font-size: 1.5rem">🎓</span>
+                    <p>No education added yet.</p>
+                </div>
+            </ng-template>
+
+            <div class="experience-form" *ngIf="showEducationForm">
+                <div class="edit-grid">
+                    <div class="edit-field">
+                        <label class="edit-label">School *</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="educationForm.school"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Degree *</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="educationForm.degree"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Field of Study</label>
+                        <input
+                            class="input"
+                            type="text"
+                            [(ngModel)]="educationForm.fieldOfStudy"
+                        />
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Start Date *</label>
+                        <input
+                            class="input"
+                            type="month"
+                            [(ngModel)]="educationForm.startDate"
+                        />
+                    </div>
+                    <div class="edit-field" *ngIf="!educationForm.current">
+                        <label class="edit-label">End Date *</label>
+                        <input
+                            class="input"
+                            type="month"
+                            [(ngModel)]="educationForm.endDate"
+                        />
+                    </div>
+                </div>
+
+                <label class="toggle-label" style="margin-top: var(--space-2)">
+                    <input
+                        type="checkbox"
+                        [(ngModel)]="educationForm.current"
+                    />
+                    <span>I currently study here</span>
+                </label>
+
+                <label class="edit-label" style="margin-top: var(--space-3)">
+                    Description
+                </label>
+                <textarea
+                    class="input"
+                    rows="3"
+                    style="width: 100%"
+                    [(ngModel)]="educationForm.description"
+                ></textarea>
+
+                <div class="experience-form-actions">
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        [disabled]="
+                            !educationForm.school ||
+                            !educationForm.degree ||
+                            !educationForm.startDate ||
+                            (!educationForm.current && !educationForm.endDate)
+                        "
+                        (click)="saveEducation()"
+                    >
+                        {{
+                            editingEducationIndex === null
+                                ? "Add Education"
+                                : "Save Education"
+                        }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        (click)="cancelEducationEdit()"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="edit-actions">
             <button
                 class="btn btn-primary"
@@ -298,14 +720,23 @@
                     icon="💪"
                     actionLabel="Add"
                 ></app-section-header>
-                <div class="empty-mini">
-                    <span style="font-size: 2rem">💪</span>
-                    <p>
-                        Upload your CV to automatically extract your skills, or
-                        add them manually.
-                    </p>
-                    <button class="btn btn-ghost btn-sm">+ Add Skill</button>
+                <div
+                    class="skills-badges"
+                    *ngIf="user.skills.length; else emptySkills"
+                >
+                    <span class="skill-badge" *ngFor="let skill of user.skills">
+                        {{ skill }}
+                    </span>
                 </div>
+                <ng-template #emptySkills>
+                    <div class="empty-mini">
+                        <span style="font-size: 2rem">💪</span>
+                        <p>
+                            No skills added yet. Click Edit Profile to add your
+                            strengths.
+                        </p>
+                    </div>
+                </ng-template>
             </div>
 
             <!-- Work Experience -->
@@ -315,13 +746,85 @@
                     icon="💼"
                     actionLabel="Add"
                 ></app-section-header>
-                <div class="empty-mini">
-                    <span style="font-size: 2rem">💼</span>
-                    <p>Add your work experience to strengthen your profile</p>
-                    <button class="btn btn-ghost btn-sm">
-                        + Add Experience
-                    </button>
+                <div
+                    class="experience-list"
+                    *ngIf="experiences.length; else emptyExperiences"
+                >
+                    <div
+                        class="experience-card"
+                        *ngFor="let exp of experiences"
+                    >
+                        <h4>{{ exp.title }}</h4>
+                        <p class="experience-company">{{ exp.company }}</p>
+                        <p class="experience-date">
+                            {{ exp.startDate }} -
+                            {{ exp.current ? "Present" : exp.endDate || "" }}
+                        </p>
+                        <p
+                            class="experience-meta"
+                            *ngIf="exp.location || exp.employmentType"
+                        >
+                            <ng-container *ngIf="exp.location">{{
+                                exp.location
+                            }}</ng-container>
+                            <ng-container
+                                *ngIf="exp.location && exp.employmentType"
+                            >
+                                •
+                            </ng-container>
+                            <ng-container *ngIf="exp.employmentType">{{
+                                exp.employmentType
+                            }}</ng-container>
+                        </p>
+                        <p class="experience-desc" *ngIf="exp.description">
+                            {{ exp.description }}
+                        </p>
+                    </div>
                 </div>
+                <ng-template #emptyExperiences>
+                    <div class="empty-mini">
+                        <span style="font-size: 2rem">💼</span>
+                        <p>
+                            Add your work experience to strengthen your profile.
+                        </p>
+                    </div>
+                </ng-template>
+            </div>
+
+            <!-- Education -->
+            <div class="card">
+                <app-section-header
+                    title="Education"
+                    icon="🎓"
+                    actionLabel="Add"
+                ></app-section-header>
+                <div
+                    class="experience-list"
+                    *ngIf="educations.length; else emptyEducations"
+                >
+                    <div class="experience-card" *ngFor="let edu of educations">
+                        <h4>{{ edu.degree }}</h4>
+                        <p class="experience-company">{{ edu.school }}</p>
+                        <p class="experience-date">
+                            {{ edu.startDate }} -
+                            {{ edu.current ? "Present" : edu.endDate || "" }}
+                        </p>
+                        <p class="experience-meta" *ngIf="edu.fieldOfStudy">
+                            {{ edu.fieldOfStudy }}
+                        </p>
+                        <p class="experience-desc" *ngIf="edu.description">
+                            {{ edu.description }}
+                        </p>
+                    </div>
+                </div>
+                <ng-template #emptyEducations>
+                    <div class="empty-mini">
+                        <span style="font-size: 2rem">🎓</span>
+                        <p>
+                            Add your education history to complete your profile.
+                        </p>
+                    </div>
+                </ng-template>
             </div>
 
             <!-- Interview Preferences -->

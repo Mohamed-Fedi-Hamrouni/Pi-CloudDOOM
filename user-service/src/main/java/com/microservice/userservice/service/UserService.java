@@ -1,7 +1,10 @@
 package com.microservice.userservice.service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -12,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
 import com.microservice.userservice.dto.UserResponse;
@@ -35,6 +40,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserEventProducer eventProducer;
+    private final ObjectMapper objectMapper;
 
     // ── CREATE ────────────────────────────────────────────────────────────────
 
@@ -56,12 +62,13 @@ public class UserService {
         user.setKeycloakId(keycloakId);
         user.setRole(RoleEnum.USER);
         user.setStatus(UserStatus.PENDING_VERIFICATION);
+        user.setSkillsJson(serializeSkills(request.getSkills()));
 
         User saved = userRepository.save(user);
         eventProducer.publishUserCreated(saved);
 
         log.info("User created successfully with id: {}", saved.getId());
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -71,7 +78,7 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with id: {}", id);
         return userRepository.findById(id)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with id: " + id));
     }
@@ -81,7 +88,7 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with keycloakId: {}", keycloakId);
         return userRepository.findByKeycloakId(keycloakId)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with keycloakId: " + keycloakId));
     }
@@ -91,29 +98,29 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with email: {}", email);
         return userRepository.findByEmail(email)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with email: " + email));
     }
 
     public Page<UserResponse> findAll(Pageable pageable) {
         return userRepository.findByDeletedAtIsNull(pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     public Page<UserResponse> search(String query, Pageable pageable) {
         return userRepository.searchUsers(query, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     public Page<UserResponse> findByStatus(UserStatus status, Pageable pageable) {
         return userRepository.findByStatusAndDeletedAtIsNull(status, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     public Page<UserResponse> findByRole(RoleEnum role, Pageable pageable) {
         return userRepository.findByRoleAndDeletedAtIsNull(role, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -135,11 +142,14 @@ public class UserService {
                 "User not found with id: " + id));
 
         userMapper.updateEntity(request, user);
+        if (request.getSkills() != null) {
+            user.setSkillsJson(serializeSkills(request.getSkills()));
+        }
         User saved = userRepository.save(user);
         eventProducer.publishUserUpdated(saved);
 
         log.info("User updated successfully with id: {}", saved.getId());
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -160,7 +170,7 @@ public class UserService {
         User saved = userRepository.save(user);
         eventProducer.publishUserRoleChanged(saved);
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -186,7 +196,7 @@ public class UserService {
             eventProducer.publishUserVerified(saved);
         }
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -208,7 +218,7 @@ public class UserService {
         User saved = userRepository.save(user);
         eventProducer.publishUserVerified(saved);
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -267,7 +277,7 @@ public class UserService {
 
     public Page<UserResponse> findDeleted(Pageable pageable) {
     return userRepository.findByDeletedAtIsNotNull(pageable)
-        .map(userMapper::toResponse);
+        .map(this::toResponseWithSkills);
 }
 
 @Transactional
@@ -284,6 +294,48 @@ public UserResponse restoreUser(UUID id) {
     user.setStatus(UserStatus.ACTIVE);
     User saved = userRepository.save(user);
     log.info("User restored successfully with id: {}", saved.getId());
-    return userMapper.toResponse(saved);
+    return toResponseWithSkills(saved);
+}
+
+private UserResponse toResponseWithSkills(User user) {
+    UserResponse response = userMapper.toResponse(user);
+    response.setSkills(deserializeSkills(user.getSkillsJson()));
+    return response;
+}
+
+private String serializeSkills(List<String> skills) {
+    if (skills == null || skills.isEmpty()) {
+        return null;
+    }
+
+    List<String> normalizedSkills = skills.stream()
+        .filter(skill -> skill != null && !skill.isBlank())
+        .map(String::trim)
+        .distinct()
+        .collect(Collectors.toList());
+
+    if (normalizedSkills.isEmpty()) {
+        return null;
+    }
+
+    try {
+        return objectMapper.writeValueAsString(normalizedSkills);
+    } catch (IOException exception) {
+        log.warn("Failed to serialize skills", exception);
+        return null;
+    }
+}
+
+private List<String> deserializeSkills(String skillsJson) {
+    if (skillsJson == null || skillsJson.isBlank()) {
+        return List.of();
+    }
+
+    try {
+        return objectMapper.readValue(skillsJson, new TypeReference<List<String>>() {});
+    } catch (IOException exception) {
+        log.warn("Failed to deserialize skills for payload", exception);
+        return List.of();
+    }
 }
 }

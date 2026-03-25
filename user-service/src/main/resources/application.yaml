@@ -28,7 +28,7 @@ spring:
                 format_sql: true
 
     flyway:
-        enabled: false
+        enabled: ${SPRING_FLYWAY_ENABLED:true}
         locations: classpath:db/migration
         baseline-on-migrate: false
         clean-disabled: true
@@ -70,3 +70,6 @@ management:
 logging:
     level:
         org.springframework.security: INFO
+
+app:
+    uploads-dir: ${APP_UPLOADS_DIR:uploads}

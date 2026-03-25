@@ -5,6 +5,7 @@ import { environment } from "../../../environments/environment";
 @Injectable({ providedIn: "root" })
 export class AuthService {
     private keycloak: Keycloak;
+    private initialized = false;
 
     constructor() {
         this.keycloak = new Keycloak({
@@ -23,11 +24,19 @@ export class AuthService {
                 pkceMethod: "S256",
                 checkLoginIframe: false,
             });
+
+            this.initialized = true;
             return authenticated;
         } catch (error) {
             console.error("Keycloak init error:", error);
+
+            this.initialized = true;
             return false;
         }
+    }
+
+    isInitialized(): boolean {
+        return this.initialized;
     }
 
     login(): void {
