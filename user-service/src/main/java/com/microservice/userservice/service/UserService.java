@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,6 +42,7 @@ public class UserService {
     private final UserMapper userMapper;
     private final UserEventProducer eventProducer;
     private final ObjectMapper objectMapper;
+    private final CvStorageService cvStorageService;
 
     // ── CREATE ────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,31 @@ public class UserService {
         eventProducer.publishUserUpdated(saved);
 
         log.info("User updated successfully with id: {}", saved.getId());
+        return toResponseWithSkills(saved);
+    }
+
+    @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "users", allEntries = true),
+        @CacheEvict(value = "users-by-keycloak", allEntries = true),
+        @CacheEvict(value = "users-by-email", allEntries = true)
+    })
+    public UserResponse uploadCv(String keycloakId, MultipartFile file) {
+        log.info("Uploading CV for user with keycloakId: {}", keycloakId);
+
+        User user = userRepository.findByKeycloakId(keycloakId)
+            .filter(u -> u.getDeletedAt() == null)
+            .orElseThrow(() -> new UserNotFoundException(
+                "User not found with keycloakId: " + keycloakId));
+
+        String previousCvUrl = user.getCvUrl();
+        String currentCvUrl = cvStorageService.storeCv(file, user.getId());
+
+        user.setCvUrl(currentCvUrl);
+        User saved = userRepository.save(user);
+        cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
+        eventProducer.publishUserUpdated(saved);
+
         return toResponseWithSkills(saved);
     }
 

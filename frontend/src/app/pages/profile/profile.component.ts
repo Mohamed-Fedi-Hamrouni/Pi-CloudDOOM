@@ -54,6 +54,15 @@ interface AvatarUploadResponse {
     url: string;
 }
 
+type ActiveEditSection =
+    | "photo"
+    | "about"
+    | "skills"
+    | "experience"
+    | "education"
+    | "preferences"
+    | null;
+
 @Component({
     selector: "app-profile",
     standalone: true,
@@ -72,7 +81,11 @@ export class ProfileComponent implements OnInit {
     saving = false;
     saveError = "";
     saveSuccess = false;
-    cvUploaded = false;
+    localDraftNotice = "";
+    activeEditSection: ActiveEditSection = null;
+    cvUploadLoading = false;
+    cvUploadError = "";
+    selectedCvFileName = "";
     completionScore = 0;
     completionSections: CompletionSection[] = [];
     avatarInputMode: "upload" | "url" = "upload";
@@ -144,6 +157,9 @@ export class ProfileComponent implements OnInit {
                 this.selectedSkills = [...user.skills];
                 this.experiences = this.parseExperiences(user.experiencesJson);
                 this.educations = this.parseEducations(user.educationsJson);
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    user.cvUrl || null,
+                );
                 this.refreshCompletion();
                 this.syncPreferences();
                 this.cdr.detectChanges();
@@ -176,42 +192,60 @@ export class ProfileComponent implements OnInit {
             this.saveProfile();
             return;
         }
-        if (this.user) {
-            this.editForm = {
-                firstName: this.user.firstName || "",
-                lastName: this.user.lastName || "",
-                bio: this.user.bio || "",
-                avatarUrl: this.user.avatarUrl || "",
-                phoneNumber: this.user.phoneNumber || "",
-                city: this.user.city || "",
-                preferredIndustry: this.user.preferredIndustry || "",
-                preferredLanguage: this.user.preferredLanguage || "fr",
-                skills: [...this.selectedSkills],
-                emailNotificationsEnabled:
-                    this.user.emailNotificationsEnabled ?? true,
-                pushNotificationsEnabled:
-                    this.user.pushNotificationsEnabled ?? false,
-                profileVisible: this.user.profileVisible ?? true,
-            };
-            this.avatarPreviewUrl = this.user.avatarUrl || "";
-            this.avatarUploadError = "";
-            this.avatarUploadLoading = false;
-            this.selectedAvatarFile = null;
-            this.setAvatarInputMode(this.editForm.avatarUrl ? "url" : "upload");
-            this.selectedSkills = [...(this.user.skills || [])];
-            this.experiences = this.parseExperiences(this.user.experiencesJson);
-            this.educations = this.parseEducations(this.user.educationsJson);
-        }
-        this.showExperienceForm = false;
-        this.showEducationForm = false;
-        this.editingExperienceIndex = null;
-        this.editingEducationIndex = null;
-        this.experienceForm = this.createEmptyExperience();
-        this.educationForm = this.createEmptyEducation();
-        this.editing = true;
-        this.saveError = "";
-        this.saveSuccess = false;
-        this.refreshCompletion();
+        this.enterEditMode();
+        this.activeEditSection = null;
+    }
+
+    openPhotoEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "photo";
+        this.scrollToEditSection("photo");
+    }
+
+    openAboutEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "about";
+        this.scrollToEditSection("about");
+    }
+
+    openSkillsEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "skills";
+        this.scrollToEditSection("skills");
+    }
+
+    openExperienceEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "experience";
+        this.startAddExperience();
+        this.scrollToEditSection("experience");
+    }
+
+    openExperienceItemEditor(index: number): void {
+        this.enterEditMode();
+        this.activeEditSection = "experience";
+        this.startEditExperience(index);
+        this.scrollToEditSection("experience");
+    }
+
+    openEducationEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "education";
+        this.startAddEducation();
+        this.scrollToEditSection("education");
+    }
+
+    openEducationItemEditor(index: number): void {
+        this.enterEditMode();
+        this.activeEditSection = "education";
+        this.startEditEducation(index);
+        this.scrollToEditSection("education");
+    }
+
+    openPreferencesEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "preferences";
+        this.scrollToEditSection("preferences");
     }
 
     saveProfile(): void {
@@ -257,8 +291,13 @@ export class ProfileComponent implements OnInit {
                     updated.experiencesJson,
                 );
                 this.educations = this.parseEducations(updated.educationsJson);
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    updated.cvUrl || null,
+                );
                 this.refreshCompletion();
                 this.editing = false;
+                this.localDraftNotice = "";
+                this.activeEditSection = null;
                 this.showExperienceForm = false;
                 this.showEducationForm = false;
                 this.saving = false;
@@ -280,6 +319,8 @@ export class ProfileComponent implements OnInit {
 
     cancelEdit(): void {
         this.editing = false;
+        this.localDraftNotice = "";
+        this.activeEditSection = null;
         this.saveError = "";
         this.showExperienceForm = false;
         this.showEducationForm = false;
@@ -401,17 +442,48 @@ export class ProfileComponent implements OnInit {
         this.refreshCompletion();
     }
 
-    triggerCvUpload(): void {
-        this.cvUploaded = !this.cvUploaded;
+    onCvFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        this.cvUploadError = "";
+
+        if (file.type !== "application/pdf") {
+            this.cvUploadError = "Only PDF files are allowed.";
+            input.value = "";
+            return;
+        }
+
+        const maxSizeBytes = 5 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            this.cvUploadError = "CV size must be 5MB or less.";
+            input.value = "";
+            return;
+        }
+
+        this.uploadCv(file);
+        input.value = "";
     }
 
     startAddExperience(): void {
+        this.activeEditSection = "experience";
+        this.localDraftNotice = "";
+        this.showEducationForm = false;
+        this.editingEducationIndex = null;
         this.editingExperienceIndex = null;
         this.experienceForm = this.createEmptyExperience();
         this.showExperienceForm = true;
     }
 
     startEditExperience(index: number): void {
+        this.activeEditSection = "experience";
+        this.localDraftNotice = "";
+        this.showEducationForm = false;
+        this.editingEducationIndex = null;
         this.editingExperienceIndex = index;
         this.experienceForm = { ...this.experiences[index] };
         this.showExperienceForm = true;
@@ -440,6 +512,8 @@ export class ProfileComponent implements OnInit {
         this.editingExperienceIndex = null;
         this.experienceForm = this.createEmptyExperience();
         this.showExperienceForm = false;
+        this.localDraftNotice =
+            "Experience saved locally. Click Save Changes to persist.";
         this.refreshCompletion();
     }
 
@@ -458,12 +532,20 @@ export class ProfileComponent implements OnInit {
     }
 
     startAddEducation(): void {
+        this.activeEditSection = "education";
+        this.localDraftNotice = "";
+        this.showExperienceForm = false;
+        this.editingExperienceIndex = null;
         this.editingEducationIndex = null;
         this.educationForm = this.createEmptyEducation();
         this.showEducationForm = true;
     }
 
     startEditEducation(index: number): void {
+        this.activeEditSection = "education";
+        this.localDraftNotice = "";
+        this.showExperienceForm = false;
+        this.editingExperienceIndex = null;
         this.editingEducationIndex = index;
         this.educationForm = { ...this.educations[index] };
         this.showEducationForm = true;
@@ -492,6 +574,8 @@ export class ProfileComponent implements OnInit {
         this.editingEducationIndex = null;
         this.educationForm = this.createEmptyEducation();
         this.showEducationForm = false;
+        this.localDraftNotice =
+            "Education saved locally. Click Save Changes to persist.";
         this.refreshCompletion();
     }
 
@@ -555,6 +639,7 @@ export class ProfileComponent implements OnInit {
         const currentAvatarUrl = this.editing
             ? this.editForm.avatarUrl
             : this.user.avatarUrl;
+        const currentCvUrl = this.user.cvUrl;
 
         const coreItems: CompletionItem[] = [
             this.buildItem(
@@ -594,6 +679,7 @@ export class ProfileComponent implements OnInit {
                 15,
                 this.selectedSkills.length > 0,
             ),
+            this.buildItem("cv", "CV uploaded", 10, this.hasText(currentCvUrl)),
         ];
 
         const professionalItems: CompletionItem[] = [
@@ -626,10 +712,18 @@ export class ProfileComponent implements OnInit {
             this.buildSection("Trust & Identity", trustItems),
         ];
 
-        this.completionScore = this.completionSections.reduce(
+        const earnedPoints = this.completionSections.reduce(
             (total, section) => total + section.earnedPoints,
             0,
         );
+        const totalPoints = this.completionSections.reduce(
+            (total, section) => total + section.totalPoints,
+            0,
+        );
+
+        this.completionScore = totalPoints
+            ? Math.round((earnedPoints / totalPoints) * 100)
+            : 0;
     }
 
     private buildItem(
@@ -717,6 +811,131 @@ export class ProfileComponent implements OnInit {
             URL.revokeObjectURL(this.avatarObjectUrl);
             this.avatarObjectUrl = null;
         }
+    }
+
+    private enterEditMode(): void {
+        if (this.editing) {
+            return;
+        }
+
+        if (this.user) {
+            this.editForm = {
+                firstName: this.user.firstName || "",
+                lastName: this.user.lastName || "",
+                bio: this.user.bio || "",
+                avatarUrl: this.user.avatarUrl || "",
+                phoneNumber: this.user.phoneNumber || "",
+                city: this.user.city || "",
+                preferredIndustry: this.user.preferredIndustry || "",
+                preferredLanguage: this.user.preferredLanguage || "fr",
+                skills: [...(this.user.skills || [])],
+                emailNotificationsEnabled:
+                    this.user.emailNotificationsEnabled ?? true,
+                pushNotificationsEnabled:
+                    this.user.pushNotificationsEnabled ?? false,
+                profileVisible: this.user.profileVisible ?? true,
+            };
+            this.avatarPreviewUrl = this.user.avatarUrl || "";
+            this.avatarUploadError = "";
+            this.avatarUploadLoading = false;
+            this.selectedAvatarFile = null;
+            this.setAvatarInputMode(this.editForm.avatarUrl ? "url" : "upload");
+            this.selectedSkills = [...(this.user.skills || [])];
+            this.experiences = this.parseExperiences(this.user.experiencesJson);
+            this.educations = this.parseEducations(this.user.educationsJson);
+        }
+
+        this.showExperienceForm = false;
+        this.showEducationForm = false;
+        this.editingExperienceIndex = null;
+        this.editingEducationIndex = null;
+        this.localDraftNotice = "";
+        this.experienceForm = this.createEmptyExperience();
+        this.educationForm = this.createEmptyEducation();
+        this.editing = true;
+        this.saveError = "";
+        this.saveSuccess = false;
+        this.refreshCompletion();
+    }
+
+    private scrollToEditSection(
+        section: Exclude<ActiveEditSection, null>,
+    ): void {
+        const targetIdBySection: Record<
+            Exclude<ActiveEditSection, null>,
+            string
+        > = {
+            photo: "photo-edit-section",
+            about: "about-edit-section",
+            skills: "skills-edit-section",
+            experience: "experience-edit-section",
+            education: "education-edit-section",
+            preferences: "preferences-edit-section",
+        };
+
+        const targetId = targetIdBySection[section];
+        setTimeout(() => {
+            const element = document.getElementById(targetId);
+            element?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 0);
+    }
+
+    private uploadCv(file: File): void {
+        this.cvUploadLoading = true;
+        this.cvUploadError = "";
+
+        this.userApi.uploadCv(file).subscribe({
+            next: (updated) => {
+                updated.skills = updated.skills || [];
+                this.user = updated;
+                this.currentUserStore.setCurrentUser(updated);
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    updated.cvUrl || null,
+                );
+                this.cvUploadLoading = false;
+                this.cvUploadError = "";
+                this.refreshCompletion();
+                this.cdr.detectChanges();
+            },
+            error: (err) => {
+                this.cvUploadLoading = false;
+                this.cvUploadError =
+                    err?.error?.message ||
+                    "CV upload failed. Please try again.";
+                this.cdr.detectChanges();
+            },
+        });
+    }
+
+    getCvFileName(): string {
+        if (this.selectedCvFileName) {
+            return this.selectedCvFileName;
+        }
+
+        return this.extractFileNameFromUrl(this.user?.cvUrl || null);
+    }
+
+    getCvLink(): string {
+        const cvUrl = this.user?.cvUrl;
+        if (!cvUrl) {
+            return "";
+        }
+
+        if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
+            return cvUrl;
+        }
+
+        return `${environment.apiUrl}${cvUrl}`;
+    }
+
+    private extractFileNameFromUrl(cvUrl: string | null): string {
+        if (!cvUrl) {
+            return "";
+        }
+
+        const sanitized = cvUrl.split("?")[0];
+        const segments = sanitized.split("/").filter(Boolean);
+        return segments.length ? segments[segments.length - 1] : "";
     }
 
     private createEmptyExperience(): ExperienceItem {

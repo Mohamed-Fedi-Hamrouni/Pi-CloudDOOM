@@ -23,6 +23,7 @@ public class UserResponse {
     private String city;
     private String bio;
     private String avatarUrl;
+    private String cvUrl;
     private Integer karmaPoints;
     private Boolean isVerified;
     private UserStatus status;

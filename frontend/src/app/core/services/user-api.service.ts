@@ -15,6 +15,7 @@ export interface UserProfile {
     karmaPoints: number;
     bio: string;
     avatarUrl: string;
+    cvUrl?: string | null;
     city: string;
     phoneNumber?: string;
     preferredIndustry: string;
@@ -49,5 +50,14 @@ export class UserApiService {
 
     getUserById(id: string): Observable<UserProfile> {
         return this.http.get<UserProfile>(`${this.apiUrl}/api/users/${id}`);
+    }
+
+    uploadCv(file: File): Observable<UserProfile> {
+        const formData = new FormData();
+        formData.append("file", file);
+        return this.http.post<UserProfile>(
+            `${this.apiUrl}/api/users/me/cv`,
+            formData,
+        );
     }
 }

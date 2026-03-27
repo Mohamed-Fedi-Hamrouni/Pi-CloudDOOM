@@ -81,6 +81,13 @@ public class UserController {
         return ResponseEntity.ok(java.util.Map.of("url", publicUrl));
     }
 
+    @PostMapping("/me/cv")
+    public ResponseEntity<UserResponse> uploadCv(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.uploadCv(jwt.getSubject(), file));
+    }
+
     // ── ADMIN ENDPOINTS ───────────────────────────────────────────────────────
 
     @GetMapping

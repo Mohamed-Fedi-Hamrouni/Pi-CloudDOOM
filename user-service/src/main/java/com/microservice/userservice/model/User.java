@@ -62,6 +62,8 @@ public class User {
 
     private String avatarUrl;
 
+    private String cvUrl;
+
     @Column(nullable = false)
     @Builder.Default
     private Integer karmaPoints = 0;
