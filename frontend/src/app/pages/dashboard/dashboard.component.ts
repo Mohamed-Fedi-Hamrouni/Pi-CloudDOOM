@@ -50,14 +50,14 @@ export class DashboardComponent implements OnInit {
   }
 
   recommendations = [
-    { icon: '⭐', title: 'STAR Method Advanced Practice', progress: 75, xp: 250 },
-    { icon: '💻', title: 'Technical Communication Skills', progress: 40, xp: 200 },
-    { icon: '🎤', title: 'Confidence & Delivery Mastery', progress: 60, xp: 150 },
+    { icon: '<i class="bi bi-star-fill"></i>', title: 'STAR Method Advanced Practice', progress: 75, xp: 250 },
+    { icon: '<i class="bi bi-laptop"></i>', title: 'Technical Communication Skills', progress: 40, xp: 200 },
+    { icon: '<i class="bi bi-mic-fill"></i>', title: 'Confidence & Delivery Mastery', progress: 60, xp: 150 },
   ];
 
   savedResources = [
-    { icon: '📄', title: 'The Ultimate STAR Method Guide', duration: '8 min', category: 'Behavioral' },
-    { icon: '📋', title: 'CV Template — Tech Roles 2025', duration: 'Download', category: 'Job Search' },
-    { icon: '🎬', title: 'Negotiation & Offer Letters', duration: '28 min', category: 'Career' },
+    { icon: '<i class="bi bi-file-text-fill"></i>', title: 'The Ultimate STAR Method Guide', duration: '8 min', category: 'Behavioral' },
+    { icon: '<i class="bi bi-clipboard-fill"></i>', title: 'CV Template — Tech Roles 2025', duration: 'Download', category: 'Job Search' },
+    { icon: '<i class="bi bi-play-circle-fill"></i>', title: 'Negotiation & Offer Letters', duration: '28 min', category: 'Career' },
   ];
 }

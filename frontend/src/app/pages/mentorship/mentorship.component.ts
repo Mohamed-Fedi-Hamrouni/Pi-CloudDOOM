@@ -18,15 +18,15 @@ import { Mentor } from '../../core/models/models';
           <p>Book 1:1 sessions with verified industry professionals. Get the insider guidance you need.</p>
         </div>
         <div class="mentor-page-stats">
-          <span class="chip chip-teal">🤝 {{ mentors.length }}+ Mentors</span>
-          <span class="chip chip-mint">⭐ 4.8 Avg Rating</span>
+          <span class="chip chip-teal"><i class="bi bi-people-fill"></i> {{ mentors.length }}+ Mentors</span>
+          <span class="chip chip-mint"><i class="bi bi-star-fill"></i> 4.8 Avg Rating</span>
         </div>
       </div>
 
       <!-- Your upcoming session -->
       <div class="card upcoming-session">
         <div class="us-header">
-          <span class="chip chip-teal">📅 Upcoming Session</span>
+          <span class="chip chip-teal"><i class="bi bi-calendar-fill"></i> Upcoming Session</span>
         </div>
         <div class="us-body">
           <div class="avatar-placeholder" style="width:52px;height:52px;font-size:1rem;">PK</div>
@@ -34,8 +34,8 @@ import { Mentor } from '../../core/models/models';
             <div class="us-mentor-name">Dr. Priya Kapoor</div>
             <div class="us-mentor-role">Senior EM &#64; Google · Behavioral & System Design</div>
             <div class="us-meta">
-              <span>📅 Tomorrow, 10:00 AM GMT</span>
-              <span>⏱️ 60 min session</span>
+              <span><i class="bi bi-calendar-fill"></i> Tomorrow, 10:00 AM GMT</span>
+              <span><i class="bi bi-stopwatch-fill"></i> 60 min session</span>
               <span class="chip chip-cyan">Video Call</span>
             </div>
           </div>
@@ -49,7 +49,7 @@ import { Mentor } from '../../core/models/models';
       <!-- Filters + Search -->
       <div class="mentors-controls">
         <div class="input-icon-wrap" style="flex:1;max-width:380px;">
-          <span class="icon">🔍</span>
+          <span class="icon"><i class="bi bi-search"></i></span>
           <input class="input" placeholder="Search by name, expertise, company...">
         </div>
         <div class="mentor-filters">
@@ -74,10 +74,10 @@ import { Mentor } from '../../core/models/models';
 
       <!-- How it works -->
       <div class="card how-mentorship-works">
-        <app-section-header title="How Mentorship Works" icon="💡"></app-section-header>
+        <app-section-header title="How Mentorship Works" icon='<i class="bi bi-lightbulb-fill"></i>'></app-section-header>
         <div class="hmw-steps">
           <div class="hmw-step" *ngFor="let step of howItWorks">
-            <div class="hmw-icon">{{ step.icon }}</div>
+            <div class="hmw-icon" [innerHTML]="step.icon"></div>
             <div class="hmw-title">{{ step.title }}</div>
             <div class="hmw-desc">{{ step.desc }}</div>
           </div>
@@ -130,9 +130,9 @@ export class MentorshipComponent {
   setFilter(f: string) { this.activeFilter.set(f); }
 
   howItWorks = [
-    { icon: '🔍', title: 'Browse Mentors', desc: 'Filter by expertise, company, rating and availability.' },
-    { icon: '📅', title: 'Book a Session', desc: 'Choose a time slot that works for you and your mentor.' },
-    { icon: '🎙️', title: 'Meet & Practice', desc: 'Join a live 1:1 video session with your mentor.' },
-    { icon: '📊', title: 'Get Feedback', desc: 'Receive personalized feedback and an action plan.' },
+    { icon: '<i class="bi bi-search"></i>', title: 'Browse Mentors', desc: 'Filter by expertise, company, rating and availability.' },
+    { icon: '<i class="bi bi-calendar-fill"></i>', title: 'Book a Session', desc: 'Choose a time slot that works for you and your mentor.' },
+    { icon: '<i class="bi bi-mic-fill"></i>', title: 'Meet & Practice', desc: 'Join a live 1:1 video session with your mentor.' },
+    { icon: '<i class="bi bi-bar-chart-fill"></i>', title: 'Get Feedback', desc: 'Receive personalized feedback and an action plan.' },
   ];
 }

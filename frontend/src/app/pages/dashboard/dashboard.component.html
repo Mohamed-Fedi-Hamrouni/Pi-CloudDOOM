@@ -1,8 +1,8 @@
 <div class="dashboard animate-fade">
 
   <div *ngIf="isAdmin" class="tab-bar">
-    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">📊 Overview</button>
-    <button class="tab-btn" [class.active]="activeTab === 'admin'" (click)="activeTab = 'admin'">⚙️ Admin Panel</button>
+    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'"><i class="bi bi-bar-chart-fill"></i> Overview</button>
+    <button class="tab-btn" [class.active]="activeTab === 'admin'" (click)="activeTab = 'admin'"><i class="bi bi-gear-fill"></i> Admin Panel</button>
   </div>
 
   <div *ngIf="isAdmin && activeTab === 'admin'">
@@ -15,9 +15,9 @@
     <div class="welcome-banner">
       <div class="welcome-left">
         <h1 class="welcome-title">Welcome back, {{ currentUser ? (currentUser.firstName + ' ' + currentUser.lastName) : (authService.getFullName() || 'there') }}! 👋</h1>
-        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! 🚀</p>
+        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! <i class="bi bi-rocket-fill"></i></p>
         <div class="welcome-ctas">
-          <a routerLink="/interviews" class="btn btn-primary">Start Mock Session →</a>
+          <a routerLink="/interviews" class="btn btn-primary">Start Mock Session <i class="bi bi-arrow-right"></i></a>
           <a routerLink="/reports" class="btn btn-secondary">View My Reports</a>
         </div>
       </div>
@@ -42,12 +42,12 @@
         </div>
         <div class="welcome-badges">
           <div class="wb-item">
-            <span class="wb-val">🔥 0</span>
+            <span class="wb-val"><i class="bi bi-fire"></i> 0</span>
             <span class="wb-label">Day Streak</span>
           </div>
           <div class="wb-divider"></div>
           <div class="wb-item">
-            <span class="wb-val">⚡ {{ currentUser?.karmaPoints || 0 }}</span>
+            <span class="wb-val"><i class="bi bi-lightning-fill"></i> {{ currentUser?.karmaPoints || 0 }}</span>
             <span class="wb-label">Karma Points</span>
           </div>
         </div>
@@ -56,10 +56,10 @@
 
     <!-- Stats Row -->
     <div class="stats-row">
-      <app-stat-card icon="🎙️" value="{{ dashboard.totalSessions }}" label="Mock Sessions Done" color="teal" change="4 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📝" value="{{ dashboard.totalQuizzes }}" label="Quizzes Completed" color="cyan" change="2 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📊" value="{{ dashboard.recentScore }}%" label="Latest Score" color="mint" change="vs 71% last time" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📚" value="{{ dashboard.hoursStudied }}h" label="Total Study Time" color="sky"></app-stat-card>
+      <app-stat-card icon='<i class="bi bi-mic-fill"></i>' value="{{ dashboard.totalSessions }}" label="Mock Sessions Done" color="teal" change="4 this week" [changePositive]="true"></app-stat-card>
+      <app-stat-card icon='<i class="bi bi-pencil-square"></i>' value="{{ dashboard.totalQuizzes }}" label="Quizzes Completed" color="cyan" change="2 this week" [changePositive]="true"></app-stat-card>
+      <app-stat-card icon='<i class="bi bi-bar-chart-fill"></i>' value="{{ dashboard.recentScore }}%" label="Latest Score" color="mint" change="vs 71% last time" [changePositive]="true"></app-stat-card>
+      <app-stat-card icon='<i class="bi bi-book-fill"></i>' value="{{ dashboard.hoursStudied }}h" label="Total Study Time" color="sky"></app-stat-card>
     </div>
 
     <!-- Main Grid -->
@@ -73,13 +73,13 @@
             <span class="chip chip-teal">Upcoming</span>
             <h3 class="ns-title">{{ dashboard.nextSession.title }}</h3>
             <div class="ns-meta">
-              <span>🗓️ {{ dashboard.nextSession.date }}</span>
-              <span>⏱️ {{ dashboard.nextSession.duration }}</span>
+              <span><i class="bi bi-calendar3"></i> {{ dashboard.nextSession.date }}</span>
+              <span><i class="bi bi-stopwatch-fill"></i> {{ dashboard.nextSession.duration }}</span>
               <span class="chip chip-neutral">{{ dashboard.nextSession.type }}</span>
             </div>
           </div>
           <div class="ns-right">
-            <a routerLink="/interviews" class="btn btn-primary">Join Session →</a>
+            <a routerLink="/interviews" class="btn btn-primary">Join Session <i class="bi bi-arrow-right"></i></a>
             <button class="btn btn-ghost btn-sm">Reschedule</button>
           </div>
         </div>
@@ -96,20 +96,20 @@
             <div class="progress-fill" [style.width]="user.profileCompletion + '%'"></div>
           </div>
           <div class="pc-todos">
-            <div class="pc-todo done">✓ Add target roles</div>
-            <div class="pc-todo done">✓ Complete first mock session</div>
-            <div class="pc-todo">+ Upload your CV</div>
-            <div class="pc-todo">+ Book a mentor session</div>
+            <div class="pc-todo done"><i class="bi bi-check-lg"></i> Add target roles</div>
+            <div class="pc-todo done"><i class="bi bi-check-lg"></i> Complete first mock session</div>
+            <div class="pc-todo"><i class="bi bi-plus"></i> Upload your CV</div>
+            <div class="pc-todo"><i class="bi bi-plus"></i> Book a mentor session</div>
           </div>
         </div>
 
         <app-chart-placeholder title="Session Score Trend" badge="Last 7 sessions" type="line" height="240px"></app-chart-placeholder>
 
         <div class="card training-recs">
-          <app-section-header title="Recommended Training" icon="🚀" actionLabel="View All"></app-section-header>
+          <app-section-header title="Recommended Training" icon='<i class="bi bi-rocket-fill"></i>' actionLabel="View All"></app-section-header>
           <div class="recs-list">
             <div class="rec-item" *ngFor="let rec of recommendations">
-              <div class="rec-icon">{{ rec.icon }}</div>
+              <div class="rec-icon" [innerHTML]="rec.icon"></div>
               <div class="rec-body">
                 <div class="rec-title">{{ rec.title }}</div>
                 <div class="progress-bar" style="height:4px;margin-top:6px;">
@@ -127,26 +127,26 @@
       <div class="dash-col dash-col-side">
 
         <div class="card">
-          <app-section-header title="Recent Activity" icon="🕐" actionLabel="View All"></app-section-header>
+          <app-section-header title="Recent Activity" icon='<i class="bi bi-clock-fill"></i>' actionLabel="View All"></app-section-header>
           <app-activity-item *ngFor="let act of dashboard.recentActivity" [icon]="act.icon" [text]="act.text" [time]="act.time"></app-activity-item>
         </div>
 
         <div class="card">
-          <app-section-header title="Your Badges" icon="🏅" actionLabel="View All"></app-section-header>
+          <app-section-header title="Your Badges" icon='<i class="bi bi-award-fill"></i>' actionLabel="View All"></app-section-header>
           <div class="badges-mini-grid">
             <app-badge-card *ngFor="let badge of earnedBadges.slice(0,4)" [badge]="badge"></app-badge-card>
           </div>
         </div>
 
         <div class="card mentor-suggest">
-          <app-section-header title="Suggested Mentor" icon="🤝" actionLabel="Browse All"></app-section-header>
+          <app-section-header title="Suggested Mentor" icon='<i class="bi bi-people-fill"></i>' actionLabel="Browse All"></app-section-header>
           <div class="ms-card">
             <div class="ms-header">
               <div class="avatar-placeholder" style="width:48px;height:48px;font-size:0.9rem;">PK</div>
               <div>
                 <div class="ms-name">Dr. Priya Kapoor</div>
                 <div class="ms-role">Senior EM @ Google</div>
-                <div class="stars" style="margin-top:2px;">★★★★★ <small style="font-size:0.65rem;color:var(--color-text-muted);">4.9 (148)</small></div>
+                <div class="stars" style="margin-top:2px;"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i> <small style="font-size:0.65rem;color:var(--color-text-muted);">4.9 (148)</small></div>
               </div>
             </div>
             <p class="ms-bio">Expert in FAANG behavioral and system design interviews. Next available tomorrow.</p>
@@ -155,10 +155,10 @@
         </div>
 
         <div class="card">
-          <app-section-header title="Saved Resources" icon="📚" actionLabel="Library"></app-section-header>
+          <app-section-header title="Saved Resources" icon='<i class="bi bi-book-fill"></i>' actionLabel="Library"></app-section-header>
           <div class="saved-resources">
             <div class="sr-item" *ngFor="let r of savedResources">
-              <span class="sr-type">{{ r.icon }}</span>
+              <span class="sr-type" [innerHTML]="r.icon"></span>
               <div class="sr-body">
                 <div class="sr-title">{{ r.title }}</div>
                 <div class="sr-meta">{{ r.duration }} · {{ r.category }}</div>

@@ -7,12 +7,12 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div class="stat-card" [class]="'stat-card--' + color">
-      <div class="stat-icon">{{ icon }}</div>
+      <div class="stat-icon" [innerHTML]="icon"></div>
       <div class="stat-body">
         <div class="stat-value">{{ value }}</div>
         <div class="stat-label">{{ label }}</div>
         <div class="stat-change" *ngIf="change" [class.positive]="changePositive" [class.negative]="!changePositive">
-          {{ changePositive ? '↑' : '↓' }} {{ change }}
+          <i class="bi" [class.bi-arrow-up]="changePositive" [class.bi-arrow-down]="!changePositive"></i> {{ change }}
         </div>
       </div>
     </div>
@@ -84,7 +84,7 @@ import { CommonModule } from '@angular/common';
   `]
 })
 export class StatCardComponent {
-  @Input() icon = '📊';
+  @Input() icon = '<i class="bi bi-bar-chart-fill"></i>';
   @Input() value = '0';
   @Input() label = 'Stat';
   @Input() color: 'teal' | 'cyan' | 'mint' | 'peach' | 'purple' | 'sand' | 'sky' = 'teal';

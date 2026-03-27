@@ -1,4 +1,4 @@
-# interV Frontend — Angular 21
+# InterviewPrepTN Frontend — Angular 21
 
 ## Overview
 Angular 21 frontend for the InterviewPrep TN platform, integrated with Keycloak for authentication and the User Microservice API.
@@ -91,7 +91,7 @@ src/
 ```
 User clicks Login/Register
         ↓
-Redirected to Keycloak (custom interV theme)
+Redirected to Keycloak (custom InterviewPrepTN theme)
         ↓
 User logs in / registers
         ↓
@@ -177,8 +177,8 @@ To make a user admin:
 ---
 
 ## Keycloak Theme
-Custom interV theme located at `/infra/keycloak/themes/interv/`.
-- Light mode, matches interV design system
+Custom InterviewPrepTN theme located at `/infra/keycloak/themes/interv/`.
+- Light mode, matches InterviewPrepTN design system
 - Custom login and register pages
 - Deployed to Keycloak container automatically on docker compose up
 

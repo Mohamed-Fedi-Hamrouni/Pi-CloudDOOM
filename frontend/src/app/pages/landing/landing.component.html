@@ -20,7 +20,7 @@
                     Start Free →
                 </button>
             </div>
-            <button class="nav-menu-btn">☰</button>
+            <button class="nav-menu-btn"><i class="bi bi-list"></i></button>
         </div>
     </nav>
 
@@ -40,7 +40,7 @@
                 Land your dream role.
             </h1>
             <p class="hero-sub">
-                interV is the all-in-one platform that helps students and
+                InterviewPrepTN is the all-in-one platform that helps students and
                 graduates build interview confidence through AI mock sessions,
                 expert mentorship, gamified training, and a supportive career
                 community.
@@ -48,11 +48,11 @@
             <div class="hero-ctas">
                 <button (click)="register()" class="btn btn-primary btn-lg">
                     Start Preparing Free
-                    <span>→</span>
+                    <i class="bi bi-arrow-right"></i>
                 </button>
                 <button (click)="login()" class="btn btn-secondary btn-lg">
                     Log in
-                    <span>→</span>
+                    <i class="bi bi-arrow-right"></i>
                 </button>
             </div>
             <div class="hero-social-proof">
@@ -140,7 +140,7 @@
                     <div class="preview-answer-area">
                         <div class="pa-header">
                             <span>Your Answer</span>
-                            <span class="pa-timer">⏱ 1:42</span>
+                            <span class="pa-timer"><i class="bi bi-stopwatch-fill"></i> 1:42</span>
                         </div>
                         <div class="pa-lines">
                             <div class="pa-line long"></div>
@@ -176,7 +176,7 @@
 
             <!-- Floating cards -->
             <div class="float-card float-badge">
-                <span>🏅</span>
+                <i class="bi bi-award-fill"></i>
                 <div>
                     <div class="fc-title">Badge Earned!</div>
                     <div class="fc-sub">Consistent Learner · +200 XP</div>
@@ -187,7 +187,7 @@
                 <div class="fs-label">Readiness<br />Score</div>
             </div>
             <div class="float-card float-streak">
-                <span>🔥</span>
+                <i class="bi bi-fire"></i>
                 <span><strong>7</strong> day streak</span>
             </div>
         </div>
@@ -220,7 +220,7 @@
                     *ngFor="let m of modules"
                     [class]="'module-card--' + m.color"
                 >
-                    <div class="module-icon">{{ m.icon }}</div>
+                    <div class="module-icon" [innerHTML]="m.icon"></div>
                     <h3 class="module-title">{{ m.title }}</h3>
                     <p class="module-desc">{{ m.desc }}</p>
                     <a routerLink="/dashboard" class="module-link">Explore →</a>
@@ -261,27 +261,27 @@
                 <div class="hiw-right">
                     <div class="journey-visual">
                         <div class="journey-node completed">
-                            <div class="jn-icon">✓</div>
+                            <div class="jn-icon"><i class="bi bi-check-lg"></i></div>
                             <div class="jn-label">Profile Setup</div>
                         </div>
                         <div class="journey-line completed"></div>
                         <div class="journey-node completed">
-                            <div class="jn-icon">✓</div>
+                            <div class="jn-icon"><i class="bi bi-check-lg"></i></div>
                             <div class="jn-label">First Mock Session</div>
                         </div>
                         <div class="journey-line active"></div>
                         <div class="journey-node active">
-                            <div class="jn-icon">⚡</div>
+                            <div class="jn-icon"><i class="bi bi-lightning-fill"></i></div>
                             <div class="jn-label">Training Path</div>
                         </div>
                         <div class="journey-line"></div>
                         <div class="journey-node">
-                            <div class="jn-icon">🎯</div>
+                            <div class="jn-icon"><i class="bi bi-bullseye"></i></div>
                             <div class="jn-label">Mentor Session</div>
                         </div>
                         <div class="journey-line"></div>
                         <div class="journey-node">
-                            <div class="jn-icon">🏆</div>
+                            <div class="jn-icon"><i class="bi bi-trophy-fill"></i></div>
                             <div class="jn-label">Offer Received</div>
                         </div>
                     </div>
@@ -296,7 +296,7 @@
             <div class="section-tag">Success stories</div>
             <h2 class="section-heading">Real candidates. Real results.</h2>
             <p class="section-body">
-                Thousands of students and graduates have used interV to land
+                Thousands of students and graduates have used InterviewPrepTN to land
                 roles at top companies worldwide.
             </p>
             <div class="testimonials-grid">
@@ -503,7 +503,7 @@
                     Your next interview<br />starts here.
                 </h2>
                 <p class="cta-sub">
-                    Join 50,000+ candidates preparing smarter with interV. Free
+                    Join 50,000+ candidates preparing smarter with InterviewPrepTN. Free
                     forever to get started.
                 </p>
                 <div class="cta-buttons">
@@ -534,7 +534,7 @@
                 <div class="footer-brand">
                     <div class="footer-logo">
                         <div class="nav-logo-icon">i</div>
-                        <span>inter<strong>V</strong></span>
+                        <span>InterviewPrepTN</span>
                     </div>
                     <p class="footer-brand-desc">
                         The AI-powered interview preparation platform for
@@ -561,7 +561,7 @@
                     </div>
                     <div class="footer-col">
                         <div class="footer-col-title">Company</div>
-                        <a href="#">About interV</a>
+                        <a href="#">About InterviewPrepTN</a>
                         <a href="#">Blog</a>
                         <a href="#">Careers</a>
                         <a href="#">Press</a>
@@ -575,7 +575,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <span>© 2025 interV. All rights reserved.</span>
+                <span>© 2025 InterviewPrepTN. All rights reserved.</span>
                 <span>Made with 💙 for job seekers everywhere</span>
             </div>
         </div>

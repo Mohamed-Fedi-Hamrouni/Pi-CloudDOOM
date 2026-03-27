@@ -1,12 +1,36 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
-import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock-data';
+import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { finalize, forkJoin } from 'rxjs';
+import { TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock-data';
+import {
+  CommunityApiService,
+  CommunityComment,
+  CommunityFollow,
+  CommunityPageResponse,
+  CommunityPost,
+  CreatePostBody,
+  KarmaResponse,
+  UserProfileResponse,
+} from '../../core/services/community-api.service';
+import { AuthService } from '../../core/auth/auth.service';
+
+interface CommunitySuggestion {
+  name: string;
+  initials: string;
+  title: string;
+  keycloakId: string;
+  following: boolean;
+  loading: boolean;
+}
 
 @Component({
   selector: 'app-community',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="community-page animate-fade">
       <div class="page-header">
@@ -14,7 +38,19 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
           <h1>Community</h1>
           <p>Connect, share, and grow together with thousands of job seekers.</p>
         </div>
-        <button class="btn btn-primary">+ Create Post</button>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" type="button" (click)="findPracticePartner()">
+            🤝 Find Practice Partner
+          </button>
+          <button class="btn btn-primary" (click)="toggleCreateForm()">
+            {{ showCreateForm ? 'Close Form' : '+ Create Post' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card error-card" *ngIf="errorMessage">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <span>{{ errorMessage }}</span>
       </div>
 
       <div class="community-layout">
@@ -23,78 +59,367 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
         <div class="feed-column">
 
           <!-- Create post panel -->
-          <div class="card create-post-card">
+          <div class="card create-post-card" *ngIf="showCreateForm">
             <div class="cp-input-row">
-              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">AO</div>
-              <input class="input cp-input" placeholder="Share something with the community...">
+              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ currentUserInitials }}</div>
+              <div class="cp-form-intro">
+                <div class="post-author-name">Create a community post</div>
+                <div class="post-author-role">Share a tip, question, discussion, or success story.</div>
+              </div>
             </div>
+
+            <div class="create-form-grid">
+              <input
+                class="input"
+                type="text"
+                name="title"
+                [(ngModel)]="createPostForm.title"
+                placeholder="Post title"
+              />
+
+              <select
+                class="input"
+                name="type"
+                [(ngModel)]="createPostForm.type"
+              >
+                <option *ngFor="let option of typeOptions" [value]="option.value">{{ option.label }}</option>
+              </select>
+
+              <select
+                class="input"
+                name="industry"
+                [(ngModel)]="createPostForm.industry"
+              >
+                <option value="">Select industry</option>
+                <option *ngFor="let option of industryOptions" [value]="option.value">{{ option.label }}</option>
+              </select>
+
+              <input
+                class="input"
+                type="text"
+                name="tags"
+                [(ngModel)]="createPostForm.tags"
+                placeholder="Tags separated by commas"
+              />
+            </div>
+
+            <textarea
+              class="input cp-textarea"
+              name="content"
+              [(ngModel)]="createPostForm.content"
+              rows="5"
+              placeholder="Share something with the community..."
+            ></textarea>
+
+            <div class="inline-error" *ngIf="createErrorMessage">{{ createErrorMessage }}</div>
+
             <div class="cp-actions">
               <div class="cp-type-btns">
-                <button class="btn btn-ghost btn-sm">💡 Tip</button>
-                <button class="btn btn-ghost btn-sm">❓ Question</button>
-                <button class="btn btn-ghost btn-sm">🎉 Success Story</button>
-                <button class="btn btn-ghost btn-sm">💬 Discussion</button>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="setCreateType('TIP')"><i class="bi bi-lightbulb-fill"></i> Tip</button>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="setCreateType('QUESTION')"><i class="bi bi-question-circle-fill"></i> Question</button>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="setCreateType('SUCCESS_STORY')">Success Story</button>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="setCreateType('DISCUSSION')">Discussion</button>
+                <button class="btn btn-ghost btn-sm find-partner-btn" type="button" (click)="findPracticePartner()"><i class="bi bi-person-check-fill"></i> Find Practice Partner</button>
               </div>
-              <button class="btn btn-primary btn-sm">Post</button>
+              <button class="btn btn-primary btn-sm" type="button" (click)="submitPost()" [disabled]="isCreatingPost">
+                <i *ngIf="isCreatingPost" class="bi bi-arrow-repeat spinner"></i>
+                <span>{{ isCreatingPost ? 'Posting...' : 'Post' }}</span>
+              </button>
             </div>
+          </div>
+
+          <!-- Search bar -->
+          <div style="position:relative;">
+            <input
+              type="text"
+              name="searchQuery"
+              [(ngModel)]="searchQuery"
+              (input)="onSearchInput()"
+              placeholder="Search posts, tips, questions..."
+              style="width:100%; padding:10px 16px 10px 40px;
+                     border:0.5px solid var(--color-border-light);
+                     border-radius:var(--radius-lg);
+                     background:var(--color-surface);
+                     color:var(--color-text);
+                     font-size:var(--text-sm); outline:none;
+                     font-family:var(--font-body);
+                     box-sizing:border-box;"
+            />
+            <span style="position:absolute; left:14px; top:50%;
+                         transform:translateY(-50%);
+                         color:var(--color-text-muted); font-size:var(--text-sm);">🔍</span>
+            <span *ngIf="searchQuery"
+                  (click)="clearSearch()"
+                  style="position:absolute; right:14px; top:50%;
+                         transform:translateY(-50%);
+                         cursor:pointer; color:var(--color-text-muted);
+                         font-size:var(--text-xs); user-select:none;">✕</span>
           </div>
 
           <!-- Feed filter -->
-          <div class="tabs">
-            <button class="tab-item active">All Posts</button>
-            <button class="tab-item">Success Stories 🎉</button>
-            <button class="tab-item">Questions ❓</button>
-            <button class="tab-item">Tips 💡</button>
+          <div class="card feed-filter-card" *ngIf="!isSearching">
+            <div class="tabs">
+              <button
+                *ngFor="let filter of typeFilters"
+                class="tab-item"
+                [class.active]="selectedType === filter.value"
+                (click)="setTypeFilter(filter.value)"
+              >
+                {{ filter.label }}
+                <i *ngIf="filter.value === 'QUESTION'" class="bi bi-question-circle-fill"></i>
+                <i *ngIf="filter.value === 'TIP'" class="bi bi-lightbulb-fill"></i>
+                <i *ngIf="filter.value === 'PRACTICE_REQUEST'" class="bi bi-person-check-fill"></i>
+              </button>
+            </div>
+
+            <div class="filter-row">
+              <select
+                class="input filter-select"
+                name="industryFilter"
+                [(ngModel)]="selectedIndustry"
+                (ngModelChange)="onIndustryChange()"
+              >
+                <option value="">All industries</option>
+                <option *ngFor="let option of industryOptions" [value]="option.value">{{ option.label }}</option>
+              </select>
+
+              <select
+                class="input filter-select"
+                name="sortFilter"
+                [(ngModel)]="selectedSort"
+                (ngModelChange)="onSortChange()"
+              >
+                <option value="createdAt,desc">Newest</option>
+                <option value="upvotes,desc">Top</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card loading-card" *ngIf="isInitialLoading">
+            <div class="loading-state">
+              <i class="bi bi-arrow-repeat spinner"></i>
+              <span>Loading community posts...</span>
+            </div>
+          </div>
+
+          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && selectedType !== 'PRACTICE_REQUEST'">
+            <div class="loading-state">
+              <i class="bi bi-chat-square-text"></i>
+              <span>No posts found for the current filters.</span>
+            </div>
+          </div>
+
+          <div class="card empty-card practice-empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && selectedType === 'PRACTICE_REQUEST'">
+            <div class="practice-empty-state">
+              <div class="practice-empty-icon">🤝</div>
+              <div class="practice-empty-title">No practice partner requests yet</div>
+              <div class="practice-empty-subtitle">Be the first to find a practice partner in this community</div>
+              <button class="btn btn-primary btn-sm" type="button" (click)="findPracticePartner()">Post a Request</button>
+            </div>
+          </div>
+
+          <!-- Search results label -->
+          <div *ngIf="isSearching && !isInitialLoading"
+               style="font-size:var(--text-xs); color:var(--color-text-muted); margin-bottom:0;">
+            Showing results for "{{ searchQuery }}" — {{ totalPosts }} found
           </div>
 
           <!-- Posts -->
-          <div class="post-card card" *ngFor="let post of posts">
+          <ng-container *ngFor="let post of posts; trackBy: trackByPostId">
+          <div class="post-card card" [class.practice-request]="post.type === 'PRACTICE_REQUEST'">
             <div class="post-header">
-              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ post.authorInitials }}</div>
+              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ getInitials(post.authorKeycloakId) }}</div>
               <div class="post-author-info">
-                <div class="post-author-name">{{ post.author }}</div>
-                <div class="post-author-role">{{ post.authorTitle }}</div>
+                <div class="post-author-name">
+                  <span
+                    (click)="navigateToProfile(post.authorKeycloakId)"
+                    (mouseenter)="onAuthorMouseEnter($event, post.authorKeycloakId)"
+                    (mouseleave)="onAuthorMouseLeave()"
+                    style="cursor:pointer;"
+                  >{{ getAuthorLabel(post.authorKeycloakId) }}</span>
+                  <ng-container *ngIf="getAuthorKarma(post.authorKeycloakId) as karma">
+                    <span class="karma-badge" [ngClass]="karmaBadgeClass(karma)">{{ karmaBadgeEmoji(karma) }} {{ karma }}</span>
+                  </ng-container>
+                </div>
+                <div class="post-author-role">{{ post.authorKeycloakId }}</div>
               </div>
               <span class="post-type-badge" [class]="typeChip(post.type)">{{ typeLabel(post.type) }}</span>
-              <span class="post-time">{{ post.timeAgo }}</span>
+              <span class="post-time">{{ formatDate(post.createdAt) }}</span>
             </div>
 
+            <div class="post-title">{{ post.title }}</div>
+            <div class="practice-partner-subtitle" *ngIf="post.type === 'PRACTICE_REQUEST'">
+              This user is looking for a mock interview practice partner
+            </div>
             <div class="post-content">{{ post.content }}</div>
 
+            <div class="post-stats-row">
+              <span class="chip chip-neutral" *ngIf="post.industry">{{ post.industry }}</span>
+              <span class="chip chip-neutral">Score {{ post.score }}</span>
+              <span class="chip chip-neutral">{{ post.viewCount }} views</span>
+              <span class="chip chip-neutral">{{ post.upvotes }} upvotes</span>
+              <span class="chip chip-neutral">{{ post.downvotes }} downvotes</span>
+            </div>
+
             <div class="post-tags">
-              <span *ngFor="let tag of post.tags" class="chip chip-neutral">#{{ tag }}</span>
+              <span *ngFor="let tag of splitTags(post.tags)" class="chip chip-neutral">#{{ tag }}</span>
             </div>
 
             <div class="post-footer">
-              <button class="post-action-btn">
-                <span>👍</span>
-                <span>{{ post.likes }}</span>
+              <button class="post-action-btn" type="button" (click)="upvotePost(post.id)">
+                <span><i class="bi bi-hand-thumbs-up"></i></span>
+                <span>{{ post.upvotes }}</span>
               </button>
-              <button class="post-action-btn">
-                <span>💬</span>
-                <span>{{ post.comments }} comments</span>
+              <button class="post-action-btn" type="button" (click)="downvotePost(post.id)">
+                <span><i class="bi bi-hand-thumbs-down"></i></span>
+                <span>{{ post.downvotes }}</span>
               </button>
-              <button class="post-action-btn">
-                <span>↗️</span>
-                <span>Share</span>
+              <button class="post-action-btn" type="button" (click)="toggleComments(post.id)">
+                <span><i class="bi bi-chat-fill"></i></span>
+                <span>{{ getCommentButtonLabel(post.id) }}</span>
               </button>
-              <button class="post-action-btn" style="margin-left:auto;">
-                <span>🔖</span>
-                <span>Save</span>
+              <button
+                *ngIf="post.type === 'PRACTICE_REQUEST'"
+                class="post-action-btn connect-action-btn"
+                type="button"
+                (click)="toggleComments(post.id)"
+              >
+                <span>🤝</span>
+                <span>Connect</span>
+              </button>
+              <button class="post-action-btn" type="button" (click)="reportPost(post.id)">
+                <span><i class="bi bi-flag-fill"></i></span>
+                <span>Report</span>
+              </button>
+              <button
+                *ngIf="post.authorKeycloakId === currentUserKeycloakId"
+                class="post-action-btn"
+                style="margin-left:auto;"
+                type="button"
+                (click)="startEdit(post)"
+              >
+                <span>✏️</span>
+                <span>Edit</span>
+              </button>
+              <button
+                *ngIf="isOwnPost(post)"
+                class="post-action-btn"
+                type="button"
+                (click)="deletePost(post.id)"
+              >
+                <span><i class="bi bi-trash-fill"></i></span>
+                <span>Delete</span>
               </button>
             </div>
 
-            <!-- Sample comment -->
-            <div class="post-comments" *ngIf="post.comments > 0">
-              <div class="comment-item">
-                <div class="avatar-placeholder" style="width:28px;height:28px;font-size:0.65rem;flex-shrink:0;">ZW</div>
-                <div class="comment-body">
-                  <span class="comment-author">Zara Williams</span>
-                  <span class="comment-text">Congratulations! This is so inspiring. What was the hardest part of the prep?</span>
+            <!-- Inline comments -->
+            <div class="post-comments" *ngIf="expandedComments[post.id]">
+              <div class="loading-state loading-comments" *ngIf="loadingComments[post.id]">
+                <i class="bi bi-arrow-repeat spinner"></i>
+                <span>Loading comments...</span>
+              </div>
+
+              <div class="inline-error" *ngIf="commentErrors[post.id]">{{ commentErrors[post.id] }}</div>
+
+              <div class="comment-item" *ngFor="let comment of getComments(post.id); trackBy: trackByCommentId">
+                <div class="avatar-placeholder" style="width:28px;height:28px;font-size:0.65rem;flex-shrink:0;">{{ getInitials(comment.authorKeycloakId) }}</div>
+                <div class="comment-content-wrap">
+                  <div class="comment-body">
+                    <span class="comment-author">{{ getAuthorLabel(comment.authorKeycloakId) }}</span>
+                    <span class="comment-text">{{ comment.content }}</span>
+                  </div>
+                  <div class="comment-meta">
+                    <span>{{ formatDate(comment.createdAt) }}</span>
+                    <button class="btn btn-ghost btn-sm" type="button" (click)="upvoteComment(post.id, comment.id)">
+                      <i class="bi bi-hand-thumbs-up"></i> {{ comment.upvotes }}
+                    </button>
+                    <button
+                      *ngIf="isOwnComment(comment)"
+                      class="btn btn-ghost btn-sm"
+                      type="button"
+                      (click)="deleteComment(post.id, comment.id)"
+                    >
+                      <i class="bi bi-trash-fill"></i> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-              <button class="btn btn-ghost btn-sm" style="margin-left:var(--space-8);">View all {{ post.comments }} comments →</button>
+
+              <div class="comment-form">
+                <textarea
+                  class="input"
+                  rows="3"
+                  [name]="'comment-' + post.id"
+                  [(ngModel)]="commentDrafts[post.id]"
+                  placeholder="Write a comment..."
+                ></textarea>
+                <div class="comment-form-actions">
+                  <button class="btn btn-primary btn-sm" type="button" (click)="submitComment(post.id)" [disabled]="commentSubmitting[post.id]">
+                    <i *ngIf="commentSubmitting[post.id]" class="bi bi-arrow-repeat spinner"></i>
+                    <span>{{ commentSubmitting[post.id] ? 'Posting...' : 'Add Comment' }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Inline edit form -->
+          <div *ngIf="editingPostId === post.id" class="card edit-form-card">
+            <div class="edit-form-title">Edit Post</div>
+
+            <input
+              type="text"
+              [name]="'editTitle-' + post.id"
+              [(ngModel)]="editForm.title"
+              placeholder="Title"
+              class="input edit-form-field"
+            />
+
+            <textarea
+              [name]="'editContent-' + post.id"
+              [(ngModel)]="editForm.content"
+              rows="4"
+              placeholder="Content"
+              class="input cp-textarea edit-form-field"
+            ></textarea>
+
+            <select
+              [name]="'editType-' + post.id"
+              [(ngModel)]="editForm.type"
+              class="input edit-form-field"
+            >
+              <option value="DISCUSSION">Discussion</option>
+              <option value="QUESTION">Question</option>
+              <option value="SUCCESS_STORY">Success Story</option>
+              <option value="TIP">Tip</option>
+              <option value="PRACTICE_REQUEST">Practice Request</option>
+            </select>
+
+            <input
+              type="text"
+              [name]="'editTags-' + post.id"
+              [(ngModel)]="editForm.tagsInput"
+              placeholder="Tags (comma separated)"
+              class="input edit-form-field"
+            />
+
+            <div class="inline-error" *ngIf="editError">{{ editError }}</div>
+
+            <div class="edit-form-actions">
+              <button class="btn btn-primary btn-sm" type="button" (click)="submitEdit()" [disabled]="submittingEdit">
+                <i *ngIf="submittingEdit" class="bi bi-arrow-repeat spinner"></i>
+                <span>{{ submittingEdit ? 'Saving...' : 'Save Changes' }}</span>
+              </button>
+              <button class="btn btn-secondary btn-sm" type="button" (click)="cancelEdit()">Cancel</button>
+            </div>
+          </div>
+          </ng-container>
+
+          <div class="load-more-wrap" *ngIf="!isInitialLoading && posts.length">
+            <button class="btn btn-secondary load-more-btn" type="button" *ngIf="hasMore" (click)="loadMore()" [disabled]="isLoadingMore">
+              <i *ngIf="isLoadingMore" class="bi bi-arrow-repeat spinner"></i>
+              <span>{{ isLoadingMore ? 'Loading...' : 'Load More' }}</span>
+            </button>
           </div>
         </div>
 
@@ -103,7 +428,14 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
 
           <!-- Trending -->
           <div class="card trending-card">
-            <app-section-header title="Trending Topics" icon="🔥"></app-section-header>
+            <div class="section-header">
+              <div class="section-header-left">
+                <span class="section-icon"><i class="bi bi-fire"></i></span>
+                <div>
+                  <h2 class="section-title">Trending Topics</h2>
+                </div>
+              </div>
+            </div>
             <div class="trending-list">
               <div class="trending-item" *ngFor="let t of trendingTopics; let i = index">
                 <span class="trending-rank">#{{ i + 1 }}</span>
@@ -115,9 +447,16 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
             </div>
           </div>
 
-          <!-- Who to Follow -->
+          <!-- Who to Follow / Your Network -->
           <div class="card">
-            <app-section-header title="Who to Follow" icon="👥"></app-section-header>
+            <div class="section-header">
+              <div class="section-header-left">
+                <span class="section-icon"><i class="bi bi-people-fill"></i></span>
+                <div>
+                  <h2 class="section-title">Who to Follow</h2>
+                </div>
+              </div>
+            </div>
             <div class="follow-list">
               <div class="follow-item" *ngFor="let person of whoToFollow">
                 <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ person.initials }}</div>
@@ -125,40 +464,140 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
                   <div class="follow-name">{{ person.name }}</div>
                   <div class="follow-title">{{ person.title }}</div>
                 </div>
-                <button class="btn btn-outline btn-sm">Follow</button>
+                <button class="btn btn-outline btn-sm" type="button" (click)="toggleFollow(person)" [disabled]="person.loading">
+                  <i *ngIf="person.loading" class="bi bi-arrow-repeat spinner"></i>
+                  <span>{{ person.following ? 'Unfollow' : 'Follow' }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="your-network-divider"></div>
+            <div class="your-network-stats">
+              <div class="yn-row">
+                <span class="yn-label">⚡ Your Karma</span>
+                <span class="yn-value">{{ myKarma?.totalKarma ?? 0 }}</span>
+              </div>
+              <div class="yn-row">
+                <span class="yn-label">📝 Posts</span>
+                <span class="yn-value">{{ myKarma?.postsCount ?? 0 }}</span>
+              </div>
+              <div class="yn-row">
+                <span class="yn-label">👍 Upvotes received</span>
+                <span class="yn-value">{{ myKarma?.upvotesReceived ?? 0 }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Community Stats -->
-          <div class="card community-stats-card">
-            <app-section-header title="Community" icon="📊"></app-section-header>
-            <div class="comm-stats">
-              <div class="cs-item">
-                <div class="cs-val">50,247</div>
-                <div class="cs-label">Members</div>
+          <!-- Karma Leaderboard -->
+          <div class="card">
+            <div class="section-header">
+              <div class="section-header-left">
+                <span class="section-icon">🏆</span>
+                <div>
+                  <h2 class="section-title">Karma Leaderboard</h2>
+                  <div class="section-subtitle">Top contributors this week</div>
+                </div>
               </div>
-              <div class="cs-item">
-                <div class="cs-val">12,803</div>
-                <div class="cs-label">Posts</div>
-              </div>
-              <div class="cs-item">
-                <div class="cs-val">94%</div>
-                <div class="cs-label">Helpful rate</div>
-              </div>
-              <div class="cs-item">
-                <div class="cs-val">1,240</div>
-                <div class="cs-label">Online now</div>
+            </div>
+            <div class="karma-empty" *ngIf="!leaderboard.length">
+              No karma data yet — start posting!
+            </div>
+            <div class="karma-list">
+              <div class="karma-item" *ngFor="let entry of leaderboard.slice(0, 5); let i = index">
+                <span class="karma-rank">{{ leaderboardRank(i) }}</span>
+                <div class="avatar-placeholder" style="width:32px;height:32px;font-size:0.75rem;flex-shrink:0;">
+                  {{ entry.displayName[0]?.toUpperCase() || '?' }}
+                </div>
+                <div class="karma-user-info">
+                  <div class="karma-display-name">{{ truncateDisplayName(entry.displayName) }}</div>
+                </div>
+                <div class="karma-score">⚡ {{ entry.totalKarma }}</div>
               </div>
             </div>
           </div>
 
         </div>
       </div>
+
+      <!-- Hover card overlay -->
+      <div
+        *ngIf="hoveredAuthorId"
+        (mouseenter)="onHoverCardMouseEnter()"
+        (mouseleave)="onHoverCardMouseLeave()"
+        [style.top.px]="hoverCardPosition.top"
+        [style.left.px]="hoverCardPosition.left"
+        style="position:absolute; z-index:1000; width:280px;
+               background:var(--color-surface);
+               border:0.5px solid var(--color-border-light);
+               border-radius:var(--radius-lg);
+               padding:16px; box-shadow: 0 4px 20px rgba(0,0,0,0.12);"
+      >
+        <div *ngIf="!hoveredProfile"
+             style="text-align:center; padding:16px;
+                    color:var(--color-text-muted); font-size:12px;">
+          Loading...
+        </div>
+
+        <div *ngIf="hoveredProfile">
+          <!-- Avatar + name row -->
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+            <div style="width:48px; height:48px; border-radius:50%;
+                        background:#1D9E75; color:white;
+                        display:flex; align-items:center; justify-content:center;
+                        font-size:18px; font-weight:500; flex-shrink:0;">
+              {{ hoveredProfile.displayName ? hoveredProfile.displayName[0].toUpperCase() : '?' }}
+            </div>
+            <div>
+              <div style="font-size:14px; font-weight:500; color:var(--color-text);">
+                {{ hoveredProfile.displayName }}
+              </div>
+              <div style="font-size:11px; color:var(--color-text-muted);">
+                ⚡ {{ hoveredProfile.totalKarma }} karma
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats row -->
+          <div style="display:flex; gap:16px; margin-bottom:12px;
+                      font-size:12px; color:var(--color-text-muted);">
+            <span><strong>{{ hoveredProfile.postsCount }}</strong> posts</span>
+            <span><strong>{{ hoveredProfile.followersCount }}</strong> followers</span>
+            <span><strong>{{ hoveredProfile.followingCount }}</strong> following</span>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex; gap:8px;"
+               *ngIf="hoveredAuthorId !== currentUserKeycloakId">
+            <button
+              (click)="toggleFollowHovered()"
+              [style.background]="isFollowingHovered ? 'transparent' : '#1D9E75'"
+              [style.color]="isFollowingHovered ? '#1D9E75' : 'white'"
+              style="flex:1; padding:7px 12px; border-radius:6px;
+                     font-size:12px; font-weight:500; cursor:pointer;
+                     border:0.5px solid #1D9E75;">
+              {{ isFollowingHovered ? '✓ Following' : '+ Follow' }}
+            </button>
+            <button
+              (click)="navigateToProfile(hoveredAuthorId!)"
+              style="flex:1; padding:7px 12px; border-radius:6px;
+                     font-size:12px; cursor:pointer;
+                     border:0.5px solid var(--color-border-light);
+                     background:transparent;
+                     color:var(--color-text-muted);">
+              View Profile
+            </button>
+          </div>
+
+          <div *ngIf="hoveredAuthorId === currentUserKeycloakId"
+               style="font-size:12px; color:var(--color-text-muted); text-align:center;">
+            This is you
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
   styles: [`
-    .community-page { display: flex; flex-direction: column; gap: var(--space-6); }
+    .community-page { display: flex; flex-direction: column; gap: var(--space-6); position: relative; }
 
     .community-layout {
       display: grid;
@@ -175,9 +614,74 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
     .cp-input { flex: 1; }
     .cp-actions { display: flex; align-items: center; justify-content: space-between; }
     .cp-type-btns { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+    .cp-form-intro { display: flex; flex-direction: column; gap: 2px; }
+    .create-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3); }
+    .cp-textarea { width: 100%; resize: vertical; min-height: 120px; margin-bottom: var(--space-3); }
+
+    .feed-filter-card { display: flex; flex-direction: column; gap: var(--space-4); }
+    .filter-row { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+    .filter-select { min-width: 180px; }
+    .inline-error {
+      font-size: var(--text-sm);
+      color: var(--error-500);
+      background: var(--error-50);
+      border: 1px solid rgba(239, 68, 68, 0.18);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .error-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      color: var(--error-500);
+      border-color: rgba(239, 68, 68, 0.18);
+      background: var(--error-50);
+    }
+    .loading-card,
+    .empty-card {
+      min-height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .loading-state {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      color: var(--color-text-muted);
+      justify-content: center;
+    }
+    .spinner {
+      animation: spin 0.9s linear infinite;
+      display: inline-block;
+    }
+    .loading-comments {
+      justify-content: flex-start;
+    }
+
+    .page-header-actions { display: flex; gap: var(--space-3); align-items: center; }
 
     /* Post card */
     .post-card { display: flex; flex-direction: column; gap: var(--space-4); }
+    .post-card.practice-request { border-left: 4px solid #1D9E75; }
+    .practice-badge { font-weight: 700 !important; }
+    .practice-partner-subtitle {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      font-style: italic;
+      margin-top: calc(var(--space-1) * -1);
+    }
+    .connect-action-btn { color: #1D9E75 !important; font-weight: var(--weight-semibold) !important; }
+    .connect-action-btn:hover { background: #f0fdf9 !important; }
+    .find-partner-btn { color: var(--teal-600); font-weight: var(--weight-semibold); }
+
+    /* Practice Partners empty state */
+    .practice-empty-card { min-height: 220px; }
+    .practice-empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); text-align: center; padding: var(--space-6); }
+    .practice-empty-icon { font-size: 2.5rem; line-height: 1; }
+    .practice-empty-title { font-size: var(--text-lg); font-weight: 700; color: var(--color-text); }
+    .practice-empty-subtitle { font-size: var(--text-sm); color: var(--color-text-muted); }
 
     .post-header {
       display: flex; align-items: flex-start; gap: var(--space-3);
@@ -196,6 +700,8 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
       line-height: var(--leading-relaxed);
       white-space: pre-wrap;
     }
+    .post-title { font-size: var(--text-lg); font-weight: 700; color: var(--color-text); }
+    .post-stats-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
     .post-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
@@ -213,9 +719,24 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
     /* Comments */
     .post-comments { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border-light); }
     .comment-item { display: flex; align-items: flex-start; gap: var(--space-3); }
+    .comment-content-wrap { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
     .comment-body { background: var(--neutral-50); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); line-height: var(--leading-relaxed); }
     .comment-author { font-weight: 700; margin-right: var(--space-2); color: var(--color-text); }
     .comment-text { color: var(--color-text-muted); }
+    .comment-meta { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-light); font-size: var(--text-xs); flex-wrap: wrap; }
+    .comment-form { display: flex; flex-direction: column; gap: var(--space-3); }
+    .comment-form-actions { display: flex; justify-content: flex-end; }
+
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+      gap: var(--space-4);
+    }
+    .section-header-left { display: flex; align-items: flex-start; gap: var(--space-3); }
+    .section-icon { font-size: 1.25rem; margin-top: 2px; }
+    .section-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--color-text); }
 
     /* Sidebar */
     .community-sidebar { display: flex; flex-direction: column; gap: var(--space-5); }
@@ -232,34 +753,817 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
     .follow-name { font-size: var(--text-sm); font-weight: 600; }
     .follow-title { font-size: var(--text-xs); color: var(--color-text-muted); }
 
-    .comm-stats { display: grid; grid-template-columns: repeat(2,1fr); gap: var(--space-4); text-align: center; }
-    .cs-val { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--teal-600); }
-    .cs-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+    .load-more-wrap { display: flex; justify-content: center; }
+    .load-more-btn { min-width: 160px; }
 
-    @media (max-width: 1024px) { .community-layout { grid-template-columns: 1fr; } .community-sidebar { display: grid; grid-template-columns: repeat(2,1fr); } }
-    @media (max-width: 640px) { .community-sidebar { grid-template-columns: 1fr; } }
+    /* Inline edit form */
+    .edit-form-card { border-left: 4px solid #1D9E75; display: flex; flex-direction: column; gap: var(--space-3); }
+    .edit-form-title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
+    .edit-form-field { margin-bottom: 0; }
+    .edit-form-actions { display: flex; gap: var(--space-2); }
+
+    /* Karma badge on post cards */
+    .karma-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 12px;
+      margin-left: 6px;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+    .karma-gold { background: #FAEEDA; color: #633806; }
+    .karma-teal { background: #E1F5EE; color: #085041; }
+    .karma-gray { background: #F1EFE8; color: #444441; }
+
+    /* Karma Leaderboard sidebar card */
+    .section-subtitle { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+    .karma-empty { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; padding: var(--space-4) 0; }
+    .karma-list { display: flex; flex-direction: column; gap: var(--space-3); }
+    .karma-item { display: flex; align-items: center; gap: var(--space-2); }
+    .karma-rank { font-size: var(--text-sm); font-weight: 700; width: 26px; text-align: center; flex-shrink: 0; }
+    .karma-user-info { flex: 1; min-width: 0; }
+    .karma-display-name { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .karma-score { font-size: var(--text-sm); font-weight: 700; color: var(--teal-600); flex-shrink: 0; }
+
+    /* Your Network karma rows */
+    .your-network-divider { height: 1px; background: var(--color-border-light); margin: var(--space-4) 0; }
+    .your-network-stats { display: flex; flex-direction: column; gap: var(--space-2); }
+    .yn-row { display: flex; align-items: center; justify-content: space-between; }
+    .yn-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+    .yn-value { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 1024px) {
+      .community-layout { grid-template-columns: 1fr; }
+      .community-sidebar { display: grid; grid-template-columns: repeat(2,1fr); }
+    }
+    @media (max-width: 640px) {
+      .create-form-grid { grid-template-columns: 1fr; }
+      .filter-row { flex-direction: column; }
+      .community-sidebar { grid-template-columns: 1fr; }
+    }
   `]
 })
-export class CommunityComponent {
-  posts = MOCK_POSTS;
+export class CommunityComponent implements OnInit {
+  private communityApi = inject(CommunityApiService);
+  private authService = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
+
+  posts: CommunityPost[] = [];
   trendingTopics = TRENDING_TOPICS;
-  whoToFollow = WHO_TO_FOLLOW;
+  whoToFollow: CommunitySuggestion[] = [];
+  followers: CommunityFollow[] = [];
+  following: CommunityFollow[] = [];
+  leaderboard: KarmaResponse[] = [];
+  myKarma: KarmaResponse | null = null;
+  karmaByUser: Record<string, number> = {};
+
+  currentUserKeycloakId = '';
+  currentUserInitials = 'YU';
+
+  selectedType = '';
+  selectedIndustry = '';
+  selectedSort = 'createdAt,desc';
+
+  currentPage = 0;
+  pageSize = 10;
+  totalPosts = 0;
+  totalPages = 0;
+  hasMore = false;
+
+  isInitialLoading = true;
+  isLoadingMore = false;
+  isCreatingPost = false;
+  showCreateForm = false;
+
+  errorMessage = '';
+  createErrorMessage = '';
+
+  searchQuery = '';
+  isSearching = false;
+  searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  editingPostId: number | null = null;
+  editForm = { title: '', content: '', type: '', industry: '', tagsInput: '' };
+  submittingEdit = false;
+  editError = '';
+
+  hoveredAuthorId: string | null = null;
+  hoveredProfile: UserProfileResponse | null = null;
+  hoverCardPosition: { top: number; left: number } = { top: 0, left: 0 };
+  hoverCardTimer: ReturnType<typeof setTimeout> | null = null;
+  isFollowingHovered = false;
+
+  expandedComments: Record<number, boolean> = {};
+  commentsByPost: Record<number, CommunityComment[]> = {};
+  loadedComments: Record<number, boolean> = {};
+  loadingComments: Record<number, boolean> = {};
+  commentDrafts: Record<number, string> = {};
+  commentSubmitting: Record<number, boolean> = {};
+  commentErrors: Record<number, string> = {};
+
+  createPostForm: CreatePostBody = {
+    title: '',
+    content: '',
+    type: 'DISCUSSION',
+    industry: '',
+    tags: '',
+  };
+
+  readonly typeOptions = [
+    { label: 'Discussion', value: 'DISCUSSION' },
+    { label: 'Question', value: 'QUESTION' },
+    { label: 'Success Story', value: 'SUCCESS_STORY' },
+    { label: 'Tip', value: 'TIP' },
+    { label: 'Practice Partner Request', value: 'PRACTICE_REQUEST' },
+  ];
+
+  readonly typeFilters = [
+    { label: 'All Posts', value: '' },
+    { label: 'Success Stories', value: 'SUCCESS_STORY' },
+    { label: 'Questions', value: 'QUESTION' },
+    { label: 'Tips', value: 'TIP' },
+    { label: 'Practice Partners', value: 'PRACTICE_REQUEST' },
+  ];
+
+  readonly industryOptions = [
+    { label: 'Technology', value: 'tech' },
+    { label: 'Finance', value: 'finance' },
+    { label: 'Healthcare', value: 'healthcare' },
+    { label: 'Education', value: 'education' },
+    { label: 'Marketing', value: 'marketing' },
+    { label: 'Engineering', value: 'engineering' },
+    { label: 'Legal', value: 'legal' },
+    { label: 'Consulting', value: 'consulting' },
+    { label: 'Media', value: 'media' },
+    { label: 'Other', value: 'other' },
+  ];
+
+  ngOnInit(): void {
+    this.currentUserKeycloakId = this.authService.getKeycloakId();
+    this.currentUserInitials = this.getInitials(this.currentUserKeycloakId || this.authService.getFullName() || 'You');
+    this.whoToFollow = WHO_TO_FOLLOW.map((person) => ({
+      ...person,
+      keycloakId: this.buildMockSuggestionKeycloakId(person.name),
+      following: false,
+      loading: false,
+    }));
+    this.loadInitialData();
+
+    this.communityApi.getLeaderboard().subscribe({
+      next: (data) => {
+        this.leaderboard = data;
+        this.karmaByUser = {};
+        data.forEach((entry) => { this.karmaByUser[entry.keycloakId] = entry.totalKarma; });
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
+
+    this.communityApi.getMyKarma().subscribe({
+      next: (data) => { this.myKarma = data; this.cdr.markForCheck(); },
+      error: () => {},
+    });
+  }
+
+  toggleCreateForm(): void {
+    this.showCreateForm = !this.showCreateForm;
+    this.createErrorMessage = '';
+  }
+
+  setCreateType(type: string): void {
+    this.createPostForm.type = type;
+  }
+
+  onSearchInput(): void {
+    if (this.searchDebounceTimer !== null) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+    if (!this.searchQuery.trim()) {
+      this.isSearching = false;
+      this.loadPosts(0, false);
+      return;
+    }
+    this.isSearching = true;
+    this.isInitialLoading = true;
+    this.cdr.markForCheck();
+    this.searchDebounceTimer = setTimeout(() => {
+      this.communityApi.searchPosts(this.searchQuery.trim()).subscribe({
+        next: (res) => {
+          this.posts = res.content;
+          this.totalPages = res.totalPages;
+          this.totalPosts = res.totalElements;
+          this.hasMore = false;
+          this.isInitialLoading = false;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.isInitialLoading = false;
+          this.cdr.markForCheck();
+        },
+      });
+    }, 350);
+  }
+
+  clearSearch(): void {
+    this.searchQuery = '';
+    this.isSearching = false;
+    this.loadPosts(0, false);
+    this.cdr.markForCheck();
+  }
+
+  startEdit(post: CommunityPost): void {
+    this.editingPostId = post.id;
+    this.editForm = {
+      title: post.title,
+      content: post.content,
+      type: post.type,
+      industry: post.industry ?? '',
+      tagsInput: post.tags ?? '',
+    };
+    this.editError = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelEdit(): void {
+    this.editingPostId = null;
+    this.editError = '';
+    this.cdr.markForCheck();
+  }
+
+  submitEdit(): void {
+    if (!this.editForm.title.trim() || !this.editForm.content.trim()) {
+      this.editError = 'Title and content are required.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.submittingEdit = true;
+    this.editError = '';
+    this.cdr.markForCheck();
+
+    const body = {
+      title: this.editForm.title.trim(),
+      content: this.editForm.content.trim(),
+      type: this.editForm.type,
+      industry: this.editForm.industry,
+      tags: this.editForm.tagsInput.trim(),
+    };
+
+    this.communityApi.updatePost(this.editingPostId!, body).subscribe({
+      next: (updated) => {
+        const idx = this.posts.findIndex((p) => p.id === this.editingPostId);
+        if (idx !== -1) {
+          this.posts = [
+            ...this.posts.slice(0, idx),
+            updated,
+            ...this.posts.slice(idx + 1),
+          ];
+        }
+        this.editingPostId = null;
+        this.submittingEdit = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.editError = 'Failed to update post. Please try again.';
+        this.submittingEdit = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  findPracticePartner(): void {
+    this.showCreateForm = true;
+    this.createErrorMessage = '';
+    this.createPostForm = {
+      title: '',
+      content: 'I am preparing for interviews and looking for a practice partner. I can do mock behavioral and technical interviews. Please comment or connect if you are interested!',
+      type: 'PRACTICE_REQUEST',
+      industry: '',
+      tags: 'practice,mock-interview,partner',
+    };
+    this.cdr.markForCheck();
+  }
+
+  submitPost(): void {
+    if (!this.createPostForm.title.trim() || !this.createPostForm.content.trim()) {
+      this.createErrorMessage = 'Title and content are required.';
+      return;
+    }
+
+    this.isCreatingPost = true;
+    this.createErrorMessage = '';
+
+    const payload: CreatePostBody = {
+      title: this.createPostForm.title.trim(),
+      content: this.createPostForm.content.trim(),
+      type: this.createPostForm.type,
+      industry: this.createPostForm.industry?.trim() || '',
+      tags: this.createPostForm.tags?.trim() || '',
+    };
+
+    this.communityApi.createPost(payload)
+      .pipe(finalize(() => { this.isCreatingPost = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: (post) => {
+          this.posts = [post, ...this.posts];
+          this.totalPosts += 1;
+          this.showCreateForm = false;
+          this.createPostForm = {
+            title: '',
+            content: '',
+            type: 'DISCUSSION',
+            industry: '',
+            tags: '',
+          };
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.createErrorMessage = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  setTypeFilter(type: string): void {
+    this.selectedType = type;
+    this.loadPosts(0, false);
+  }
+
+  onIndustryChange(): void {
+    this.loadPosts(0, false);
+  }
+
+  onSortChange(): void {
+    this.loadPosts(0, false);
+  }
+
+  upvotePost(postId: number): void {
+    this.communityApi.upvotePost(postId).subscribe({
+      next: (updatedPost) => { this.replacePost(updatedPost); this.cdr.markForCheck(); },
+      error: (error) => { this.errorMessage = this.getErrorMessage(error); this.cdr.markForCheck(); },
+    });
+  }
+
+  downvotePost(postId: number): void {
+    this.communityApi.downvotePost(postId).subscribe({
+      next: (updatedPost) => { this.replacePost(updatedPost); this.cdr.markForCheck(); },
+      error: (error) => { this.errorMessage = this.getErrorMessage(error); this.cdr.markForCheck(); },
+    });
+  }
+
+  reportPost(postId: number): void {
+    this.communityApi.reportPost(postId).subscribe({
+      next: () => {
+        const post = this.posts.find((item) => item.id === postId);
+        if (post) {
+          this.replacePost({ ...post, isReported: true });
+        }
+        this.cdr.markForCheck();
+      },
+      error: (error) => { this.errorMessage = this.getErrorMessage(error); this.cdr.markForCheck(); },
+    });
+  }
+
+  deletePost(postId: number): void {
+    this.communityApi.deletePost(postId).subscribe({
+      next: () => {
+        this.posts = this.posts.filter((post) => post.id !== postId);
+        this.totalPosts = Math.max(0, this.totalPosts - 1);
+        this.cdr.markForCheck();
+      },
+      error: (error) => { this.errorMessage = this.getErrorMessage(error); this.cdr.markForCheck(); },
+    });
+  }
+
+  toggleComments(postId: number): void {
+    this.expandedComments[postId] = !this.expandedComments[postId];
+    if (this.expandedComments[postId] && !this.loadedComments[postId]) {
+      this.loadComments(postId);
+    }
+  }
+
+  submitComment(postId: number): void {
+    const content = (this.commentDrafts[postId] || '').trim();
+    if (!content) {
+      this.commentErrors[postId] = 'Comment content is required.';
+      return;
+    }
+
+    this.commentSubmitting[postId] = true;
+    this.commentErrors[postId] = '';
+
+    this.communityApi.addComment(postId, { content })
+      .pipe(finalize(() => { this.commentSubmitting[postId] = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: (comment) => {
+          const currentComments = this.commentsByPost[postId] || [];
+          this.commentsByPost[postId] = [...currentComments, comment];
+          this.loadedComments[postId] = true;
+          this.commentDrafts[postId] = '';
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.commentErrors[postId] = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  upvoteComment(postId: number, commentId: number): void {
+    this.communityApi.upvoteComment(commentId).subscribe({
+      next: (updatedComment) => {
+        const currentComments = this.commentsByPost[postId] || [];
+        this.commentsByPost[postId] = currentComments.map((comment) =>
+          comment.id === commentId ? updatedComment : comment
+        );
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.commentErrors[postId] = this.getErrorMessage(error);
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  deleteComment(postId: number, commentId: number): void {
+    this.communityApi.deleteComment(commentId).subscribe({
+      next: () => {
+        this.commentsByPost[postId] = (this.commentsByPost[postId] || []).filter((comment) => comment.id !== commentId);
+        this.cdr.markForCheck();
+      },
+      error: (error) => {
+        this.commentErrors[postId] = this.getErrorMessage(error);
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  loadMore(): void {
+    if (!this.hasMore || this.isLoadingMore) {
+      return;
+    }
+
+    this.isLoadingMore = true;
+    this.loadPosts(this.currentPage + 1, true);
+  }
+
+  toggleFollow(person: CommunitySuggestion): void {
+    person.loading = true;
+    const request$ = person.following
+      ? this.communityApi.unfollowUser(person.keycloakId)
+      : this.communityApi.followUser(person.keycloakId);
+
+    request$
+      .pipe(finalize(() => { person.loading = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: () => {
+          person.following = !person.following;
+          this.refreshFollowingAfterToggle(person.keycloakId, person.following);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.errorMessage = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
 
   typeLabel(type: string): string {
     const labels: Record<string, string> = {
-      success: '🎉 Success', discussion: '💬 Discussion',
-      question: '❓ Question', tip: '💡 Tip'
+      DISCUSSION: 'Discussion',
+      QUESTION: 'Question',
+      SUCCESS_STORY: 'Success Story',
+      TIP: 'Tip',
+      PRACTICE_REQUEST: '🤝 Looking for Partner',
     };
-    return labels[type] || type;
+    return labels[type] || type.replaceAll('_', ' ');
   }
 
   typeChip(type: string): string {
     const chips: Record<string, string> = {
-      success: 'chip chip-teal',
-      discussion: 'chip chip-cyan',
-      question: 'chip chip-sky',
-      tip: 'chip chip-sand'
+      SUCCESS_STORY: 'chip chip-teal',
+      DISCUSSION: 'chip chip-cyan',
+      QUESTION: 'chip chip-sky',
+      TIP: 'chip chip-sand',
+      PRACTICE_REQUEST: 'chip chip-teal practice-badge',
     };
     return chips[type] || 'chip chip-neutral';
+  }
+
+  splitTags(tags: string | null): string[] {
+    if (!tags) {
+      return [];
+    }
+
+    return tags.split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  formatDate(dateValue: string | null | undefined): string {
+    if (!dateValue) {
+      return 'Unknown date';
+    }
+
+    return new Date(dateValue).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  getInitials(value: string): string {
+    const cleaned = value.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+    if (!cleaned) {
+      return 'IP';
+    }
+
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return parts
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  getAuthorLabel(authorKeycloakId: string): string {
+    return authorKeycloakId === this.currentUserKeycloakId ? 'You' : this.truncateKeycloakId(authorKeycloakId);
+  }
+
+  getComments(postId: number): CommunityComment[] {
+    return this.commentsByPost[postId] || [];
+  }
+
+  getCommentButtonLabel(postId: number): string {
+    if (this.loadedComments[postId]) {
+      const count = this.getComments(postId).length;
+      return `${count} comment${count === 1 ? '' : 's'}`;
+    }
+
+    return 'Comments';
+  }
+
+  isOwnPost(post: CommunityPost): boolean {
+    return !!this.currentUserKeycloakId && post.authorKeycloakId === this.currentUserKeycloakId;
+  }
+
+  isOwnComment(comment: CommunityComment): boolean {
+    return !!this.currentUserKeycloakId && comment.authorKeycloakId === this.currentUserKeycloakId;
+  }
+
+  trackByPostId(_index: number, post: CommunityPost): number {
+    return post.id;
+  }
+
+  trackByCommentId(_index: number, comment: CommunityComment): number {
+    return comment.id;
+  }
+
+  getAuthorKarma(keycloakId: string): number {
+    return this.karmaByUser[keycloakId] ?? 0;
+  }
+
+  karmaBadgeClass(karma: number): string {
+    if (karma >= 50) return 'karma-gold';
+    if (karma >= 20) return 'karma-teal';
+    return 'karma-gray';
+  }
+
+  karmaBadgeEmoji(karma: number): string {
+    if (karma >= 50) return '🏆';
+    if (karma >= 20) return '⭐';
+    return '⚡';
+  }
+
+  truncateDisplayName(name: string): string {
+    return name.length > 15 ? name.slice(0, 15) + '…' : name;
+  }
+
+  leaderboardRank(index: number): string {
+    if (index === 0) return '🏆';
+    if (index === 1) return '⭐';
+    return `#${index + 1}`;
+  }
+
+  navigateToProfile(keycloakId: string): void {
+    this.router.navigate(['/profile', keycloakId]);
+  }
+
+  onAuthorMouseEnter(event: MouseEvent, keycloakId: string): void {
+    if (this.hoverCardTimer !== null) clearTimeout(this.hoverCardTimer);
+    this.hoverCardTimer = setTimeout(() => {
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      this.hoverCardPosition = {
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
+      };
+      this.hoveredAuthorId = keycloakId;
+      this.hoveredProfile = null;
+      this.cdr.markForCheck();
+
+      this.communityApi.getUserProfile(keycloakId).subscribe({
+        next: (profile) => { this.hoveredProfile = profile; this.cdr.markForCheck(); },
+        error: () => {},
+      });
+
+      if (this.currentUserKeycloakId) {
+        this.communityApi.checkIsFollowing(keycloakId).subscribe({
+          next: (res) => { this.isFollowingHovered = res.following; this.cdr.markForCheck(); },
+          error: () => {},
+        });
+      }
+    }, 400);
+  }
+
+  onAuthorMouseLeave(): void {
+    if (this.hoverCardTimer !== null) clearTimeout(this.hoverCardTimer);
+    this.hoverCardTimer = setTimeout(() => {
+      this.hoveredAuthorId = null;
+      this.hoveredProfile = null;
+      this.cdr.markForCheck();
+    }, 200);
+  }
+
+  onHoverCardMouseEnter(): void {
+    if (this.hoverCardTimer !== null) clearTimeout(this.hoverCardTimer);
+  }
+
+  onHoverCardMouseLeave(): void {
+    this.hoveredAuthorId = null;
+    this.hoveredProfile = null;
+    this.cdr.markForCheck();
+  }
+
+  toggleFollowHovered(): void {
+    if (!this.hoveredAuthorId) return;
+    const request$ = this.isFollowingHovered
+      ? this.communityApi.unfollowUser(this.hoveredAuthorId)
+      : this.communityApi.followUser(this.hoveredAuthorId);
+    request$.subscribe({
+      next: () => { this.isFollowingHovered = !this.isFollowingHovered; this.cdr.markForCheck(); },
+      error: () => {},
+    });
+  }
+
+  private loadInitialData(): void {
+    this.isInitialLoading = true;
+    this.errorMessage = '';
+
+    forkJoin({
+      posts: this.communityApi.getPosts(0, this.pageSize, '', '', 'createdAt,desc'),
+      followers: this.communityApi.getFollowers(),
+      following: this.communityApi.getFollowing(),
+    })
+      .pipe(finalize(() => { this.isInitialLoading = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: ({ posts, followers, following }) => {
+          this.applyPostsResponse(posts, false);
+          this.followers = followers;
+          this.following = following;
+          this.syncWhoToFollow(following);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.errorMessage = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  private loadPosts(page: number, append: boolean): void {
+    if (!append) {
+      this.errorMessage = '';
+      this.isInitialLoading = page === 0;
+    }
+
+    this.communityApi.getPosts(
+      page,
+      this.pageSize,
+      this.selectedType,
+      this.selectedIndustry,
+      this.selectedSort
+    )
+      .pipe(finalize(() => {
+        this.isInitialLoading = false;
+        this.isLoadingMore = false;
+        this.cdr.markForCheck();
+      }))
+      .subscribe({
+        next: (response) => {
+          this.applyPostsResponse(response, append);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.errorMessage = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  private applyPostsResponse(response: CommunityPageResponse<CommunityPost>, append: boolean): void {
+    this.posts = append ? [...this.posts, ...response.content] : response.content;
+    this.currentPage = response.number;
+    this.totalPosts = response.totalElements;
+    this.totalPages = response.totalPages;
+    this.hasMore = response.number + 1 < response.totalPages;
+  }
+
+  private loadComments(postId: number): void {
+    this.loadingComments[postId] = true;
+    this.commentErrors[postId] = '';
+
+    this.communityApi.getComments(postId)
+      .pipe(finalize(() => { this.loadingComments[postId] = false; this.cdr.markForCheck(); }))
+      .subscribe({
+        next: (comments) => {
+          this.commentsByPost[postId] = comments;
+          this.loadedComments[postId] = true;
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.commentErrors[postId] = this.getErrorMessage(error);
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  private replacePost(updatedPost: CommunityPost): void {
+    this.posts = this.posts.map((post) => post.id === updatedPost.id ? updatedPost : post);
+  }
+
+  private refreshFollowingAfterToggle(targetKeycloakId: string, isFollowing: boolean): void {
+    if (isFollowing) {
+      this.following = [
+        ...this.following,
+        {
+          followerKeycloakId: this.currentUserKeycloakId,
+          followingKeycloakId: targetKeycloakId,
+          followedAt: new Date().toISOString(),
+        },
+      ];
+      return;
+    }
+
+    this.following = this.following.filter((follow) => follow.followingKeycloakId !== targetKeycloakId);
+  }
+
+  private syncWhoToFollow(following: CommunityFollow[]): void {
+    const followingIds = new Set(following.map((item) => item.followingKeycloakId));
+    this.whoToFollow = this.whoToFollow.map((person) => ({
+      ...person,
+      following: followingIds.has(person.keycloakId),
+    }));
+  }
+
+  private buildMockSuggestionKeycloakId(name: string): string {
+    return `mock-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  }
+
+  private truncateKeycloakId(keycloakId: string): string {
+    if (keycloakId.length <= 18) {
+      return keycloakId;
+    }
+    return `${keycloakId.slice(0, 8)}...${keycloakId.slice(-6)}`;
+  }
+
+  private getErrorMessage(error: unknown): string {
+    const httpError = error as HttpErrorResponse;
+
+    if (httpError.status === 0) {
+      return 'Cannot connect to community service on port 8086';
+    }
+
+    const payload = httpError.error;
+
+    if (payload?.fields && typeof payload.fields === 'object') {
+      return Object.values(payload.fields).join(', ');
+    }
+
+    if (typeof payload === 'string' && payload.trim()) {
+      return payload;
+    }
+
+    if (payload?.message) {
+      return payload.message;
+    }
+
+    if (payload?.error) {
+      return payload.error;
+    }
+
+    return 'Something went wrong while contacting the community service.';
   }
 }
