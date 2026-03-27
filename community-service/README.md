@@ -1,67 +1,144 @@
-# Community Service
-
-A Spring Boot 3.x microservice for managing community interactions, including posts, comments, and user follows. Part of the **InterviewPrep TN** platform (Module 6 - Community & Social).
+# Community Service — Module 6
 
 ## Overview
 
-The Community Service provides a RESTful API for:
-- **Posts** — users can create discussion threads, ask questions, share success stories, and tips
-- **Comments** — threaded comments with upvoting and editing flags
-- **Follows** — users can follow other community members
-- **Voting** — upvote/downvote posts and comments to surface quality content
-- **Reporting** — users can report inappropriate content
+Community Service is a Spring Boot 3.x microservice that provides comprehensive community and social features for **InterviewPrep TN**, a platform helping Tunisian graduates prepare for job interviews. Module 6 encompasses all social and community interactions, including posts, comments, follow relationships, user profiles, and a karma-based reputation system.
+
+---
+
+## Developer
+
+- **Name:** Aziz Bnamoura
+- **Module:** M6 — Community & Social
+- **Branch:** `feature/m6-community-service`
+- **Repository:** InterviewPrep TN Platform
+
+---
 
 ## Tech Stack
 
-- **Java 21** with Spring Boot 3.5.12
-- **PostgreSQL** for persistence
-- **Spring Data JPA** + Hibernate for ORM
-- **Flyway** for database migrations
-- **Spring Security** + OAuth2 Resource Server for JWT-based auth (Keycloak)
-- **Maven** for builds
-- **Lombok** for reducing boilerplate
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Java | 21 | Programming Language |
+| Spring Boot | 3.5.12 | Framework & Runtime |
+| Spring Data JPA | Latest | Database ORM & Persistence |
+| Spring Security | Latest | Authentication & Authorization |
+| Spring OAuth2 Resource Server | Latest | JWT Validation & Keycloak Integration |
+| PostgreSQL | 16 | Relational Database |
+| Flyway | Latest | Database Migration Management |
+| Lombok | Latest | Boilerplate Reduction |
+| Maven | 3.8+ | Build & Dependency Management |
 
-## Prerequisites
+---
 
-- Java 21+
-- Maven 3.8+
-- PostgreSQL 12+
-- Keycloak instance running at `http://localhost:8080` with realm `myapp-realm`
+## Port
 
-## Setup & Running
-
-### 1. Create Database
-
-```bash
-createdb communitydb
+```
+8086
 ```
 
-If using a different user/password, update `application.yaml`:
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/communitydb
-    username: postgres
-    password: devpassword
+---
+
+## Database
+
+### Database Name
+```sql
+communitydb
 ```
 
-### 2. Build & Run
+### Tables
 
-```bash
-mvn clean compile
-mvn spring-boot:run
-```
+#### 1. **posts**
+Stores user-created discussion posts with content, metadata, and engagement metrics.
 
-Or with IDE (IntelliJ, VS Code):
-1. Load the project
-2. Run `CommunityServiceApplication.java`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY |
+| `author_keycloak_id` | VARCHAR(255) | NOT NULL, Foreign Key to Keycloak |
+| `title` | VARCHAR(500) | NOT NULL |
+| `content` | TEXT | NOT NULL |
+| `type` | VARCHAR(50) | NOT NULL (e.g., "Question", "Discussion", "Practice Partner") |
+| `industry` | VARCHAR(50) | Nullable (e.g., "Tech", "Finance") |
+| `tags` | VARCHAR(500) | Comma-separated tags |
+| `upvotes` | INTEGER | DEFAULT 0 |
+| `downvotes` | INTEGER | DEFAULT 0 |
+| `view_count` | INTEGER | DEFAULT 0 |
+| `is_pinned` | BOOLEAN | DEFAULT false |
+| `is_reported` | BOOLEAN | DEFAULT false |
+| `created_at` | TIMESTAMP | DEFAULT NOW() |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() |
 
-Server starts on **port 8086**.
+**Indexes:** `idx_posts_author`, `idx_posts_type`, `idx_posts_industry`
 
-### 3. Database Initialization
+---
 
-Flyway automatically runs migrations on startup:
-- `V1__create_community_tables.sql` creates posts, comments, follows tables with indexes
+#### 2. **comments**
+Stores nested comments on posts with support for threading via `parent_comment_id`.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY |
+| `post_id` | BIGINT | NOT NULL, REFERENCES posts(id) ON DELETE CASCADE |
+| `author_keycloak_id` | VARCHAR(255) | NOT NULL, Foreign Key to Keycloak |
+| `content` | TEXT | NOT NULL |
+| `parent_comment_id` | VARCHAR(50) | Nullable, enables nested comments |
+| `upvotes` | INTEGER | DEFAULT 0 |
+| `is_edited` | BOOLEAN | DEFAULT false |
+| `is_reported` | BOOLEAN | DEFAULT false |
+| `created_at` | TIMESTAMP | DEFAULT NOW() |
+
+**Indexes:** `idx_comments_post_id`
+
+---
+
+#### 3. **follows**
+Tracks follower/following relationships between users.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY |
+| `follower_keycloak_id` | VARCHAR(255) | NOT NULL, Foreign Key to Keycloak |
+| `following_keycloak_id` | VARCHAR(255) | NOT NULL, Foreign Key to Keycloak |
+| `followed_at` | TIMESTAMP | DEFAULT NOW() |
+| Composite | UNIQUE | (follower_keycloak_id, following_keycloak_id) |
+
+**Indexes:** `idx_follows_follower`, `idx_follows_following`
+
+---
+
+#### 4. **karma_scores**
+Maintains aggregated karma and contribution metrics per user.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY |
+| `keycloak_id` | VARCHAR(255) | NOT NULL, UNIQUE |
+| `display_name` | VARCHAR(255) | Nullable |
+| `total_karma` | INTEGER | NOT NULL, DEFAULT 0 |
+| `posts_count` | INTEGER | NOT NULL, DEFAULT 0 |
+| `comments_count` | INTEGER | NOT NULL, DEFAULT 0 |
+| `upvotes_received` | INTEGER | NOT NULL, DEFAULT 0 |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() |
+
+**Indexes:** `idx_karma_keycloak_id`, `idx_karma_total` (DESC)
+
+---
+
+#### 5. **flyway_schema_history**
+Automatic table created by Flyway for migration version tracking.
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `installed_rank` | INTEGER | Migration order |
+| `version` | VARCHAR(50) | Migration version |
+| `description` | VARCHAR(255) | Migration name |
+| `type` | VARCHAR(20) | Migration type (SQL, UNDO, etc.) |
+| `script` | VARCHAR(1000) | Script filename |
+| `checksum` | INTEGER | Integrity check |
+| `installed_by` | VARCHAR(100) | Installer |
+| `installed_on` | TIMESTAMP | Installation timestamp |
+| `execution_time` | INTEGER | Execution time (ms) |
+| `success` | BOOLEAN | Success status |
 
 ## Project Structure
 
@@ -99,270 +176,378 @@ src/main/resources/
     └── V1__create_community_tables.sql
 ```
 
+---
+
 ## API Endpoints
 
-### Posts (Public Read, Authenticated Write)
+All endpoints are relative to `/api/community`.
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/community/posts` | Public | List posts (paginated, filterable) |
-| GET | `/api/community/posts/{id}` | Public | Get post (increments view count) |
-| POST | `/api/community/posts` | Required | Create post |
-| PUT | `/api/community/posts/{id}` | Required | Update own post |
-| DELETE | `/api/community/posts/{id}` | Required | Delete own post (admins can delete any) |
-| POST | `/api/community/posts/{id}/upvote` | Public | Upvote post |
-| POST | `/api/community/posts/{id}/downvote` | Public | Downvote post |
-| POST | `/api/community/posts/{id}/report` | Public | Report post as inappropriate |
+### Posts (9 endpoints)
 
-### Comments (Public Read, Authenticated Write)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/posts` | Public | Fetch paginated posts with filtering by type, industry, and sorting |
+| `GET` | `/posts/search` | Public | Full-text search posts by title, content, and tags |
+| `GET` | `/posts/{id}` | Public | Retrieve a specific post by ID |
+| `POST` | `/posts` | Authenticated | Create a new post |
+| `PUT` | `/posts/{id}` | Authenticated | Update a post (owner-only) |
+| `DELETE` | `/posts/{id}` | Authenticated | Delete a post (owner or admin) |
+| `POST` | `/posts/{id}/upvote` | Public | Increment post upvote count |
+| `POST` | `/posts/{id}/downvote` | Public | Increment post downvote count |
+| `POST` | `/posts/{id}/report` | Public | Flag a post as inappropriate |
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/community/posts/{postId}/comments` | Public | Get post comments (ordered by creation) |
-| POST | `/api/community/posts/{postId}/comments` | Required | Add comment to post |
-| DELETE | `/api/community/comments/{id}` | Required | Delete own comment |
-| POST | `/api/community/comments/{id}/upvote` | Public | Upvote comment |
+### Comments (4 endpoints)
 
-### Follows (Authenticated)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/posts/{postId}/comments` | Public | Retrieve all comments for a post (nested threading) |
+| `POST` | `/posts/{postId}/comments` | Authenticated | Add a comment to a post (supports parent comment ID for nesting) |
+| `DELETE` | `/comments/{id}` | Authenticated | Delete a comment (owner-only) |
+| `POST` | `/comments/{id}/upvote` | Public | Increment comment upvote count |
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/community/follow/{targetKeycloakId}` | Required | Follow user |
-| DELETE | `/api/community/follow/{targetKeycloakId}` | Required | Unfollow user |
-| GET | `/api/community/follow/{keycloakId}/status` | Required | Check if following |
-| GET | `/api/community/follow/followers` | Required | Get your followers |
-| GET | `/api/community/follow/following` | Required | Get users you're following |
+### Follows (5 endpoints)
 
-## Query Parameters
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/follow/{targetKeycloakId}` | Authenticated | Follow a user |
+| `DELETE` | `/follow/{targetKeycloakId}` | Authenticated | Unfollow a user |
+| `GET` | `/follow/{keycloakId}/status` | Authenticated | Check if current user follows a target user |
+| `GET` | `/follow/followers` | Authenticated | Get list of users following the current user |
+| `GET` | `/follow/following` | Authenticated | Get list of users the current user is following |
 
-### GET /api/community/posts
+### Karma (3 endpoints)
 
-```bash
-GET /api/community/posts?page=0&size=10&type=DISCUSSION&industry=tech&sort=createdAt,desc
-```
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/karma/leaderboard` | Public | Get top 10 users by karma score |
+| `GET` | `/karma/me` | Authenticated | Get current user's karma stats |
+| `GET` | `/karma/{keycloakId}` | Public | Get karma stats for a specific user |
 
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| page | int | 0 | 0-indexed page number |
-| size | int | 10 | Items per page |
-| type | string | — | Filter by type: `DISCUSSION`, `QUESTION`, `SUCCESS_STORY`, `TIP` |
-| industry | string | — | Filter by industry |
-| sort | string | `createdAt,desc` | Sort field and direction: `field,asc` or `field,desc` |
+### User Profile (2 endpoints)
 
-## Authentication
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/users/{keycloakId}/profile` | Public | Get user's community profile (posts, comments, karma, followers) |
+| `GET` | `/users/{keycloakId}/is-following` | Authenticated | Check if current user follows a specific user |
 
-- Uses **Keycloak** as OAuth2 provider
-- JWT tokens issued by Keycloak are validated at `http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs`
-- User identification: **`sub` claim** in JWT becomes the `keycloakId`
-- Roles extracted from **`realm_access.roles`** and prefixed with `ROLE_`
+### Summary
 
-### Sending Authenticated Requests
+- **Total Endpoints:** 23
+- **Authenticated:** 10
+- **Public:** 13
 
-Include the JWT in the Authorization header:
+---
 
-```bash
-curl -H "Authorization: Bearer <JWT_TOKEN>" \
-  -X POST http://localhost:8086/api/community/posts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Great interview tips",
-    "content": "Here are my top 5 interview tips...",
-    "type": "TIP",
-    "industry": "tech",
-    "tags": "interviews,tips"
-  }'
-```
+## Features Implemented
 
-## Database Schema
+### Post Management
+1. **Post Feed with Pagination** — Retrieve posts with page/size parameters, default 10 per page
+2. **Post Filtering** — Filter by post type (e.g., "Question", "Discussion", "Practice Partner") and industry
+3. **Post Sorting** — Sort by creation date, updates, or engagement (upvotes)
+4. **Full-Text Post Search** — Search across post titles, content, and tags
+5. **Post CRUD** — Create, read, update, delete posts with validation
+6. **Post Owner Protection** — Only post authors can edit/delete their own posts
+7. **Post Upvoting/Downvoting** — Track engagement with upvote and downvote counts
+8. **Post Reporting** — Flag inappropriate posts as reported
 
-### posts
-- `id` — BIGSERIAL PRIMARY KEY
-- `author_keycloak_id` — VARCHAR(255) NOT NULL
-- `title` — VARCHAR(500) NOT NULL
-- `content` — TEXT NOT NULL
-- `type` — VARCHAR(50) NOT NULL (DISCUSSION, QUESTION, SUCCESS_STORY, TIP)
-- `industry` — VARCHAR(50)
-- `tags` — VARCHAR(500)
-- `upvotes` — INTEGER DEFAULT 0
-- `downvotes` — INTEGER DEFAULT 0
-- `view_count` — INTEGER DEFAULT 0
-- `is_pinned` — BOOLEAN DEFAULT false
-- `is_reported` — BOOLEAN DEFAULT false
-- `created_at`, `updated_at` — TIMESTAMP
+### Comment System
+9. **Nested Comments** — Comments support threading via `parent_comment_id` field
+10. **Comment CRUD** — Add, retrieve, delete comments with authorization checks
+11. **Comment Upvoting** — Track comment engagement
 
-**Indexes:** author_keycloak_id, type, industry
+### Follow System
+12. **Follow/Unfollow Users** — Users can follow and unfollow other users
+13. **Follower Lists** — Retrieve users following the current user
+14. **Following Lists** — Retrieve users the current user is following
+15. **Follow Status Check** — Query if a user follows another user
 
-### comments
-- `id` — BIGSERIAL PRIMARY KEY
-- `post_id` — BIGINT NOT NULL (FK → posts)
-- `author_keycloak_id` — VARCHAR(255) NOT NULL
-- `content` — TEXT NOT NULL
-- `parent_comment_id` — VARCHAR(50) (for threading)
-- `upvotes` — INTEGER DEFAULT 0
-- `is_edited`, `is_reported` — BOOLEAN
-- `created_at` — TIMESTAMP
+### Karma & Reputation
+16. **Karma Points System** — Award karma for posts, comments, and upvotes received
+17. **Karma Leaderboard** — Display top 10 users by total karma (publicly visible)
+18. **User Karma Stats** — Query individual user karma and contribution counts
 
-**Indexes:** post_id
+### User Profiles
+19. **Community User Profile** — Aggregated view of user activity (posts, comments, karma, follower count)
 
-### follows
-- `id` — BIGSERIAL PRIMARY KEY
-- `follower_keycloak_id` — VARCHAR(255) NOT NULL
-- `following_keycloak_id` — VARCHAR(255) NOT NULL
-- `followed_at` — TIMESTAMP
-- **UNIQUE constraint:** (follower_keycloak_id, following_keycloak_id)
+### Security & Integration
+20. **JWT Authentication** — Spring Security OAuth2 with Keycloak JWT tokens
+21. **Role-Based Access** — Admin role (`ROLE_ADMIN`) for content deletion privileges
+22. **Realm Role Extraction** — Extract roles from JWT's `realm_access` claim
+23. **CORS Configuration** — Configured for Angular frontend at `localhost:4200`
 
-**Indexes:** follower_keycloak_id, following_keycloak_id
+---
 
-## CORS Configuration
+## Angular Frontend Integration
 
-Frontend at `http://localhost:4200` is allowed to:
-- Make requests to any endpoint
-- Use any HTTP method
-- Send any headers
+The Community Service is consumed by the InterviewPrep TN Angular frontend at `localhost:4200`.
 
-Update in `SecurityConfig.java` to allow additional origins.
+### Connected Pages & Components
 
-## Error Handling
+- **`community.component.ts`** — Main community hub displaying the post feed with filtering, search, and pagination. Users can create posts, view comments, upvote/downvote, and follow other users from this page.
 
-All endpoints return JSON error responses:
+- **`user-profile.component.ts`** — User community profile page showing aggregated stats (karma, post count, comment count, follower count), user's recent posts, and a follow button. Links to the `/users/{keycloakId}/profile` endpoint.
 
-### 404 Not Found
-```json
-{ "error": "Not found" }
-```
+### Key Angular Features Wired Up
 
-### 403 Forbidden
-```json
-{ "error": "Forbidden" }
-```
+- Real-time post feed with live upvote/downvote counts
+- Search and filter UI connected to `/posts/search` and `/posts` with query parameters
+- Comment threading UI for nested comment display
+- Follow/unfollow buttons with follow status indicators
+- Karma leaderboard display
+- User profile cards with karma badges and follow relationships
 
-### 400 Bad Request (Validation)
-```json
-{
-  "error": "Validation failed",
-  "fields": {
-    "title": "Title is required",
-    "content": "Content is required"
-  }
-}
-```
+---
 
-## Example Workflows
+## How to Run Locally
 
-### Create a Post
+### Prerequisites
 
-```bash
-curl -X POST http://localhost:8086/api/community/posts \
-  -H "Authorization: Bearer <JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Strategies for algorithm interviews",
-    "content": "I recently prepared for interviews. Here are my tips...",
-    "type": "TIP",
-    "industry": "tech",
-    "tags": "algorithms,interviews"
-  }'
-```
+- **Java 21** or higher (verify with `java -version`)
+- **Maven 3.8+** (verify with `mvn -v`)
+- **PostgreSQL 16+** running on `localhost:5432`
+- **Keycloak** running on `http://localhost:8080` with realm `myapp-realm`
+- **Realm Role** `ROLE_ADMIN` and test users configured in Keycloak
 
-Response (201):
-```json
-{
-  "id": 1,
-  "authorKeycloakId": "user-123",
-  "title": "Strategies for algorithm interviews",
-  "content": "I recently prepared...",
-  "type": "TIP",
-  "industry": "tech",
-  "tags": "algorithms,interviews",
-  "upvotes": 0,
-  "downvotes": 0,
-  "viewCount": 0,
-  "isPinned": false,
-  "isReported": false,
-  "score": 0,
-  "createdAt": "2026-03-25T15:00:00",
-  "updatedAt": "2026-03-25T15:00:00"
-}
-```
+### Step 1: Create the Database
 
-### Add a Comment
+Connect to PostgreSQL and create the community service database:
 
-```bash
-curl -X POST http://localhost:8086/api/community/posts/1/comments \
-  -H "Authorization: Bearer <JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Great tips! I especially liked tip #3.",
-    "parentCommentId": null
-  }'
-```
-
-### Follow a User
-
-```bash
-curl -X POST http://localhost:8086/api/community/follow/user-456 \
-  -H "Authorization: Bearer <JWT>"
-```
-
-Returns 204 No Content.
-
-### List Posts with Filters
-
-```bash
-curl http://localhost:8086/api/community/posts?type=QUESTION&industry=tech&page=0&size=20&sort=upvotes,desc
-```
-
-## Development
-
-### Running Tests
-
-```bash
-mvn test
-```
-
-### Code Style
-
-- Lombok is used for `@Data`, `@Builder`, `@RequiredArgsConstructor`
-- JPA entities use `@Entity` and `@Table`
-- DTOs are plain POJOs with Lombok
-- Services are singleton `@Service` beans
-
-### Adding Endpoints
-
-1. Add method to `CommunityService`
-2. Add `@RequestMapping` method to `CommunityController`
-3. Use `@AuthenticationPrincipal Jwt jwt` to extract `jwt.getSubject()` for keycloakId
-4. Apply `@Valid` to request DTOs for validation
-
-### Database Migrations
-
-Add new migrations to `src/main/resources/db/migration/`:
 ```sql
--- V2__add_new_feature.sql
-ALTER TABLE posts ADD COLUMN new_column VARCHAR(255);
+CREATE DATABASE communitydb;
 ```
 
-Flyway runs them in order automatically on startup.
+Verify the database was created:
 
-## Troubleshooting
+```sql
+\l
+```
 
-| Issue | Solution |
-|-------|----------|
-| **403 Forbidden on POST** | Ensure JWT token is valid and not expired. Check Keycloak config. |
-| **404 on GET /posts/{id}** | Post ID doesn't exist. Check database or create new post first. |
-| **Connection refused on startup** | PostgreSQL not running or wrong connection string in `application.yaml` |
-| **Keycloak token validation fails** | Verify issuer-uri and jwk-set-uri point to running Keycloak instance |
-| **Build fails with Lombok warnings** | Normal. Lombok uses internal APIs. Does not affect runtime. |
+### Step 2: Configure Connection
 
-## Integration with InterviewPrep TN
+Update `application.yaml` if your PostgreSQL password differs from the default:
 
-This service is **Module 6** and integrates with:
-- **User Service** — for user profiles and validation
-- **Keycloak** — for identity and authentication
-- **Frontend** (Angular) — consuming API at `http://localhost:4200`
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/communitydb
+    username: postgres
+    password: "0000"  # Change if needed
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/myapp-realm
+          jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
+```
 
-Posts, comments, and follows are persisted independently and referenced by Keycloak ID.
+### Step 3: Run the Service
 
-## License
+From the `community-service/` directory:
 
-Part of InterviewPrep TN microservices platform.
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+The service will:
+1. Apply Flyway migrations (creating tables and indexes)
+2. Start on `http://localhost:8086`
+3. Validate database schema
+4. Connect to Keycloak for JWT validation
+
+### Verify the Service
+
+Test the service with a public endpoint:
+
+```bash
+curl http://localhost:8086/api/community/posts
+```
+
+Expected response: `{"content":[],"pageNumber":0,"pageSize":10,"totalElements":0,"totalPages":0}`
+
+### Run with Docker (Coming Soon)
+
+Dockerfile and docker-compose integration are pending. Once available, you'll be able to run:
+
+```bash
+docker-compose up
+```
+
+---
+
+## Testing
+
+All 23 API endpoints have been tested and validated using the **Yaak API client** with the following test users available in the Keycloak realm `myapp-realm`:
+
+- **Test User 1:** keycloak_id = `user1`, roles: `ROLE_USER`
+- **Test User 2:** keycloak_id = `user2`, roles: `ROLE_USER`
+- **Admin User:** keycloak_id = `admin`, roles: `ROLE_ADMIN`, `ROLE_USER`
+
+### Test Coverage
+
+- ✅ Public endpoints (posts feed, search, leaderboard)
+- ✅ Authenticated endpoints (create post, follow, comment)
+- ✅ Owner-only operations (edit/delete own post/comment)
+- ✅ Admin operations (delete any content)
+- ✅ Pagination and filtering
+- ✅ Nested comments with threading
+- ✅ Upvote/downvote counts
+- ✅ Karma point calculation
+- ✅ Follow relationships
+- ✅ User profile aggregation
+
+---
+
+## Security
+
+### Public Endpoints
+Users can access these endpoints without authentication:
+
+- `GET /posts`
+- `GET /posts/search`
+- `GET /posts/{id}`
+- `GET /posts/{id}/upvote`
+- `GET /posts/{id}/downvote`
+- `GET /posts/{id}/report`
+- `GET /posts/{postId}/comments`
+- `GET /comments/{id}/upvote`
+- `GET /karma/leaderboard`
+- `GET /karma/{keycloakId}`
+- `GET /users/{keycloakId}/profile`
+
+### Authenticated Endpoints
+Requires valid JWT token from Keycloak:
+
+- `POST /posts` — Create a new post
+- `PUT /posts/{id}` — Update post (owner-only)
+- `DELETE /posts/{id}` — Delete post (owner or admin)
+- `POST /posts/{postId}/comments` — Add comment
+- `DELETE /comments/{id}` — Delete comment (owner-only)
+- `POST /follow/{targetKeycloakId}` — Follow a user
+- `DELETE /follow/{targetKeycloakId}` — Unfollow a user
+- `GET /follow/{keycloakId}/status` — Check follow status
+- `GET /follow/followers` — Get followers
+- `GET /follow/following` — Get following list
+- `GET /karma/me` — Get own karma
+
+### Authorization
+
+- **Owner-Only Protection:** Users can only edit/delete their own posts and comments
+- **Admin Override:** Users with `ROLE_ADMIN` can delete any content
+- **JWT Validation:** All authentication via Keycloak OAuth2 JWT tokens with realm roles in `realm_access.roles` claim
+- **Keycloak ID:** Cross-service identity uses `keycloakId` (extracted from JWT `sub` claim)
+
+### CORS
+
+CORS is configured to allow requests from the Angular frontend:
+
+```
+Allowed Origins: http://localhost:4200
+Allowed Methods: GET, POST, PUT, DELETE
+Allowed Headers: Content-Type, Authorization
+```
+
+---
+
+## Flyway Migrations
+
+Flyway automatically applies database migrations on startup. Migrations are stored in `src/main/resources/db/migration/`.
+
+### V1__create_community_tables.sql
+
+Initial schema with core tables:
+
+- **posts** — Discussion posts with metadata and engagement metrics
+- **comments** — Nested comments on posts with threading support
+- **follows** — User follow relationships
+- **Indexes** — Performance indexes on frequently queried columns
+
+### V2__add_karma_table.sql
+
+Adds the karma reputation system:
+
+- **karma_scores** — Aggregated karma and contribution metrics per user
+- **Indexes** — Fast lookups by keycloak_id and sorting by total karma
+
+---
+
+## Related Modules
+
+### Dependencies
+
+- **Module 1 (User Service):** Community Service depends on M1 for Keycloak integration and JWT validation. M1 manages user identities and authentication realms.
+
+### Cross-Service Integration
+
+- **Keycloak ID:** Both services use `keycloakId` (JWT `sub` claim) as the canonical user identifier
+- **JWT Validation:** Community Service validates JWTs issued by the Keycloak realm configured in M1
+- **No Direct DB Coupling:** Maintains microservice boundaries — no direct database queries to user-service. All identity checks use JWT claims.
+
+### Architecture Notes
+
+- Community Service is a **resource server** that trusts JWTs from Keycloak
+- User-Service is the **identity provider** managing users and realms
+- Services communicate via REST APIs and shared JWT standards
+- Scalable design allows independent deployment and scaling
+
+---
+
+## Development Notes
+
+### Code Structure
+
+```
+community-service/
+├── src/main/
+│   ├── java/com/microservice/community_service/
+│   │   ├── controller/        # REST endpoints
+│   │   ├── service/           # Business logic
+│   │   ├── repository/        # JPA repositories
+│   │   ├── entity/            # JPA entities
+│   │   ├── dto/               # Request/Response DTOs
+│   │   └── config/            # Security & CORS config
+│   └── resources/
+│       ├── application.yaml   # Configuration
+│       └── db/migration/      # Flyway migrations
+├── pom.xml                    # Maven dependencies
+└── README.md                  # This file
+```
+
+### Build & Deploy
+
+```bash
+# Build the service
+mvn clean package
+
+# Run the JAR
+java -jar target/community-service-0.0.1-SNAPSHOT.jar
+
+# Run with specific profile (e.g., production)
+mvn spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=prod"
+```
+
+### Extending the Service
+
+To add new endpoints:
+
+1. Create a new method in `CommunityService`
+2. Add a corresponding endpoint in `CommunityController`
+3. Create/update DTOs in the `dto/` package
+4. Add tests using Yaak or similar API client
+5. Update this README with new endpoint documentation
+
+---
+
+## Contact & Support
+
+For questions or issues regarding the Community Service module, reach out to:
+
+- **Developer:** Aziz Bnamoura
+- **Module:** M6 — Community & Social
+- **Project:** InterviewPrep TN
+
+---
+
+**Last Updated:** March 27, 2026
+**Service Version:** 0.0.1-SNAPSHOT
+**Spring Boot Version:** 3.5.12
