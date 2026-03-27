@@ -8,7 +8,7 @@ Community Service is a Spring Boot 3.x microservice that provides comprehensive 
 
 ## Developer
 
-- **Name:** Aziz Bnamoura
+- **Name:** Aziz BenAmor
 - **Module:** M6 — Community & Social
 - **Branch:** `feature/m6-community-service`
 - **Repository:** InterviewPrep TN Platform
