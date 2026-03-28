@@ -4,6 +4,7 @@ import {
     inject,
     OnInit,
     ChangeDetectorRef,
+    ChangeDetectionStrategy,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink, ActivatedRoute, Router } from "@angular/router";
@@ -24,6 +25,7 @@ import { UserProfile } from "../../core/services/user-api.service";
 @Component({
     selector: "app-dashboard",
     standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         CommonModule,
         RouterLink,
@@ -119,7 +121,7 @@ export class DashboardComponent implements OnInit {
                 console.log("Dashboard got user:", user);
                 this.currentUser = user;
                 this.isAdmin = this.computeIsAdmin(user);
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             });
 
         this.currentUserStore.initialized$
@@ -128,7 +130,7 @@ export class DashboardComponent implements OnInit {
                 console.log("Dashboard got initialized:", initialized);
                 this.storeInitialized = initialized;
                 this.loading = !initialized;
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             });
 
         if (!this.currentUserStore.initialized) {
