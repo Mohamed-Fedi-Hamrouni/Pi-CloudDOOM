@@ -1,4 +1,10 @@
-import { Component, DestroyRef, inject, OnInit } from "@angular/core";
+import {
+    Component,
+    DestroyRef,
+    inject,
+    OnInit,
+    ChangeDetectorRef,
+} from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink, ActivatedRoute, Router } from "@angular/router";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -35,6 +41,7 @@ export class DashboardComponent implements OnInit {
     private authService = inject(AuthService);
     private currentUserStore = inject(CurrentUserStoreService);
     private destroyRef = inject(DestroyRef);
+    private cdr = inject(ChangeDetectorRef);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
 
@@ -90,6 +97,15 @@ export class DashboardComponent implements OnInit {
     ];
 
     ngOnInit(): void {
+        console.log(
+            "Dashboard ngOnInit - store initialized:",
+            this.currentUserStore.initialized,
+        );
+        console.log(
+            "Dashboard ngOnInit - store user:",
+            this.currentUserStore.currentUser,
+        );
+
         this.route.queryParamMap
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((params) => {
@@ -100,27 +116,35 @@ export class DashboardComponent implements OnInit {
         this.currentUserStore.currentUser$
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((user) => {
+                console.log("Dashboard got user:", user);
                 this.currentUser = user;
                 this.isAdmin = this.computeIsAdmin(user);
+                this.cdr.detectChanges();
             });
 
         this.currentUserStore.initialized$
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((initialized) => {
+                console.log("Dashboard got initialized:", initialized);
                 this.storeInitialized = initialized;
                 this.loading = !initialized;
+                this.cdr.detectChanges();
             });
 
-        if (!this.authService.isAuthenticated()) {
+        if (!this.currentUserStore.initialized) {
+            console.log("Dashboard triggering loadCurrentUser");
+            this.currentUserStore
+                .loadCurrentUser()
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe({
+                    next: (u) => console.log("loadCurrentUser result:", u),
+                    error: (e) => console.error("loadCurrentUser error:", e),
+                });
+        } else {
+            console.log("Dashboard using cached user");
             this.loading = false;
             this.storeInitialized = true;
-            return;
         }
-
-        this.currentUserStore
-            .loadCurrentUser()
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe();
     }
 
     setTab(tab: "overview" | "admin"): void {

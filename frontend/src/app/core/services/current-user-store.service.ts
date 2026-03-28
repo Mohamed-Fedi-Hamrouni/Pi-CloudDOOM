@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 import { BehaviorSubject, Observable, of } from "rxjs";
-import { catchError, finalize, shareReplay, tap } from "rxjs/operators";
+import { catchError, tap } from "rxjs/operators";
 import { UserApiService, UserProfile } from "./user-api.service";
 
 @Injectable({ providedIn: "root" })
@@ -10,8 +10,7 @@ export class CurrentUserStoreService {
     private readonly currentUserSubject =
         new BehaviorSubject<UserProfile | null>(null);
     private readonly initializedSubject = new BehaviorSubject<boolean>(false);
-
-    private loadInFlight$?: Observable<UserProfile | null>;
+    private loading = false;
 
     readonly currentUser$ = this.currentUserSubject.asObservable();
     readonly initialized$ = this.initializedSubject.asObservable();
@@ -25,32 +24,30 @@ export class CurrentUserStoreService {
     }
 
     loadCurrentUser(force = false): Observable<UserProfile | null> {
-        if (!force && this.currentUserSubject.value) {
-            this.initializedSubject.next(true);
+        if (!force && this.initializedSubject.value) {
             return of(this.currentUserSubject.value);
         }
 
-        if (!force && this.loadInFlight$) {
-            return this.loadInFlight$;
+        if (this.loading && !force) {
+            return of(this.currentUserSubject.value);
         }
 
-        this.loadInFlight$ = this.userApi.getCurrentUser().pipe(
+        this.loading = true;
+
+        return this.userApi.getCurrentUser().pipe(
             tap((user) => {
                 this.currentUserSubject.next(user);
+                this.initializedSubject.next(true);
+                this.loading = false;
             }),
             catchError((err) => {
                 console.error("Failed to load current user", err);
                 this.currentUserSubject.next(null);
+                this.initializedSubject.next(true);
+                this.loading = false;
                 return of(null);
             }),
-            finalize(() => {
-                this.initializedSubject.next(true);
-                this.loadInFlight$ = undefined;
-            }),
-            shareReplay(1),
         );
-
-        return this.loadInFlight$;
     }
 
     refreshCurrentUser(): Observable<UserProfile | null> {
@@ -65,5 +62,6 @@ export class CurrentUserStoreService {
     clear(): void {
         this.currentUserSubject.next(null);
         this.initializedSubject.next(false);
+        this.loading = false;
     }
 }
