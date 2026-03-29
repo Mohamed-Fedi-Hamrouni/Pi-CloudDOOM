@@ -124,7 +124,22 @@ Maintains aggregated karma and contribution metrics per user.
 
 ---
 
-#### 5. **flyway_schema_history**
+#### 5. **post_bookmarks** (NEW — Module 6.2)
+Stores user bookmarks for saving favorite posts for later reference.
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | BIGSERIAL | PRIMARY KEY |
+| `user_keycloak_id` | VARCHAR(255) | NOT NULL, Foreign Key to Keycloak |
+| `post_id` | BIGINT | NOT NULL, REFERENCES posts(id) ON DELETE CASCADE |
+| `created_at` | TIMESTAMP | DEFAULT NOW() |
+| Composite | UNIQUE | (user_keycloak_id, post_id) |
+
+**Indexes:** `idx_bookmarks_user`, `idx_bookmarks_post`
+
+---
+
+#### 6. **flyway_schema_history**
 Automatic table created by Flyway for migration version tracking.
 
 | Column | Type | Purpose |
@@ -147,11 +162,13 @@ src/main/java/com/microservice/community_service/
 ├── model/               # JPA entities
 │   ├── Post.java       # Community post with voting & view tracking
 │   ├── Comment.java    # Threaded comments with upvotes
-│   └── Follow.java     # User follow relationships
+│   ├── Follow.java     # User follow relationships
+│   └── PostBookmark.java # NEW: User post bookmarks for saving favorites
 ├── repository/         # JPA repositories (Spring Data)
 │   ├── PostRepository.java
 │   ├── CommentRepository.java
-│   └── FollowRepository.java
+│   ├── FollowRepository.java
+│   └── PostBookmarkRepository.java # NEW: Bookmark queries
 ├── dto/                # Data transfer objects
 │   ├── PostResponse.java
 │   ├── CreatePostRequest.java
@@ -161,9 +178,11 @@ src/main/java/com/microservice/community_service/
 │   ├── FollowResponse.java
 │   └── PageResponse.java
 ├── service/            # Business logic
-│   └── CommunityService.java
+│   ├── CommunityService.java
+│   └── PostBookmarkService.java # NEW: Bookmark operations
 ├── controller/         # REST endpoints
-│   └── CommunityController.java
+│   ├── CommunityController.java
+│   └── PostBookmarkController.java # NEW: Bookmark endpoints
 ├── config/             # Spring configuration
 │   ├── SecurityConfig.java
 │   └── JwtAuthConverter.java
@@ -182,12 +201,13 @@ src/main/resources/
 
 All endpoints are relative to `/api/community`.
 
-### Posts (9 endpoints)
+### Posts (11 endpoints)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/posts` | Public | Fetch paginated posts with filtering by type, industry, and sorting |
 | `GET` | `/posts/search` | Public | Full-text search posts by title, content, and tags |
+| `GET` | `/posts/feed` | Authenticated | Fetch paginated posts from users the current user follows (NEW) |
 | `GET` | `/posts/{id}` | Public | Retrieve a specific post by ID |
 | `POST` | `/posts` | Authenticated | Create a new post |
 | `PUT` | `/posts/{id}` | Authenticated | Update a post (owner-only) |
@@ -223,6 +243,15 @@ All endpoints are relative to `/api/community`.
 | `GET` | `/karma/me` | Authenticated | Get current user's karma stats |
 | `GET` | `/karma/{keycloakId}` | Public | Get karma stats for a specific user |
 
+### Bookmarks (4 endpoints — NEW Module 6.2)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/bookmarks/{postId}/toggle` | Authenticated | Toggle bookmark status for a post (NEW) |
+| `GET` | `/bookmarks` | Authenticated | Retrieve user's bookmarked posts (NEW) |
+| `GET` | `/bookmarks/{postId}/status` | Authenticated | Check if current user has bookmarked a specific post (NEW) |
+| `GET` | `/bookmarks/{postId}/count` | Public | Get total bookmark count for a post (NEW) |
+
 ### User Profile (2 endpoints)
 
 | Method | Path | Auth | Description |
@@ -232,9 +261,9 @@ All endpoints are relative to `/api/community`.
 
 ### Summary
 
-- **Total Endpoints:** 23
-- **Authenticated:** 10
-- **Public:** 13
+- **Total Endpoints:** 29 (was 23)
+- **Authenticated:** 14 (was 10)
+- **Public:** 15 (was 13)
 
 ---
 
@@ -260,6 +289,14 @@ All endpoints are relative to `/api/community`.
 13. **Follower Lists** — Retrieve users following the current user
 14. **Following Lists** — Retrieve users the current user is following
 15. **Follow Status Check** — Query if a user follows another user
+16. **Following Feed** — NEW: Get paginated posts only from users the current user follows
+
+### Bookmarks (NEW — Module 6.2)
+17. **Post Bookmarking** — NEW: Users can bookmark posts to save them for later
+18. **Bookmark Toggle** — NEW: Single endpoint to toggle bookmark on/off with bookmark count returned
+19. **Bookmark Management** — NEW: Query all bookmarked posts for the current user
+20. **Bookmark Status Check** — NEW: Check if a specific post is bookmarked by the current user
+21. **Bookmark Count** — NEW: Query total bookmarks on any post (publicly visible)
 
 ### Karma & Reputation
 16. **Karma Points System** — Award karma for posts, comments, and upvotes received
@@ -267,13 +304,13 @@ All endpoints are relative to `/api/community`.
 18. **User Karma Stats** — Query individual user karma and contribution counts
 
 ### User Profiles
-19. **Community User Profile** — Aggregated view of user activity (posts, comments, karma, follower count)
+22. **Community User Profile** — Aggregated view of user activity (posts, comments, karma, follower count)
 
 ### Security & Integration
-20. **JWT Authentication** — Spring Security OAuth2 with Keycloak JWT tokens
-21. **Role-Based Access** — Admin role (`ROLE_ADMIN`) for content deletion privileges
-22. **Realm Role Extraction** — Extract roles from JWT's `realm_access` claim
-23. **CORS Configuration** — Configured for Angular frontend at `localhost:4200`
+23. **JWT Authentication** — Spring Security OAuth2 with Keycloak JWT tokens
+24. **Role-Based Access** — Admin role (`ROLE_ADMIN`) for content deletion privileges
+25. **Realm Role Extraction** — Extract roles from JWT's `realm_access` claim
+26. **CORS Configuration** — Configured for Angular frontend at `localhost:4200`
 
 ---
 
@@ -295,6 +332,10 @@ The Community Service is consumed by the InterviewPrep TN Angular frontend at `l
 - Follow/unfollow buttons with follow status indicators
 - Karma leaderboard display
 - User profile cards with karma badges and follow relationships
+- **NEW (M6.2):** 4-tab community page UI (All Posts | My Posts | Following | Bookmarks)
+- **NEW (M6.2):** Bookmark toggle button on each post with visual indicator
+- **NEW (M6.2):** Tab-specific empty state messages (e.g., "Follow some members to see their posts here")
+- **NEW (M6.2):** Synchronized bookmark state across tabs
 
 ---
 
@@ -363,15 +404,24 @@ Test the service with a public endpoint:
 curl http://localhost:8086/api/community/posts
 ```
 
-Expected response: `{"content":[],"pageNumber":0,"pageSize":10,"totalElements":0,"totalPages":0}`
+Expected response: `{"content":[],"totalElements":0,"totalPages":0,"number":0,"size":10}`
 
-### Run with Docker (Coming Soon)
+### Run with Docker (Available — Module 6.2)
 
-Dockerfile and docker-compose integration are pending. Once available, you'll be able to run:
+A multi-stage Dockerfile and docker-compose integration are now available:
 
 ```bash
-docker-compose up
+cd infra
+docker-compose up -d
 ```
+
+This will:
+1. Create a `communitydb` PostgreSQL database
+2. Build the community-service from the Dockerfile (multi-stage: Maven builder + Java runtime)
+3. Start the service on port 8086
+4. Apply all Flyway migrations automatically
+
+**Note:** Ensure `user-service` is also running, as community-service depends on Keycloak which is managed through the main docker-compose file.
 
 ---
 
@@ -469,6 +519,14 @@ Adds the karma reputation system:
 - **karma_scores** — Aggregated karma and contribution metrics per user
 - **Indexes** — Fast lookups by keycloak_id and sorting by total karma
 
+### V3__add_post_bookmarks.sql (NEW — Module 6.2)
+
+Adds post bookmarking functionality:
+
+- **post_bookmarks** — User bookmarks for saving favorite posts
+- **Unique Constraint** — Prevents duplicate bookmarks (user_keycloak_id, post_id)
+- **Indexes** — Fast lookups by user and post, with cascading delete on post removal
+
 ---
 
 ## Related Modules
@@ -548,6 +606,7 @@ For questions or issues regarding the Community Service module, reach out to:
 
 ---
 
-**Last Updated:** March 27, 2026
+**Last Updated:** March 29, 2026 (M6.2 — Bookmarks & Following Feed)
 **Service Version:** 0.0.1-SNAPSHOT
 **Spring Boot Version:** 3.5.12
+**Module:** M6 — Community Service (Fully Implemented)
