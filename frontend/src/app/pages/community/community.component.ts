@@ -128,42 +128,6 @@ interface CommunitySuggestion {
             </div>
           </div>
 
-          <!-- Tab bar -->
-          <div class="tab-bar">
-            <button
-              class="tab-btn"
-              [class.active]="activeTab === 'all'"
-              (click)="loadTab('all')"
-              type="button"
-            >
-              🌐 All Posts
-            </button>
-            <button
-              class="tab-btn"
-              [class.active]="activeTab === 'mine'"
-              (click)="loadTab('mine')"
-              type="button"
-            >
-              ✍️ My Posts
-            </button>
-            <button
-              class="tab-btn"
-              [class.active]="activeTab === 'following'"
-              (click)="loadTab('following')"
-              type="button"
-            >
-              👥 Following
-            </button>
-            <button
-              class="tab-btn"
-              [class.active]="activeTab === 'bookmarks'"
-              (click)="loadTab('bookmarks')"
-              type="button"
-            >
-              🔖 Bookmarks
-            </button>
-          </div>
-
           <!-- Search bar -->
           <div style="position:relative;">
             <input
@@ -190,6 +154,48 @@ interface CommunitySuggestion {
                          transform:translateY(-50%);
                          cursor:pointer; color:var(--color-text-muted);
                          font-size:var(--text-xs); user-select:none;">✕</span>
+          </div>
+
+          <!-- Tab bar for feed types -->
+          <div class="tab-bar">
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'all'"
+              (click)="loadTab('all')"
+              type="button"
+              title="All posts"
+            >
+              🌐 All Posts
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'mine'"
+              (click)="loadTab('mine')"
+              type="button"
+              title="Your posts"
+            >
+              ✍️ My Posts
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'following'"
+              (click)="loadTab('following')"
+              type="button"
+              title="Posts from people you follow"
+            >
+              👥 Following
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'bookmarks'"
+              (click)="loadTab('bookmarks')"
+              type="button"
+              title="Your saved posts"
+            >
+              🔖 Bookmarks
+              <span *ngIf="bookmarkedPostIds.size > 0" class="badge">{{ bookmarkedPostIds.size }}</span>
+            </button>
+            <div class="tab-indicator"></div>
           </div>
 
           <!-- Feed filter -->
@@ -238,7 +244,7 @@ interface CommunitySuggestion {
             </div>
           </div>
 
-          <!-- Empty states -->
+          <!-- Empty states by tab -->
           <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'all' && selectedType !== 'PRACTICE_REQUEST'">
             <div class="loading-state">
               <i class="bi bi-chat-square-text"></i>
@@ -348,8 +354,10 @@ interface CommunitySuggestion {
               <button
                 class="post-action-btn bookmark-btn"
                 [class.bookmarked]="bookmarkedPostIds.has(post.id)"
+                [class.bookmark-pop]="bookmarkAnimating.has(post.id)"
                 type="button"
                 (click)="onToggleBookmark(post)"
+                [title]="bookmarkedPostIds.has(post.id) ? 'Remove bookmark' : 'Add bookmark'"
               >
                 <span>{{ bookmarkedPostIds.has(post.id) ? '🔖' : '🏷️' }}</span>
               </button>
@@ -860,13 +868,17 @@ interface CommunitySuggestion {
     .yn-label { font-size: var(--text-xs); color: var(--color-text-muted); }
     .yn-value { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
 
-    /* Tab bar */
+    /* ========== UX ENHANCEMENTS ========== */
+
+    /* 3A: Enhanced tab bar */
     .tab-bar {
       display: flex;
       gap: var(--space-2);
-      margin-bottom: var(--space-3);
+      margin-bottom: var(--space-4);
       border-bottom: 2px solid var(--color-border-light);
       padding-bottom: 0;
+      position: relative;
+      align-items: center;
     }
 
     .tab-btn {
@@ -875,34 +887,365 @@ interface CommunitySuggestion {
       background: none;
       cursor: pointer;
       font-size: var(--text-sm);
-      font-weight: 600;
+      font-weight: 500;
       color: var(--color-text-muted);
       border-bottom: 3px solid transparent;
       transition: all var(--transition-fast);
       margin-bottom: -2px;
       white-space: nowrap;
       font-family: var(--font-body);
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
     }
 
     .tab-btn:hover {
       color: var(--color-text);
-      background: var(--neutral-50);
+      background: rgba(var(--teal-600-rgb, 16, 185, 129), 0.08);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
     }
 
     .tab-btn.active {
       color: var(--teal-600);
+      font-weight: 600;
       border-bottom-color: var(--teal-600);
     }
 
-    /* Bookmark button */
+    .tab-indicator {
+      position: absolute;
+      bottom: -2px;
+      height: 3px;
+      background: var(--teal-600);
+      transition: all var(--transition-base);
+      border-radius: 2px 2px 0 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      background: var(--teal-600);
+      color: white;
+      border-radius: var(--radius-full);
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 4px;
+    }
+
+    /* 3B: Post card enhancements */
+    @keyframes postFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .post-card {
+      animation: postFadeIn var(--transition-base) ease-out backwards;
+      transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .post-card:nth-child(1) { animation-delay: 0ms; }
+    .post-card:nth-child(2) { animation-delay: 60ms; }
+    .post-card:nth-child(3) { animation-delay: 120ms; }
+    .post-card:nth-child(4) { animation-delay: 180ms; }
+    .post-card:nth-child(5) { animation-delay: 240ms; }
+    .post-card:nth-child(6) { animation-delay: 300ms; }
+    .post-card:nth-child(n+7) { animation-delay: 360ms; }
+
+    .post-card:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px);
+    }
+
+    /* Bookmark button pop animation */
+    @keyframes bookmarkPop {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    .bookmark-btn.bookmark-pop {
+      animation: bookmarkPop 200ms ease-out;
+    }
+
     .bookmark-btn {
       padding: var(--space-2) var(--space-2) !important;
       min-width: 40px;
       justify-content: center;
+      transition: color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .bookmark-btn:active {
+      transform: scale(0.92);
     }
 
     .bookmark-btn.bookmarked {
       color: var(--teal-600);
+    }
+
+    /* Type chip with left border accent */
+    .type-chip {
+      border-left: 3px solid var(--teal-600);
+      padding-left: calc(var(--space-2) - 3px);
+    }
+
+    /* Upvote/downvote button pressed state */
+    .post-action-btn:active {
+      transform: scale(0.92);
+      transition: transform 80ms ease;
+    }
+
+    /* 3C: Search bar enhancements */
+    @keyframes searchSpinner {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .search-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--color-border-light);
+      border-top-color: var(--teal-600);
+      border-radius: 50%;
+      animation: searchSpinner 0.6s linear infinite;
+    }
+
+    input[type="text"][name="searchQuery"]:focus {
+      border-color: var(--teal-600);
+      transition: border-color var(--transition-fast);
+    }
+
+    /* Clear button fade-in */
+    .search-clear-btn {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition-fast);
+    }
+
+    .search-clear-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 3D: Create form enhancements */
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    }
+
+    .create-form-pulse {
+      animation: pulse 2s infinite;
+      animation-iteration-count: 2;
+    }
+
+    .create-form-grid input:focus,
+    .create-form-grid select:focus {
+      border-color: var(--teal-600);
+      transition: border-color var(--transition-fast);
+    }
+
+    .create-post-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: searchSpinner 0.6s linear infinite;
+      margin-right: 6px;
+    }
+
+    .char-counter {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      margin-top: 4px;
+      transition: color var(--transition-fast);
+    }
+
+    .char-counter.warning {
+      color: #f59e0b;
+    }
+
+    .char-counter.danger {
+      color: #ef4444;
+    }
+
+    /* 3E: Comments enhancements */
+    .comments-section {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height var(--transition-base) ease;
+    }
+
+    .comments-section.open {
+      max-height: 2000px;
+    }
+
+    .comment-textarea {
+      resize: none;
+      min-height: 40px;
+      max-height: 200px;
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      overflow-y: auto;
+    }
+
+    /* 3G: Loading states - skeleton shimmer */
+    @keyframes shimmer {
+      0% { background-position: -600px 0; }
+      100% { background-position: 600px 0; }
+    }
+
+    .skeleton-card {
+      background: linear-gradient(90deg, #ebebeb 25%, #f5f5f5 50%, #ebebeb 75%);
+      background-size: 1200px 100%;
+      animation: shimmer 1.4s infinite linear;
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-4);
+    }
+
+    .skeleton-header {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--color-border-light);
+    }
+
+    .skeleton-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, #ebebeb 25%, #f5f5f5 50%, #ebebeb 75%);
+      background-size: 1200px 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+
+    .skeleton-text-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .skeleton-line {
+      height: 14px;
+      background: linear-gradient(90deg, #ebebeb 25%, #f5f5f5 50%, #ebebeb 75%);
+      background-size: 1200px 100%;
+      animation: shimmer 1.4s infinite linear;
+      border-radius: 4px;
+    }
+
+    .skeleton-line.short { width: 70%; }
+    .skeleton-line.medium { width: 85%; }
+
+    /* 3H: Load more button */
+    .load-more-btn {
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .load-more-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: searchSpinner 0.6s linear infinite;
+      margin-right: 6px;
+    }
+
+    /* 3I: Error messages */
+    .error-alert {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+      color: #991b1b;
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: slideDown var(--transition-base) ease-out;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .error-alert-close {
+      background: none;
+      border: none;
+      color: #991b1b;
+      cursor: pointer;
+      font-size: var(--text-lg);
+      padding: 0;
+      opacity: 0.6;
+      transition: opacity var(--transition-fast);
+    }
+
+    .error-alert-close:hover {
+      opacity: 1;
+    }
+
+    /* 3J: Who to Follow button states */
+    .follow-btn {
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+
+    .follow-btn:hover {
+      background: rgba(16, 185, 129, 0.9);
+    }
+
+    .follow-btn.following {
+      background: var(--neutral-100);
+      color: var(--teal-600);
+      border: 1px solid var(--color-border-light);
+    }
+
+    .follow-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(16, 185, 129, 0.3);
+      border-top-color: var(--teal-600);
+      border-radius: 50%;
+      animation: searchSpinner 0.6s linear infinite;
+    }
+
+    /* 3K: Hover profile card animations */
+    @keyframes hoverCardIn {
+      from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .hover-card {
+      animation: hoverCardIn var(--transition-base) ease-out;
+      backdrop-filter: blur(2px);
+    }
+
+    /* 3L: Responsive polish */
+    @media (max-width: 768px) {
+      .tab-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .tab-bar::-webkit-scrollbar {
+        display: none;
+      }
+      .tab-btn {
+        white-space: nowrap;
+        padding: var(--space-2) var(--space-3);
+      }
+      .post-card {
+        padding: var(--space-3);
+      }
     }
 
     @keyframes spin {
@@ -930,6 +1273,7 @@ export class CommunityComponent implements OnInit {
   posts: CommunityPost[] = [];
   activeTab: 'all' | 'mine' | 'following' | 'bookmarks' = 'all';
   bookmarkedPostIds = new Set<number>();
+  bookmarkAnimating = new Set<number>();
   trendingTopics = TRENDING_TOPICS;
   whoToFollow: CommunitySuggestion[] = [];
   followers: CommunityFollow[] = [];
@@ -1174,6 +1518,7 @@ export class CommunityComponent implements OnInit {
   }
 
   onToggleBookmark(post: CommunityPost): void {
+    this.bookmarkAnimating.add(post.id);
     this.communityApi.toggleBookmark(post.id).subscribe({
       next: (response) => {
         if (response.bookmarked) {
@@ -1181,10 +1526,15 @@ export class CommunityComponent implements OnInit {
         } else {
           this.bookmarkedPostIds.delete(post.id);
         }
+        setTimeout(() => {
+          this.bookmarkAnimating.delete(post.id);
+          this.cdr.markForCheck();
+        }, 200);
         this.cdr.markForCheck();
       },
       error: () => {
         this.errorMessage = 'Failed to toggle bookmark';
+        this.bookmarkAnimating.delete(post.id);
         this.cdr.markForCheck();
       },
     });
