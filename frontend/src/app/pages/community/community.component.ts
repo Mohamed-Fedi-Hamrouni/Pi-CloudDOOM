@@ -128,6 +128,42 @@ interface CommunitySuggestion {
             </div>
           </div>
 
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'all'"
+              (click)="loadTab('all')"
+              type="button"
+            >
+              🌐 All Posts
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'mine'"
+              (click)="loadTab('mine')"
+              type="button"
+            >
+              ✍️ My Posts
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'following'"
+              (click)="loadTab('following')"
+              type="button"
+            >
+              👥 Following
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'bookmarks'"
+              (click)="loadTab('bookmarks')"
+              type="button"
+            >
+              🔖 Bookmarks
+            </button>
+          </div>
+
           <!-- Search bar -->
           <div style="position:relative;">
             <input
@@ -202,19 +238,41 @@ interface CommunitySuggestion {
             </div>
           </div>
 
-          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && selectedType !== 'PRACTICE_REQUEST'">
+          <!-- Empty states -->
+          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'all' && selectedType !== 'PRACTICE_REQUEST'">
             <div class="loading-state">
               <i class="bi bi-chat-square-text"></i>
               <span>No posts found for the current filters.</span>
             </div>
           </div>
 
-          <div class="card empty-card practice-empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && selectedType === 'PRACTICE_REQUEST'">
+          <div class="card empty-card practice-empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'all' && selectedType === 'PRACTICE_REQUEST'">
             <div class="practice-empty-state">
               <div class="practice-empty-icon">🤝</div>
               <div class="practice-empty-title">No practice partner requests yet</div>
               <div class="practice-empty-subtitle">Be the first to find a practice partner in this community</div>
               <button class="btn btn-primary btn-sm" type="button" (click)="findPracticePartner()">Post a Request</button>
+            </div>
+          </div>
+
+          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'mine'">
+            <div class="loading-state">
+              <i class="bi bi-pencil"></i>
+              <span>You haven't posted anything yet. Start the conversation!</span>
+            </div>
+          </div>
+
+          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'following'">
+            <div class="loading-state">
+              <i class="bi bi-people"></i>
+              <span>Follow some members to see their posts here.</span>
+            </div>
+          </div>
+
+          <div class="card empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'bookmarks'">
+            <div class="loading-state">
+              <i class="bi bi-bookmark"></i>
+              <span>You have no bookmarked posts yet.</span>
             </div>
           </div>
 
@@ -286,6 +344,14 @@ interface CommunitySuggestion {
               >
                 <span>🤝</span>
                 <span>Connect</span>
+              </button>
+              <button
+                class="post-action-btn bookmark-btn"
+                [class.bookmarked]="bookmarkedPostIds.has(post.id)"
+                type="button"
+                (click)="onToggleBookmark(post)"
+              >
+                <span>{{ bookmarkedPostIds.has(post.id) ? '🔖' : '🏷️' }}</span>
               </button>
               <button class="post-action-btn" type="button" (click)="reportPost(post.id)">
                 <span><i class="bi bi-flag-fill"></i></span>
@@ -794,6 +860,51 @@ interface CommunitySuggestion {
     .yn-label { font-size: var(--text-xs); color: var(--color-text-muted); }
     .yn-value { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
 
+    /* Tab bar */
+    .tab-bar {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+      border-bottom: 2px solid var(--color-border-light);
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      padding: var(--space-3) var(--space-4);
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      border-bottom: 3px solid transparent;
+      transition: all var(--transition-fast);
+      margin-bottom: -2px;
+      white-space: nowrap;
+      font-family: var(--font-body);
+    }
+
+    .tab-btn:hover {
+      color: var(--color-text);
+      background: var(--neutral-50);
+    }
+
+    .tab-btn.active {
+      color: var(--teal-600);
+      border-bottom-color: var(--teal-600);
+    }
+
+    /* Bookmark button */
+    .bookmark-btn {
+      padding: var(--space-2) var(--space-2) !important;
+      min-width: 40px;
+      justify-content: center;
+    }
+
+    .bookmark-btn.bookmarked {
+      color: var(--teal-600);
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -817,6 +928,8 @@ export class CommunityComponent implements OnInit {
   private router = inject(Router);
 
   posts: CommunityPost[] = [];
+  activeTab: 'all' | 'mine' | 'following' | 'bookmarks' = 'all';
+  bookmarkedPostIds = new Set<number>();
   trendingTopics = TRENDING_TOPICS;
   whoToFollow: CommunitySuggestion[] = [];
   followers: CommunityFollow[] = [];
@@ -916,6 +1029,7 @@ export class CommunityComponent implements OnInit {
       loading: false,
     }));
     this.loadInitialData();
+    this.loadBookmarkedIds();
 
     this.communityApi.getLeaderboard().subscribe({
       next: (data) => {
@@ -996,6 +1110,97 @@ export class CommunityComponent implements OnInit {
     this.editingPostId = null;
     this.editError = '';
     this.cdr.markForCheck();
+  }
+
+  loadTab(tab: 'all' | 'mine' | 'following' | 'bookmarks', page = 0): void {
+    this.activeTab = tab;
+    this.currentPage = 0;
+    this.posts = [];
+    this.errorMessage = '';
+    this.isInitialLoading = true;
+    this.cdr.markForCheck();
+
+    switch (tab) {
+      case 'all':
+        this.loadPosts(0, false);
+        break;
+      case 'mine':
+        this.communityApi.getPosts(0, this.pageSize, '', '', 'createdAt,desc')
+          .pipe(finalize(() => { this.isInitialLoading = false; this.cdr.markForCheck(); }))
+          .subscribe({
+            next: (response) => {
+              this.applyPostsResponse(response, false);
+              this.cdr.markForCheck();
+            },
+            error: (error) => {
+              this.errorMessage = this.getErrorMessage(error);
+              this.cdr.markForCheck();
+            },
+          });
+        break;
+      case 'following':
+        this.communityApi.getFollowingFeed(0, this.pageSize)
+          .pipe(finalize(() => { this.isInitialLoading = false; this.cdr.markForCheck(); }))
+          .subscribe({
+            next: (response) => {
+              this.applyPostsResponse(response, false);
+              this.cdr.markForCheck();
+            },
+            error: (error) => {
+              this.errorMessage = this.getErrorMessage(error);
+              this.cdr.markForCheck();
+            },
+          });
+        break;
+      case 'bookmarks':
+        this.communityApi.getMyBookmarks()
+          .pipe(finalize(() => { this.isInitialLoading = false; this.cdr.markForCheck(); }))
+          .subscribe({
+            next: (response) => {
+              this.posts = response.data;
+              this.totalPosts = response.total;
+              this.totalPages = 1;
+              this.currentPage = 0;
+              this.hasMore = false;
+              this.cdr.markForCheck();
+            },
+            error: (error) => {
+              this.errorMessage = this.getErrorMessage(error);
+              this.cdr.markForCheck();
+            },
+          });
+        break;
+    }
+  }
+
+  onToggleBookmark(post: CommunityPost): void {
+    this.communityApi.toggleBookmark(post.id).subscribe({
+      next: (response) => {
+        if (response.bookmarked) {
+          this.bookmarkedPostIds.add(post.id);
+        } else {
+          this.bookmarkedPostIds.delete(post.id);
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.errorMessage = 'Failed to toggle bookmark';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private loadBookmarkedIds(): void {
+    this.communityApi.getMyBookmarks().subscribe({
+      next: (response) => {
+        this.bookmarkedPostIds.clear();
+        response.data.forEach((post) => {
+          this.bookmarkedPostIds.add(post.id);
+        });
+        this.cdr.markForCheck();
+      },
+      error: () => {},
+    });
   }
 
   submitEdit(): void {

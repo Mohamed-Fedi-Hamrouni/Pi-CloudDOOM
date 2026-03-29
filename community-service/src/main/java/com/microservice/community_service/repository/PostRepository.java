@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByType(String type, Pageable pageable);
@@ -22,4 +24,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> searchPosts(@Param("q") String query, Pageable pageable);
 
     Page<Post> findByAuthorKeycloakIdOrderByCreatedAtDesc(String authorKeycloakId, Pageable pageable);
+
+    Page<Post> findByAuthorKeycloakIdIn(List<String> authorKeycloakIds, Pageable pageable);
 }

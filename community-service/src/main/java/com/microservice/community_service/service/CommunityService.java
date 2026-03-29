@@ -227,6 +227,31 @@ public class CommunityService {
                 .stream().map(this::toFollowResponse).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<PostResponse> getFollowingFeed(String followerKeycloakId, int page, int size) {
+        List<String> followingIds = followRepository.findByFollowerKeycloakId(followerKeycloakId)
+                .stream()
+                .map(Follow::getFollowingKeycloakId)
+                .collect(Collectors.toList());
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Post> result;
+        if (followingIds.isEmpty()) {
+            result = Page.empty(pageable);
+        } else {
+            result = postRepository.findByAuthorKeycloakIdIn(followingIds, pageable);
+        }
+
+        return PageResponse.<PostResponse>builder()
+                .content(result.getContent().stream().map(this::toPostResponse).collect(Collectors.toList()))
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .build();
+    }
+
     // ─── Karma ────────────────────────────────────────────────────────────────
 
     public List<KarmaResponse> getLeaderboard() {

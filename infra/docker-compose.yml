@@ -206,12 +206,52 @@ services:
         ports:
             - "${FRONTEND_PORT:-4200}:80"
 
+    communitydb:
+        image: postgres:16-alpine
+        container_name: communitydb
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: communitydb
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: "0000"
+        volumes:
+            - communitydb_data:/var/lib/postgresql/data
+        networks:
+            - userservice-network
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d communitydb"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    community-service:
+        build:
+            context: ../community-service
+            dockerfile: Dockerfile
+        container_name: community-service
+        restart: unless-stopped
+        ports:
+            - "8086:8086"
+        environment:
+            SPRING_DATASOURCE_URL: jdbc:postgresql://communitydb:5432/communitydb
+            SPRING_DATASOURCE_USERNAME: postgres
+            SPRING_DATASOURCE_PASSWORD: "0000"
+            SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+            SPRING_FLYWAY_ENABLED: "true"
+            SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+        depends_on:
+            communitydb:
+                condition: service_healthy
+        networks:
+            - userservice-network
+
 volumes:
     pgdata:
     redisdata:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    communitydb_data:
 
 networks:
     default:

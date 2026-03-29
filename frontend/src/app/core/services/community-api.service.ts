@@ -204,4 +204,24 @@ export class CommunityApiService {
       .set('size', size.toString());
     return this.http.get<CommunityPageResponse<CommunityPost>>(`${this.apiUrl}/posts/search`, { params });
   }
+
+  getFollowingFeed(page: number, size: number): Observable<CommunityPageResponse<CommunityPost>> {
+    const params = new HttpParams()
+      .set('page', page)
+      .set('size', size);
+    return this.http.get<CommunityPageResponse<CommunityPost>>(`${this.apiUrl}/posts/feed`, { params });
+  }
+
+  toggleBookmark(postId: number): Observable<{ success: boolean; bookmarked: boolean; bookmarkCount: number }> {
+    return this.http.post<{ success: boolean; bookmarked: boolean; bookmarkCount: number }>(
+      `${this.apiUrl}/bookmarks/${postId}/toggle`,
+      {}
+    );
+  }
+
+  getMyBookmarks(): Observable<{ success: boolean; data: CommunityPost[]; total: number }> {
+    return this.http.get<{ success: boolean; data: CommunityPost[]; total: number }>(
+      `${this.apiUrl}/bookmarks`
+    );
+  }
 }

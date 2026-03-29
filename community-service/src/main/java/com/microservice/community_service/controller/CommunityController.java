@@ -42,6 +42,14 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.searchPosts(q, page, size));
     }
 
+    @GetMapping("/posts/feed")
+    public ResponseEntity<PageResponse<PostResponse>> getFollowingFeed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(communityService.getFollowingFeed(jwt.getSubject(), page, size));
+    }
+
     @GetMapping("/posts/{id}")
     public ResponseEntity<PostResponse> getPost(@PathVariable Long id) {
         return ResponseEntity.ok(communityService.getPost(id));
