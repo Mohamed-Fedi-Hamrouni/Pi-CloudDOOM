@@ -26,4 +26,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByAuthorKeycloakIdOrderByCreatedAtDesc(String authorKeycloakId, Pageable pageable);
 
     Page<Post> findByAuthorKeycloakIdIn(List<String> authorKeycloakIds, Pageable pageable);
+
+    Page<Post> findByAuthorKeycloakId(String authorKeycloakId, Pageable pageable);
 }

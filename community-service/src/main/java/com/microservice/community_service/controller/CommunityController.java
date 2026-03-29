@@ -50,6 +50,14 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.getFollowingFeed(jwt.getSubject(), page, size));
     }
 
+    @GetMapping("/posts/my")
+    public ResponseEntity<PageResponse<PostResponse>> getMyPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(communityService.getMyPosts(jwt.getSubject(), page, size));
+    }
+
     @GetMapping("/posts/{id}")
     public ResponseEntity<PostResponse> getPost(@PathVariable Long id) {
         return ResponseEntity.ok(communityService.getPost(id));

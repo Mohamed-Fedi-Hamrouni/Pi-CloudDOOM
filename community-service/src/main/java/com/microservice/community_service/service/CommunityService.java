@@ -252,6 +252,20 @@ public class CommunityService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<PostResponse> getMyPosts(String authorKeycloakId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Post> result = postRepository.findByAuthorKeycloakId(authorKeycloakId, pageable);
+
+        return PageResponse.<PostResponse>builder()
+                .content(result.getContent().stream().map(this::toPostResponse).collect(Collectors.toList()))
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .build();
+    }
+
     // ─── Karma ────────────────────────────────────────────────────────────────
 
     public List<KarmaResponse> getLeaderboard() {
