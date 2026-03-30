@@ -2,6 +2,9 @@ package com.microservice.interviewservice.service.impl;
 
 import java.util.List;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional
 public class InterviewSessionServiceImpl implements InterviewSessionService {
 
+    private static final ObjectMapper EVENT_MAPPER = JsonMapper.builder().findAndAddModules().build();
+
     private final InterviewSessionRepository  repository;
     private final InterviewSessionMapper      mapper;
     private final QuestionSelectionService    questionSelectionService;
@@ -42,7 +47,7 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
     private final ReportGenerationService     reportGenerationService;
     private final ProgressTrackerService      progressTrackerService;
     private final PerformanceReportRepository reportRepository;
-    private final KafkaTemplate<String, SessionCompletedEvent> kafkaTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -139,7 +144,7 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
                 .globalScore(report.getGlobalScore())
                 .preparationLevel(report.getPreparationLevel())
                 .totalSessionsCompleted(tracker.getTotalSessionsCompleted())
-                .generatedAt(report.getGeneratedAt())
+            .generatedAt(report.getGeneratedAt() == null ? null : report.getGeneratedAt().toString())
                 .build());
 
         return mapper.toResponse(saved);
@@ -197,7 +202,8 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
 
     private void publishEventSafely(SessionCompletedEvent event) {
         try {
-            kafkaTemplate.send("interview.session.completed", event.getUserId(), event)
+            String payload = EVENT_MAPPER.writeValueAsString(event);
+            kafkaTemplate.send("interview.session.completed", event.getUserId(), payload)
                     .whenComplete((result, ex) -> {
                         if (ex != null) {
                             log.warn("Kafka delivery failed [sessionId={}]: {}", event.getSessionId(), ex.getMessage());
@@ -205,6 +211,8 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
                             log.info("SessionCompletedEvent published [sessionId={}]", event.getSessionId());
                         }
                     });
+        } catch (JsonProcessingException ex) {
+            log.warn("Could not serialize Kafka payload [sessionId={}]: {}", event.getSessionId(), ex.getMessage());
         } catch (Exception ex) {
             log.warn("Could not submit Kafka send [sessionId={}]: {}", event.getSessionId(), ex.getMessage());
         }

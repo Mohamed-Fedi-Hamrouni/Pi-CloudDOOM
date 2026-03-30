@@ -121,6 +121,10 @@ services:
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.updated --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.deleted --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.events.DLQ --partitions 1 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic interview.session.completed --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.created --partitions 2 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.updated --partitions 2 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.badge.earned --partitions 2 --replication-factor 1
             echo 'Topics créés :'
             kafka-topics --list --bootstrap-server kafka:29092
             "
@@ -194,6 +198,34 @@ services:
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
 
+    interview-service:
+        build:
+            context: ../interview-service
+            dockerfile: Dockerfile
+        container_name: userservice-interview-service
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+        ports:
+            - "${INTERVIEW_SERVICE_PORT:-8082}:8082"
+        environment:
+            SERVER_PORT: 8082
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/interviewdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+            KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+            KEYCLOAK_SERVER_URL: http://keycloak:8080
+            KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_CLIENT_ID: interview-service
+            KEYCLOAK_CLIENT_SECRET: interview-service-secret-change-in-prod
+
     frontend:
         build:
             context: ../frontend
@@ -205,6 +237,35 @@ services:
                 condition: service_started
         ports:
             - "${FRONTEND_PORT:-4200}:80"
+
+    training-service:
+        build:
+            context: ../training-service
+            dockerfile: Dockerfile
+        container_name: userservice-training-service
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+        ports:
+            - "${TRAINING_SERVICE_PORT:-8083}:8083"
+        environment:
+            SERVER_PORT: 8083
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainingdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+            KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+            KEYCLOAK_SERVER_URL: http://keycloak:8080
+            KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_CLIENT_ID: training-service
+            KEYCLOAK_CLIENT_SECRET: training-service-secret-change-in-prod
+            TRAINING_DEBUG_BADGE_SIMULATION_ENABLED: "true"
 
 volumes:
     pgdata:

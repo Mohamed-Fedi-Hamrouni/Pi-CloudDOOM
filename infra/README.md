@@ -57,6 +57,14 @@ docker compose up -d --build user-service
 docker compose up -d --build
 ```
 
+## Smoke test M4 (one-command)
+
+Script automatique pour valider M4 Training & Gamification (sécurité, création de path, update module, activité XP/streak, leaderboard, simulation badges QA):
+
+```bash
+./scripts/m4_smoke.sh
+```
+
 ## Topics Kafka créés automatiquement
 
 | Topic           | Usage              |
