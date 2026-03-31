@@ -1,6 +1,5 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MOCK_INTERVIEWS, MOCK_QUIZ_QUESTIONS } from '../../core/data/mock-data';
 import { InterviewSession } from '../../core/models/models';
@@ -8,7 +7,7 @@ import { InterviewSession } from '../../core/models/models';
 @Component({
   selector: 'app-interviews',
   standalone: true,
-  imports: [CommonModule, RouterLink, SectionHeaderComponent],
+  imports: [CommonModule, SectionHeaderComponent],
   template: `
     <div class="interviews-page animate-fade">
 

@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Resource } from '../../../core/models/models';
 
@@ -25,7 +25,7 @@ import { Resource } from '../../../core/models/models';
             <span>⭐ {{ resource.rating }}</span>
             <span>👁️ {{ resource.views.toLocaleString() }}</span>
           </div>
-          <button class="btn btn-ghost btn-sm save-btn" [class.saved]="resource.saved">
+          <button class="btn btn-ghost btn-sm save-btn" [class.saved]="resource.saved" (click)="onToggleSaved()">
             {{ resource.saved ? '🔖' : '＋' }} {{ resource.saved ? 'Saved' : 'Save' }}
           </button>
         </div>
@@ -116,6 +116,7 @@ import { Resource } from '../../../core/models/models';
 })
 export class ResourceCardComponent {
   @Input() resource!: Resource;
+  @Output() toggleSaved = new EventEmitter<void>();
 
   get typeIcon(): string {
     const icons: Record<string, string> = {
@@ -133,5 +134,9 @@ export class ResourceCardComponent {
       template:'chip chip-sand'
     };
     return classes[this.resource?.type] || 'chip chip-teal';
+  }
+
+  onToggleSaved(): void {
+    this.toggleSaved.emit();
   }
 }
