@@ -34,7 +34,7 @@ Flyway will automatically create the `users` table on first run.
 
 ### 4 — Verify
 - API running at: `http://localhost:8081`
-- Keycloak at: `http://localhost:8080` (admin / 0000)
+- Keycloak at: `http://localhost:8780` (admin / 0000)
 - Health check: `http://localhost:8081/actuator/health`
 
 ## Keycloak credentials

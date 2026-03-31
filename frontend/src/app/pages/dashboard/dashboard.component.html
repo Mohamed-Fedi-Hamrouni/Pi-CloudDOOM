@@ -1,8 +1,8 @@
 <div class="dashboard animate-fade">
 
   <div *ngIf="isAdmin" class="tab-bar">
-    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">📊 Overview</button>
-    <button class="tab-btn" [class.active]="activeTab === 'admin'" (click)="activeTab = 'admin'">⚙️ Admin Panel</button>
+    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="switchTab('overview')">📊 Overview</button>
+    <button class="tab-btn" [class.active]="activeTab === 'admin'" (click)="switchTab('admin')">⚙️ Admin Panel</button>
   </div>
 
   <div *ngIf="isAdmin && activeTab === 'admin'">
@@ -11,16 +11,18 @@
 
   <div *ngIf="activeTab === 'overview'" class="overview-wrap">
 
-    <!-- Welcome Banner -->
     <div class="welcome-banner">
       <div class="welcome-left">
-        <h1 class="welcome-title">Welcome back, {{ currentUser ? (currentUser.firstName + ' ' + currentUser.lastName) : (authService.getFullName() || 'there') }}! 👋</h1>
-        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! 🚀</p>
+        <h1 class="welcome-title">
+          Welcome back, {{ currentUser?.firstName || 'User' }}! 👋
+        </h1>
+        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up! 🚀</p>
         <div class="welcome-ctas">
           <a routerLink="/interviews" class="btn btn-primary">Start Mock Session →</a>
           <a routerLink="/reports" class="btn btn-secondary">View My Reports</a>
         </div>
       </div>
+
       <div class="welcome-right">
         <div class="readiness-ring">
           <svg viewBox="0 0 120 120" width="120" height="120">
@@ -36,7 +38,7 @@
             </defs>
           </svg>
           <div class="ring-label">
-            <div class="ring-score">{{ user.readinessScore }}</div>
+            <div class="ring-score">{{ currentUser?.readinessScore || user.readinessScore }}%</div>
             <div class="ring-sub">Readiness</div>
           </div>
         </div>
@@ -54,20 +56,15 @@
       </div>
     </div>
 
-    <!-- Stats Row -->
     <div class="stats-row">
-      <app-stat-card icon="🎙️" value="{{ dashboard.totalSessions }}" label="Mock Sessions Done" color="teal" change="4 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📝" value="{{ dashboard.totalQuizzes }}" label="Quizzes Completed" color="cyan" change="2 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📊" value="{{ dashboard.recentScore }}%" label="Latest Score" color="mint" change="vs 71% last time" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📚" value="{{ dashboard.hoursStudied }}h" label="Total Study Time" color="sky"></app-stat-card>
-    </div>
+  <app-stat-card icon="🎙️" [value]="dashboard.totalSessions.toString()" label="Mock Sessions" color="teal"></app-stat-card>
+  <app-stat-card icon="📝" [value]="dashboard.totalQuizzes.toString()" label="Quizzes" color="cyan"></app-stat-card>
+  <app-stat-card icon="📊" [value]="dashboard.recentScore + '%'" label="Latest Score" color="mint"></app-stat-card>
+  <app-stat-card icon="📚" [value]="dashboard.hoursStudied + 'h'" label="Study Time" color="sky"></app-stat-card>
+</div>
 
-    <!-- Main Grid -->
     <div class="dashboard-grid">
-
-      <!-- Left Column -->
       <div class="dash-col dash-col-main">
-
         <div class="card next-session-card">
           <div class="ns-left">
             <span class="chip chip-teal">Upcoming</span>
@@ -80,7 +77,6 @@
           </div>
           <div class="ns-right">
             <a routerLink="/interviews" class="btn btn-primary">Join Session →</a>
-            <button class="btn btn-ghost btn-sm">Reschedule</button>
           </div>
         </div>
 
@@ -88,18 +84,11 @@
           <div class="pc-header">
             <div>
               <div class="pc-title">Profile Completeness</div>
-              <div class="pc-sub">Complete your profile to get better recommendations</div>
             </div>
             <div class="pc-pct">{{ user.profileCompletion }}%</div>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" [style.width]="user.profileCompletion + '%'"></div>
-          </div>
-          <div class="pc-todos">
-            <div class="pc-todo done">✓ Add target roles</div>
-            <div class="pc-todo done">✓ Complete first mock session</div>
-            <div class="pc-todo">+ Upload your CV</div>
-            <div class="pc-todo">+ Book a mentor session</div>
           </div>
         </div>
 
@@ -120,53 +109,19 @@
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- Right Column -->
       <div class="dash-col dash-col-side">
-
         <div class="card">
           <app-section-header title="Recent Activity" icon="🕐" actionLabel="View All"></app-section-header>
           <app-activity-item *ngFor="let act of dashboard.recentActivity" [icon]="act.icon" [text]="act.text" [time]="act.time"></app-activity-item>
         </div>
-
         <div class="card">
           <app-section-header title="Your Badges" icon="🏅" actionLabel="View All"></app-section-header>
           <div class="badges-mini-grid">
             <app-badge-card *ngFor="let badge of earnedBadges.slice(0,4)" [badge]="badge"></app-badge-card>
           </div>
         </div>
-
-        <div class="card mentor-suggest">
-          <app-section-header title="Suggested Mentor" icon="🤝" actionLabel="Browse All"></app-section-header>
-          <div class="ms-card">
-            <div class="ms-header">
-              <div class="avatar-placeholder" style="width:48px;height:48px;font-size:0.9rem;">PK</div>
-              <div>
-                <div class="ms-name">Dr. Priya Kapoor</div>
-                <div class="ms-role">Senior EM @ Google</div>
-                <div class="stars" style="margin-top:2px;">★★★★★ <small style="font-size:0.65rem;color:var(--color-text-muted);">4.9 (148)</small></div>
-              </div>
-            </div>
-            <p class="ms-bio">Expert in FAANG behavioral and system design interviews. Next available tomorrow.</p>
-            <a routerLink="/mentorship" class="btn btn-outline btn-sm" style="width:100%;margin-top:var(--space-2);">Book Session · $80</a>
-          </div>
-        </div>
-
-        <div class="card">
-          <app-section-header title="Saved Resources" icon="📚" actionLabel="Library"></app-section-header>
-          <div class="saved-resources">
-            <div class="sr-item" *ngFor="let r of savedResources">
-              <span class="sr-type">{{ r.icon }}</span>
-              <div class="sr-body">
-                <div class="sr-title">{{ r.title }}</div>
-                <div class="sr-meta">{{ r.duration }} · {{ r.category }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>

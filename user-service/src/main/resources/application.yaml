@@ -9,8 +9,8 @@ spring:
         oauth2:
             resourceserver:
                 jwt:
-                    issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/myapp-realm}
-                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs}
+                    issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8780/realms/myapp-realm}
+                    jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8780/realms/myapp-realm/protocol/openid-connect/certs}
 
     datasource:
         url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/userdb}
@@ -20,7 +20,7 @@ spring:
 
     jpa:
         hibernate:
-            ddl-auto: none
+            ddl-auto: update
         show-sql: true
         open-in-view: false
         properties:
@@ -30,7 +30,7 @@ spring:
     flyway:
         enabled: false
         locations: classpath:db/migration
-        baseline-on-migrate: false
+        baseline-on-migrate: true
         clean-disabled: true
         validate-on-migrate: true
 

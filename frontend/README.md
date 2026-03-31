@@ -17,8 +17,8 @@ Angular 21 frontend for the InterviewPrep TN platform, integrated with Keycloak 
 - Node.js 22+
 - npm 10+
 - Angular CLI 21 (`npm install -g @angular/cli`)
-- Backend running at `http://localhost:8081`
-- Keycloak running at `http://localhost:8080`
+- Backend running at `http://localhost:8082`
+- Keycloak running at `http://localhost:8780`
 - Infrastructure started (see `/infra/README.md`)
 
 ---
@@ -134,9 +134,9 @@ Automatically adds `Authorization: Bearer <token>` to every HTTP request. No man
 ### environment.ts
 ```typescript
 export const environment = {
-  apiUrl: 'http://localhost:8081',
+  apiUrl: 'http://localhost:8082',
   keycloak: {
-    url: 'http://localhost:8080',
+    url: 'http://localhost:8780',
     realm: 'myapp-realm',
     clientId: 'angular-client'
   }
@@ -170,7 +170,7 @@ Accessible to users with `ROLE_ADMIN` only.
 - Features: list users, search, filter by status/role, verify, suspend, activate, delete, restore, view full details
 
 To make a user admin:
-1. Go to `http://localhost:8080` → Admin Console → myapp-realm → Users
+1. Go to `http://localhost:8780` → Admin Console → myapp-realm → Users
 2. Click the user → Role mapping → Assign role → ROLE_ADMIN
 3. User must log out and log back in for the role to take effect
 
@@ -218,4 +218,4 @@ docker restart userservice-keycloak
 → Keycloak container is not healthy. Wait 90 seconds after `docker compose up -d`.
 
 **Cannot connect to server (status 0)**
-→ CORS issue or Spring Boot not running. Check `http://localhost:8081/actuator/health`.
+→ CORS issue or Spring Boot not running. Check `http://localhost:8082/actuator/health`.

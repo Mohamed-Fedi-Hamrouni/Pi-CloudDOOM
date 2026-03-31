@@ -1,358 +1,360 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal, inject, ChangeDetectorRef, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
-import { MOCK_QUIZZES, MOCK_QUIZ_QUESTIONS } from '../../core/data/mock-data';
-import { Quiz } from '../../core/models/models';
+import { RouterModule } from '@angular/router';
+import { QuizService } from '../../core/services/quiz.service'; 
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-quiz-assessment',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent],
+  imports: [CommonModule, RouterModule],
   template: `
-    <div class="quiz-page animate-fade">
-      <div class="page-header">
-        <div>
-          <h1>Quiz & Assessment</h1>
-          <p>Test your knowledge across behavioral, technical, and product domains.</p>
-        </div>
-        <div class="quiz-header-stats">
-          <span class="chip chip-teal">🏆 14 Completed</span>
-          <span class="chip chip-mint">📊 Avg 78%</span>
-        </div>
-      </div>
+    <div class="assessment-wrapper">
+      
+      <ng-container *ngIf="!activeQuiz() && !showResults()">
+        <header class="main-header">
+          <div class="top-meta">
+            <span class="badge emerald">📚 {{ quizzes().length }} Quiz disponibles</span>
+            <span class="badge rose">🏆 {{ myAttempts().length }} Tentatives</span>
+          </div>
+          <h1 class="title">Quiz & Assessment</h1>
+          <p class="subtitle">Sélectionnez une évaluation pour tester vos connaissances.</p>
+        </header>
 
-      <!-- Search + Filters -->
-      <div class="quiz-filters">
-        <div class="input-icon-wrap" style="flex:1; max-width:400px;">
-          <span class="icon">🔍</span>
-          <input class="input" placeholder="Search quizzes...">
-        </div>
-        <div class="filter-chips">
-          <button class="chip" [class]="activeFilter() === 'all' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('all')">All</button>
-          <button class="chip" [class]="activeFilter() === 'behavioral' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('behavioral')">Behavioral</button>
-          <button class="chip" [class]="activeFilter() === 'technical' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('technical')">Technical</button>
-          <button class="chip" [class]="activeFilter() === 'product' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('product')">Product</button>
-        </div>
-        <div class="difficulty-chips">
-          <span class="chip chip-mint">Easy</span>
-          <span class="chip chip-sand">Medium</span>
-          <span class="chip chip-peach">Hard</span>
-        </div>
-      </div>
-
-      <div class="quiz-layout">
-
-        <!-- Left: Catalog -->
-        <div class="quiz-catalog">
-          <div class="quiz-card-item"
-            *ngFor="let quiz of quizzes"
-            [class.selected]="selectedQuiz()?.id === quiz.id"
-            (click)="selectQuiz(quiz)">
-            <div class="qci-top">
-              <span class="chip" [class]="diffChip(quiz.difficulty)">{{ quiz.difficulty }}</span>
-              <span class="chip chip-neutral">{{ quiz.category }}</span>
-            </div>
-            <h3 class="qci-title">{{ quiz.title }}</h3>
-            <p class="qci-desc">{{ quiz.description }}</p>
-            <div class="qci-meta">
-              <span>❓ {{ quiz.questions }} questions</span>
-              <span>⏱️ {{ quiz.duration }}</span>
-            </div>
-            <div class="qci-popularity">
-              <div class="progress-bar" style="height:4px;">
-                <div class="progress-fill" [style.width]="quiz.completedByPercent + '%'"></div>
-              </div>
-              <span class="qci-pop-label">{{ quiz.completedByPercent }}% of users completed</span>
-            </div>
+        <div class="filter-bar">
+          <div class="search-input">
+            <span class="icon">🔍</span>
+            <input type="text" placeholder="Rechercher un quiz..." (input)="onSearch($event)">
           </div>
         </div>
 
-        <!-- Right: Quiz Details / Active Quiz -->
-        <div class="quiz-detail">
+        <div class="quiz-grid">
+          @for (quiz of filteredQuizzes(); track quiz.id) {
+            <div class="masterclass-card animate-in">
+              <div class="card-label">✨ Disponible</div>
+              <h2 class="card-title">{{ quiz.title }}</h2>
+              <p class="card-description">{{ quiz.description }}</p>
+              
+              <div class="card-tags">
+                <span class="tag-pill">📝 Quiz</span>
+                <span class="tag-info">⏱️ {{ quiz.timeLimit }} min</span>
+                <span class="tag-level">{{ quiz.difficulty }}</span>
+              </div>
 
-          <!-- No quiz started -->
-          <ng-container *ngIf="!activeQuiz() && selectedQuiz()">
-            <div class="card quiz-detail-card">
-              <div class="qd-header">
-                <div>
-                  <span class="chip" [class]="diffChip(selectedQuiz()!.difficulty)">{{ selectedQuiz()!.difficulty }}</span>
-                  <h2 class="qd-title">{{ selectedQuiz()!.title }}</h2>
-                  <p class="qd-desc">{{ selectedQuiz()!.description }}</p>
-                </div>
-              </div>
-              <div class="qd-stats">
-                <div class="qds-item">
-                  <div class="qds-val">{{ selectedQuiz()!.questions }}</div>
-                  <div class="qds-label">Questions</div>
-                </div>
-                <div class="qds-item">
-                  <div class="qds-val">{{ selectedQuiz()!.duration }}</div>
-                  <div class="qds-label">Duration</div>
-                </div>
-                <div class="qds-item">
-                  <div class="qds-val">{{ selectedQuiz()!.completedByPercent }}%</div>
-                  <div class="qds-label">Completion rate</div>
-                </div>
-              </div>
-              <div class="qd-tags">
-                <span *ngFor="let tag of selectedQuiz()!.tags" class="chip chip-neutral">{{ tag }}</span>
-              </div>
-              <button class="btn btn-primary btn-lg" style="width:100%;margin-top:var(--space-4);" (click)="startQuiz()">
-                Start Quiz →
+              <button class="action-button" (click)="start(quiz.id)">
+                Commencer l'évaluation —
               </button>
             </div>
-
-            <!-- Sample question preview -->
-            <div class="card">
-              <app-section-header title="Sample Question" icon="👀"></app-section-header>
-              <div class="sq-text">{{ sampleQuestion.text }}</div>
-              <div class="sq-options">
-                <div class="sq-option" *ngFor="let opt of sampleQuestion.options; let i = index" [class.correct]="i === sampleQuestion.correct">
-                  <span class="sq-opt-letter">{{ letters[i] }}</span>
-                  <span class="sq-opt-text">{{ opt }}</span>
-                  <span *ngIf="i === sampleQuestion.correct" class="sq-correct-mark">✓</span>
-                </div>
-              </div>
+          } @empty {
+            <div class="empty-state">
+              <h3>Aucun quiz trouvé.</h3>
+              <p>Vérifiez si des quiz sont publiés dans le backend.</p>
             </div>
-          </ng-container>
+          }
+        </div>
+      </ng-container>
 
-          <!-- Active Quiz -->
-          <ng-container *ngIf="activeQuiz()">
-            <div class="card active-quiz-card">
-              <div class="aq-progress-bar">
-                <div class="aq-prog-label">
-                  <span>Question {{ currentQuestion() + 1 }} of {{ quizQuestions.length }}</span>
-                  <span class="aq-timer">⏱ 12:43</span>
-                </div>
-                <div class="progress-bar" style="height:6px;">
-                  <div class="progress-fill" [style.width]="((currentQuestion() + 1)/quizQuestions.length*100) + '%'"></div>
-                </div>
-              </div>
-
-              <div class="aq-question">{{ quizQuestions[currentQuestion()].text }}</div>
-
-              <div class="aq-options">
-                <button class="aq-option"
-                  *ngFor="let opt of quizQuestions[currentQuestion()].options; let i = index"
-                  [class.selected]="selectedAnswer() === i"
-                  [class.correct]="answered() && i === quizQuestions[currentQuestion()].correct"
-                  [class.incorrect]="answered() && selectedAnswer() === i && i !== quizQuestions[currentQuestion()].correct"
-                  (click)="selectAnswer(i)">
-                  <span class="aq-opt-letter">{{ letters[i] }}</span>
-                  <span>{{ opt }}</span>
-                </button>
-              </div>
-
-              <div class="aq-explanation" *ngIf="answered()">
-                <div class="aqe-label">💡 Explanation</div>
-                <p>{{ quizQuestions[currentQuestion()].explanation }}</p>
-              </div>
-
-              <div class="aq-controls">
-                <button class="btn btn-secondary" (click)="endQuiz()">Exit Quiz</button>
-                <button class="btn btn-primary" (click)="nextQuestion()" [disabled]="!answered()">
-                  {{ currentQuestion() < quizQuestions.length - 1 ? 'Next →' : 'Finish Quiz' }}
-                </button>
-              </div>
+      <div class="exam-card animate-in" *ngIf="activeQuiz() && !showResults()">
+        <div class="exam-header">
+           <span>Question {{ currentIdx() + 1 }} / {{ totalQuestions() }}</span>
+           <div class="progress-bar">
+             <div class="progress-fill" [style.width.%]="getProgress()"></div>
+           </div>
+        </div>
+        
+        <h2 class="question-text">{{ currentQuestion()?.content }}</h2>
+        
+        <div class="options-grid">
+          @for (opt of currentQuestion()?.answers; track opt.id) {
+            <div class="option-item" 
+                 [class.selected]="isPicked(opt.id)" 
+                 (click)="selectOption(opt.id)">
+              <div class="radio-circle"></div>
+              <span class="option-content">{{ opt.content }}</span>
             </div>
-          </ng-container>
+          }
+        </div>
 
-          <!-- Results card after quiz -->
-          <ng-container *ngIf="showResults()">
-            <div class="card results-card">
-              <div class="rc-top">
-                <div class="rc-icon">🎉</div>
-                <h2 class="rc-title">Quiz Complete!</h2>
-                <div class="rc-score">{{ quizScore }}%</div>
-                <div class="rc-sub">{{ quizScore >= 80 ? 'Excellent work!' : quizScore >= 60 ? 'Good effort!' : 'Keep practicing!' }}</div>
-              </div>
-              <div class="rc-breakdown">
-                <div class="rc-bd-item success">
-                  <span>✓</span>
-                  <span>2 Correct</span>
-                </div>
-                <div class="rc-bd-item error">
-                  <span>✗</span>
-                  <span>1 Incorrect</span>
-                </div>
-              </div>
-              <div class="rc-badges">
-                <span class="chip chip-teal">+150 XP</span>
-                <span class="chip chip-mint">+2 Streak days</span>
-              </div>
-              <div class="rc-ctas">
-                <button class="btn btn-primary" (click)="resetQuiz()">Retake Quiz</button>
-                <button class="btn btn-secondary" (click)="resetQuiz()">Try Another</button>
-              </div>
-            </div>
-          </ng-container>
-
-          <!-- Empty state -->
-          <div class="empty-state" *ngIf="!activeQuiz() && !selectedQuiz() && !showResults()">
-            <div class="empty-state-icon">📝</div>
-            <h3>Select a quiz</h3>
-            <p>Choose from our quiz catalog to start assessing your interview readiness.</p>
-          </div>
+        <div class="exam-footer">
+          <button class="btn-back" (click)="prev()" [disabled]="currentIdx() === 0">Retour</button>
+          <button class="btn-next" (click)="next()">
+            {{ isLast() ? 'Terminer' : 'Suivant' }}
+          </button>
         </div>
       </div>
+
+      <div class="results-card animate-in" *ngIf="showResults()">
+        <header class="results-header">
+          <div>
+            <h2 class="res-title">Correction : {{ quizResult()?.quizTitle }}</h2>
+            <p class="res-subtitle">Analyse détaillée de vos réponses</p>
+          </div>
+          <div class="score-circle" [class.passed]="quizResult()?.passed">
+            <span class="score-val">{{ quizResult()?.percentage }}%</span>
+          </div>
+        </header>
+
+        <div class="questions-review">
+          @for (res of quizResult()?.questionResults; track res.orderIndex) {
+            <div class="review-item" [class.correct]="res.isCorrect" [class.wrong]="!res.isCorrect">
+              <div class="review-status-icon">
+                {{ res.isCorrect ? '✅' : '❌' }}
+              </div>
+              <div class="review-body">
+                <h3 class="review-q">Question {{ res.orderIndex + 1 }}: {{ res.questionContent }}</h3>
+                
+                <div class="answer-box">
+                  <div class="ans-row">
+                    <span class="label">Vos réponses :</span>
+                    <span class="val">{{ res.yourAnswers.join(', ') || 'Aucune réponse' }}</span>
+                  </div>
+                  <div class="ans-row" *ngIf="!res.isCorrect">
+                    <span class="label">Bonnes réponses :</span>
+                    <span class="val correct-text">{{ res.correctAnswers.join(', ') }}</span>
+                  </div>
+                </div>
+
+                <div class="explanation-box" *ngIf="res.explanation">
+                  <strong>💡 Explication :</strong> {{ res.explanation }}
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="results-footer">
+          <button class="action-button secondary" (click)="showResults.set(false); refresh()">
+            Retour à l'accueil
+          </button>
+        </div>
+      </div>
+
     </div>
   `,
   styles: [`
-    .quiz-page { display: flex; flex-direction: column; gap: var(--space-6); }
-    .quiz-header-stats { display: flex; gap: var(--space-3); align-items: center; }
-    .quiz-filters { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
-    .filter-chips, .difficulty-chips { display: flex; gap: var(--space-2); }
-    .filter-chips .chip, .difficulty-chips .chip { cursor: pointer; }
+    :host { --emerald: #00a884; --rose: #ef4444; display: block; background: #f9fbfb; min-height: 100vh; font-family: 'Inter', sans-serif; }
+    .assessment-wrapper { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+    
+    /* Header & Badges */
+    .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-right: 8px; }
+    .emerald { background: #dcfce7; color: #15803d; }
+    .rose { background: #fee2e2; color: #b91c1c; }
+    .title { font-size: 32px; font-weight: 800; color: #1e293b; margin: 15px 0 5px; }
+    .subtitle { color: #64748b; margin-bottom: 30px; }
 
-    .quiz-layout {
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: var(--space-6);
-      align-items: start;
-    }
+    /* Filter & Grid */
+    .filter-bar { margin-bottom: 30px; }
+    .search-input { background: white; padding: 12px 20px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; gap: 10px; max-width: 400px; }
+    .search-input input { border: none; outline: none; width: 100%; font-size: 14px; }
+    .quiz-grid { display: grid; gap: 20px; }
+    .masterclass-card { background: var(--emerald); border-radius: 24px; padding: 35px; color: white; position: relative; overflow: hidden; }
+    .card-label { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px; margin-bottom: 15px; width: fit-content; }
+    .card-title { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
+    .card-description { opacity: 0.9; font-size: 15px; margin-bottom: 20px; }
+    .card-tags { display: flex; gap: 10px; margin-bottom: 25px; }
+    .tag-pill { background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 10px; font-size: 12px; }
+    .tag-level { background: #064e3b; color: #00dfad; padding: 5px 12px; border-radius: 10px; font-weight: 700; font-size: 12px; }
+    .action-button { background: #00dfad; color: #064e3b; border: none; padding: 16px; border-radius: 14px; font-weight: 800; cursor: pointer; transition: 0.2s; width: 100%; }
+    .action-button:hover { transform: translateY(-2px); filter: brightness(1.05); }
+    .action-button.secondary { background: #1e293b; color: white; margin-top: 20px; }
 
-    /* Catalog */
-    .quiz-catalog { display: flex; flex-direction: column; gap: var(--space-3); }
+    /* Exam Card */
+    .exam-card { background: white; border-radius: 24px; padding: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .progress-bar { height: 8px; background: #f1f5f9; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--emerald); transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+    .question-text { font-size: 1.6rem; color: #0f172a; margin: 30px 0; font-weight: 700; }
+    .option-item { border: 2px solid #f1f5f9; padding: 18px; border-radius: 16px; margin-bottom: 12px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: 0.2s; }
+    .option-item:hover { border-color: #cbd5e1; background: #f8fafc; }
+    .option-item.selected { border-color: var(--emerald); background: #f0fdfa; }
+    .radio-circle { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 50%; flex-shrink: 0; }
+    .selected .radio-circle { border-color: var(--emerald); background: var(--emerald); box-shadow: inset 0 0 0 4px white; }
+    .option-content { color: #334155; font-weight: 500; }
+    .exam-footer { display: flex; justify-content: space-between; margin-top: 40px; }
+    .btn-next { background: #1e293b; color: white; border: none; padding: 14px 30px; border-radius: 12px; font-weight: 600; cursor: pointer; }
+    .btn-back { background: #f1f5f9; color: #475569; border: none; padding: 14px 30px; border-radius: 12px; font-weight: 600; cursor: pointer; }
 
-    .quiz-card-item {
-      background: var(--color-surface);
-      border: 1.5px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      padding: var(--space-4);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-    }
+    /* Results/Correction Card */
+    .results-card { background: white; border-radius: 24px; padding: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9; }
+    .res-title { font-size: 24px; color: #1e293b; font-weight: 800; }
+    .score-circle { width: 80px; height: 80px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; border: 4px solid #fecaca; }
+    .score-circle.passed { background: #dcfce7; border-color: #bbf7d0; }
+    .score-val { font-size: 20px; font-weight: 800; color: #1e293b; }
+    .review-item { display: flex; gap: 20px; padding: 25px; border-radius: 18px; margin-bottom: 20px; border: 1px solid #f1f5f9; }
+    .review-item.correct { border-left: 6px solid #10b981; background: #f0fdf4; }
+    .review-item.wrong { border-left: 6px solid #ef4444; background: #fef2f2; }
+    .review-status-icon { font-size: 24px; }
+    .review-q { font-size: 17px; color: #1e293b; margin-bottom: 15px; line-height: 1.5; }
+    .answer-box { background: rgba(255,255,255,0.6); padding: 15px; border-radius: 12px; }
+    .ans-row { margin-bottom: 5px; font-size: 14px; }
+    .ans-row .label { color: #64748b; margin-right: 10px; }
+    .ans-row .val { font-weight: 600; color: #1e293b; }
+    .correct-text { color: #059669 !important; }
+    .explanation-box { margin-top: 15px; font-size: 14px; color: #475569; line-height: 1.6; padding: 10px; background: rgba(255,255,255,0.8); border-radius: 8px; }
 
-    .quiz-card-item:hover { border-color: var(--teal-300); box-shadow: var(--shadow-md); }
-    .quiz-card-item.selected { border-color: var(--teal-400); background: var(--teal-50); box-shadow: 0 0 0 3px rgba(20,184,166,0.1); }
-
-    .qci-top { display: flex; gap: var(--space-2); }
-    .qci-title { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text); }
-    .qci-desc { font-size: var(--text-xs); color: var(--color-text-muted); line-height: var(--leading-relaxed); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .qci-meta { display: flex; gap: var(--space-3); font-size: var(--text-xs); color: var(--color-text-light); }
-    .qci-pop-label { font-size: 0.65rem; color: var(--color-text-light); margin-top: 4px; }
-
-    /* Detail */
-    .quiz-detail { display: flex; flex-direction: column; gap: var(--space-5); }
-    .qd-header { margin-bottom: var(--space-5); }
-    .qd-title { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; margin: var(--space-2) 0; }
-    .qd-desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: var(--leading-relaxed); }
-
-    .qd-stats {
-      display: grid; grid-template-columns: repeat(3,1fr);
-      gap: var(--space-4); background: var(--neutral-50);
-      border-radius: var(--radius-md); padding: var(--space-4);
-      margin-bottom: var(--space-4); text-align: center;
-    }
-    .qds-val { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--teal-600); }
-    .qds-label { font-size: var(--text-xs); color: var(--color-text-muted); }
-    .qd-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-
-    /* Sample question */
-    .sq-text { font-size: var(--text-base); font-weight: var(--weight-medium); color: var(--color-text); margin-bottom: var(--space-4); line-height: var(--leading-relaxed); }
-    .sq-options { display: flex; flex-direction: column; gap: var(--space-3); }
-    .sq-option {
-      display: flex; align-items: center; gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
-      border: 1.5px solid var(--color-border);
-      border-radius: var(--radius-md);
-      font-size: var(--text-sm);
-      transition: all var(--transition-fast);
-    }
-    .sq-option.correct { border-color: var(--success-500); background: var(--success-50); }
-    .sq-opt-letter { font-weight: 700; color: var(--color-text-muted); width: 20px; }
-    .sq-correct-mark { margin-left: auto; color: var(--success-600); font-weight: 700; }
-
-    /* Active quiz */
-    .aq-progress-bar { margin-bottom: var(--space-6); }
-    .aq-prog-label { display: flex; justify-content: space-between; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); margin-bottom: var(--space-2); }
-    .aq-timer { color: var(--warning-600); background: var(--warning-50); padding: 2px 8px; border-radius: var(--radius-full); }
-    .aq-question { font-size: var(--text-lg); font-weight: var(--weight-medium); color: var(--color-text); line-height: var(--leading-relaxed); margin-bottom: var(--space-6); }
-    .aq-options { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-5); }
-    .aq-option {
-      display: flex; align-items: center; gap: var(--space-3);
-      padding: var(--space-4); border: 1.5px solid var(--color-border);
-      border-radius: var(--radius-lg); font-size: var(--text-sm); font-family: var(--font-body);
-      background: white; cursor: pointer; text-align: left; width: 100%;
-      transition: all var(--transition-fast);
-    }
-    .aq-option:hover { border-color: var(--teal-300); background: var(--teal-50); }
-    .aq-option.selected { border-color: var(--teal-500); background: var(--teal-50); }
-    .aq-option.correct { border-color: var(--success-500); background: var(--success-50); }
-    .aq-option.incorrect { border-color: var(--error-500); background: var(--error-50); }
-    .aq-opt-letter { font-weight: 700; color: var(--color-text-muted); width: 20px; }
-    .aq-explanation { background: var(--sky-50); border: 1px solid var(--sky-100); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4); }
-    .aqe-label { font-size: var(--text-xs); font-weight: 700; color: #0369a1; margin-bottom: var(--space-2); }
-    .aq-explanation p { font-size: var(--text-sm); color: var(--color-text); line-height: var(--leading-relaxed); }
-    .aq-controls { display: flex; justify-content: space-between; margin-top: var(--space-2); }
-
-    /* Results */
-    .results-card { text-align: center; }
-    .rc-top { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); margin-bottom: var(--space-6); }
-    .rc-icon { font-size: 3rem; }
-    .rc-title { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; }
-    .rc-score { font-family: var(--font-display); font-size: var(--text-5xl); font-weight: 700; color: var(--teal-600); }
-    .rc-sub { font-size: var(--text-sm); color: var(--color-text-muted); }
-    .rc-breakdown { display: flex; justify-content: center; gap: var(--space-6); margin-bottom: var(--space-4); }
-    .rc-bd-item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; }
-    .rc-bd-item.success { color: var(--success-600); }
-    .rc-bd-item.error   { color: var(--error-500); }
-    .rc-badges { display: flex; justify-content: center; gap: var(--space-3); margin-bottom: var(--space-5); }
-    .rc-ctas { display: flex; justify-content: center; gap: var(--space-3); }
-
-    @media (max-width: 1024px) { .quiz-layout { grid-template-columns: 1fr; } }
+    .animate-in { animation: slideIn 0.4s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
   `]
 })
-export class QuizAssessmentComponent {
-  quizzes = MOCK_QUIZZES;
-  quizQuestions = MOCK_QUIZ_QUESTIONS;
-  sampleQuestion = MOCK_QUIZ_QUESTIONS[0];
-  letters = ['A', 'B', 'C', 'D'];
+export class QuizAssessmentComponent implements OnInit {
+  private quizService = inject(QuizService);
+  private cdr = inject(ChangeDetectorRef);
 
-  selectedQuiz   = signal<Quiz | null>(null);
-  activeQuiz     = signal(false);
-  showResults    = signal(false);
-  currentQuestion= signal(0);
-  selectedAnswer = signal<number | null>(null);
-  answered       = signal(false);
-  activeFilter   = signal('all');
-  quizScore      = 67;
+  quizzes = signal<any[]>([]);
+  myAttempts = signal<any[]>([]);
+  activeQuiz = signal(false);
+  showResults = signal(false);
+  searchTerm = signal('');
 
-  setFilter(f: string) { this.activeFilter.set(f); }
-  selectQuiz(q: Quiz) { this.selectedQuiz.set(q); this.activeQuiz.set(false); this.showResults.set(false); }
+  currentAttempt = signal<any>(null);
+  quizResult = signal<any>(null); // Pour stocker la correction
+  currentIdx = signal(0);
+  userAnswers = signal<{ [key: number]: string[] }>({});
 
-  diffChip(d: string): string {
-    return d === 'easy' ? 'chip chip-mint' : d === 'medium' ? 'chip chip-sand' : 'chip chip-peach';
+  currentQuestion = computed(() => this.currentAttempt()?.questions?.[this.currentIdx()]);
+  totalQuestions = computed(() => this.currentAttempt()?.questions?.length || 0);
+
+  filteredQuizzes = computed(() => {
+    return this.quizzes().filter(q => 
+      (q.title || '').toLowerCase().includes(this.searchTerm().toLowerCase())
+    );
+  });
+
+  ngOnInit() {
+    setTimeout(() => this.refresh(), 0);
   }
 
-  startQuiz() {
-    this.activeQuiz.set(true);
-    this.showResults.set(false);
-    this.currentQuestion.set(0);
-    this.selectedAnswer.set(null);
-    this.answered.set(false);
+  refresh() {
+    this.quizService.getQuizzes().subscribe({
+      next: (res: any) => {
+        this.quizzes.set(res.content || res || []);
+        this.cdr.detectChanges();
+      }
+    });
+    this.quizService.getMyAttempts().subscribe(res => this.myAttempts.set(res || []));
   }
 
-  selectAnswer(i: number) {
-    if (this.answered()) return;
-    this.selectedAnswer.set(i);
-    this.answered.set(true);
+  onSearch(e: Event) {
+    this.searchTerm.set((e.target as HTMLInputElement).value);
   }
 
-  nextQuestion() {
-    if (this.currentQuestion() < this.quizQuestions.length - 1) {
-      this.currentQuestion.update(q => q + 1);
-      this.selectedAnswer.set(null);
-      this.answered.set(false);
+  start(id: string) {
+    this.quizService.startQuiz(id).subscribe({
+      next: (att) => {
+        this.currentAttempt.set(att);
+        this.activeQuiz.set(true);
+        this.showResults.set(false);
+        this.currentIdx.set(0);
+        this.userAnswers.set({});
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        Swal.fire('Erreur', 'Impossible de démarrer ce quiz.', 'error');
+      }
+    });
+  }
+
+  getProgress() {
+    if (this.totalQuestions() === 0) return 0;
+    return ((this.currentIdx() + 1) / this.totalQuestions()) * 100;
+  }
+
+  isLast() {
+    return this.currentIdx() === (this.totalQuestions() - 1);
+  }
+
+  selectOption(answerId: string) {
+    this.userAnswers.update(prev => ({ ...prev, [this.currentIdx()]: [answerId] }));
+  }
+
+  isPicked(answerId: string) {
+    return (this.userAnswers()[this.currentIdx()] || []).includes(answerId);
+  }
+
+  next() {
+    if (this.isLast()) {
+      this.confirmSubmit();
     } else {
-      this.activeQuiz.set(false);
-      this.showResults.set(true);
+      this.currentIdx.update(i => i + 1);
     }
   }
 
-  endQuiz() { this.activeQuiz.set(false); this.showResults.set(false); }
-  resetQuiz() { this.showResults.set(false); this.selectedQuiz.set(null); }
+  prev() {
+    if (this.currentIdx() > 0) {
+      this.currentIdx.update(i => i - 1);
+    }
+  }
+
+  confirmSubmit() {
+    Swal.fire({
+      title: 'Terminer l\'examen ?',
+      text: "Voulez-vous soumettre vos réponses pour correction ?",
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#00a884',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Oui, soumettre',
+      cancelButtonText: 'Annuler'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.submit();
+      }
+    });
+  }
+
+  submit() {
+    const attemptData = this.currentAttempt();
+    const attemptId = attemptData.attemptId || attemptData.id;
+
+    const payload = {
+      answers: Object.keys(this.userAnswers()).map(key => ({
+        questionId: attemptData.questions[+key].id,
+        selectedAnswerIds: this.userAnswers()[+key]
+      })),
+      timeSpentSeconds: 60
+    };
+
+    Swal.fire({
+      title: 'Correction en cours...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    this.quizService.submitAttempt(attemptId, payload).subscribe({
+      next: (res: any) => {
+        const score = res.percentage || 0;
+        const passed = res.passed;
+
+        Swal.fire({
+          title: passed ? 'Félicitations ! 🎉' : 'Quiz terminé',
+          html: `<div style="font-size: 2rem; font-weight: 800; color: #00a884; margin: 15px 0;">${score}%</div>`,
+          icon: passed ? 'success' : 'info',
+          showDenyButton: true,
+          confirmButtonText: 'Retour aux quiz',
+          denyButtonText: 'Voir la correction 🔍',
+          confirmButtonColor: '#64748b',
+          denyButtonColor: '#00a884',
+          allowOutsideClick: false
+        }).then((result) => {
+          if (result.isDenied) {
+            this.viewCorrection(res); 
+          } else {
+            this.activeQuiz.set(false);
+            this.showResults.set(false);
+            this.refresh();
+          }
+        });
+      },
+      error: (err) => {
+        Swal.fire('Erreur', 'Impossible de corriger le quiz.', 'error');
+      }
+    });
+  }
+
+  viewCorrection(result: any) {
+    this.quizResult.set(result);
+    this.showResults.set(true);
+    this.activeQuiz.set(false);
+    this.cdr.detectChanges();
+  }
 }
