@@ -72,7 +72,7 @@ public class ResourceController {
         @Valid @RequestBody ResourceRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        accessControlService.assertCanManageResources(jwt);
+        accessControlService.assertCanAdminResources(jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(resourceService.createResource(request));
     }
 
@@ -83,7 +83,7 @@ public class ResourceController {
         @Valid @RequestBody ResourceRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        accessControlService.assertCanManageResources(jwt);
+        accessControlService.assertCanAdminResources(jwt);
         return ResponseEntity.ok(resourceService.updateResource(id, request));
     }
 
@@ -93,7 +93,7 @@ public class ResourceController {
         @PathVariable UUID id,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        accessControlService.assertCanManageResources(jwt);
+        accessControlService.assertCanAdminResources(jwt);
         resourceService.deleteResource(id);
         return ResponseEntity.noContent().build();
     }
@@ -109,7 +109,7 @@ public class ResourceController {
         @Valid @RequestBody ResourceCategoryRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        accessControlService.assertCanManageResources(jwt);
+        accessControlService.assertCanAdminResources(jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(resourceService.createCategory(request));
     }
 

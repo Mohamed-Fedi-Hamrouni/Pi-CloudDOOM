@@ -54,7 +54,6 @@ public class ResourceService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "resource", key = "#id")
     public ResourceResponse getResourceById(UUID id) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
@@ -111,7 +110,6 @@ public class ResourceService {
     }
 
     @Transactional
-    @CachePut(value = "resource", key = "#id")
     public ResourceResponse updateResource(UUID id, ResourceRequest request) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));

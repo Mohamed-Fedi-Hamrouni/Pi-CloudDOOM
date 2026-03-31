@@ -28,18 +28,18 @@ public class ResourceAccessControlService {
         this.userServiceBaseUrl = userServiceBaseUrl;
     }
 
-    public void assertCanManageResources(Jwt jwt) {
+    public void assertCanAdminResources(Jwt jwt) {
         if (jwt == null) {
             throw new AccessDeniedException("Authentication required");
         }
 
-        if (hasRealmRole(jwt, "ROLE_ADMIN") || hasRealmRole(jwt, "ROLE_MANAGER")) {
+        if (hasRealmRole(jwt, "ROLE_ADMIN")) {
             return;
         }
 
         String appRole = getApplicationRole(jwt.getTokenValue());
-        if (!"ADMIN".equals(appRole) && !"MANAGER".equals(appRole)) {
-            throw new AccessDeniedException("Admin or manager role required");
+        if (!"ADMIN".equals(appRole)) {
+            throw new AccessDeniedException("Admin role required");
         }
     }
 
