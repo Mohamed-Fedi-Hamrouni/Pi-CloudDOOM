@@ -15,6 +15,8 @@ import java.util.List;
     @Index(name = "idx_training_paths_status", columnList = "status")
 })
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@ToString(onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -22,6 +24,8 @@ public class TrainingPath {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    @ToString.Include
     private Long id;
     
     @Column(name = "user_id", nullable = false, unique = true)

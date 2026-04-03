@@ -8,6 +8,8 @@ import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingModuleUpsertRequest;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
 import com.microservice.trainingservice.dto.TrainingPathUpsertRequest;
+import com.microservice.trainingservice.dto.TrainingLessonResponse;
+import com.microservice.trainingservice.dto.TrainingLessonUpsertRequest;
 import com.microservice.trainingservice.dto.UserBadgeResponse;
 import com.microservice.trainingservice.dto.UserBadgeUpsertRequest;
 import com.microservice.trainingservice.dto.UserXPTrackerResponse;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -67,6 +70,33 @@ public class TrainingAdminContentController {
     @GetMapping("/modules")
     public List<TrainingModuleResponse> getAllModules() {
         return trainingAdminContentService.getAllModules();
+    }
+
+    @GetMapping("/lessons")
+    public List<TrainingLessonResponse> getAllLessons(@RequestParam(required = false) Boolean active) {
+        return trainingAdminContentService.getAllLessons(active);
+    }
+
+    @GetMapping("/lessons/{id}")
+    public TrainingLessonResponse getLessonById(@PathVariable Long id) {
+        return trainingAdminContentService.getLessonById(id);
+    }
+
+    @PostMapping("/lessons")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TrainingLessonResponse createLesson(@RequestBody TrainingLessonUpsertRequest request) {
+        return trainingAdminContentService.createLesson(request);
+    }
+
+    @PutMapping("/lessons/{id}")
+    public TrainingLessonResponse updateLesson(@PathVariable Long id, @RequestBody TrainingLessonUpsertRequest request) {
+        return trainingAdminContentService.updateLesson(id, request);
+    }
+
+    @DeleteMapping("/lessons/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteLesson(@PathVariable Long id) {
+        trainingAdminContentService.deleteLesson(id);
     }
 
     @GetMapping("/modules/{id}")

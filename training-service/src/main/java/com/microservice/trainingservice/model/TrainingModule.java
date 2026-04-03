@@ -6,6 +6,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "training_modules", indexes = {
@@ -14,6 +16,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_training_modules_category", columnList = "category")
 })
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@ToString(onlyExplicitlyIncluded = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -21,6 +25,8 @@ public class TrainingModule {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
+    @ToString.Include
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -52,6 +58,11 @@ public class TrainingModule {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private ModuleStatus status;
+
+    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("orderIndex ASC")
+    @Builder.Default
+    private Set<TrainingModuleLesson> moduleLessons = new LinkedHashSet<>();
     
     @Column(name = "unlock_at")
     private LocalDateTime unlockedAt;
@@ -80,5 +91,15 @@ public class TrainingModule {
     
     public boolean isInProgress() {
         return ModuleStatus.IN_PROGRESS == status;
+    }
+
+    public void addModuleLesson(TrainingModuleLesson lesson) {
+        moduleLessons.add(lesson);
+        lesson.setModule(this);
+    }
+
+    public void removeModuleLesson(TrainingModuleLesson lesson) {
+        moduleLessons.remove(lesson);
+        lesson.setModule(null);
     }
 }

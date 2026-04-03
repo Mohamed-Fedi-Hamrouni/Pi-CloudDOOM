@@ -135,6 +135,17 @@ export interface Post {
 }
 
 // Training module model
+export interface TrainingModuleLesson {
+  id: string;
+  title: string;
+  status: 'PENDING' | 'COMPLETED';
+  orderIndex: number;
+  format?: 'TEXT' | 'VIDEO' | string;
+  contentMarkdown?: string | null;
+  videoUrl?: string | null;
+  estimatedMinutes?: number;
+}
+
 export interface TrainingModule {
   id: string;
   title: string;
@@ -145,6 +156,7 @@ export interface TrainingModule {
   completedLessons: number;
   status: 'locked' | 'in-progress' | 'completed';
   icon: string;
+  moduleLessons?: TrainingModuleLesson[];
 }
 
 // Pricing plan

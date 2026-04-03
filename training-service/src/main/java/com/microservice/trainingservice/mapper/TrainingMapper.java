@@ -20,6 +20,13 @@ public interface TrainingMapper {
     // TrainingModule mappings
     @Mapping(target = "pathId", source = "trainingPath.id")
     TrainingModuleResponse trainingModuleToResponse(TrainingModule module);
+
+    @Mapping(target = "moduleId", source = "module.id")
+    @Mapping(target = "lessonId", expression = "java(moduleLesson.getLesson() == null ? null : moduleLesson.getLesson().getId())")
+    TrainingModuleLessonResponse trainingModuleLessonToResponse(TrainingModuleLesson moduleLesson);
+
+    // TrainingLesson mappings (admin)
+    TrainingLessonResponse trainingLessonToResponse(TrainingLesson lesson);
     
     // Badge mappings
     BadgeResponse badgeToResponse(Badge badge);

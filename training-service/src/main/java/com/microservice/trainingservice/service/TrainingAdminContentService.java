@@ -8,6 +8,8 @@ import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingModuleUpsertRequest;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
 import com.microservice.trainingservice.dto.TrainingPathUpsertRequest;
+import com.microservice.trainingservice.dto.TrainingLessonResponse;
+import com.microservice.trainingservice.dto.TrainingLessonUpsertRequest;
 import com.microservice.trainingservice.dto.UserBadgeResponse;
 import com.microservice.trainingservice.dto.UserBadgeUpsertRequest;
 import com.microservice.trainingservice.dto.UserXPTrackerResponse;
@@ -17,13 +19,17 @@ import com.microservice.trainingservice.exception.ResourceNotFoundException;
 import com.microservice.trainingservice.mapper.TrainingMapper;
 import com.microservice.trainingservice.model.Badge;
 import com.microservice.trainingservice.model.DailyActivity;
+import com.microservice.trainingservice.model.LessonFormat;
 import com.microservice.trainingservice.model.ModuleStatus;
+import com.microservice.trainingservice.model.PathStatus;
+import com.microservice.trainingservice.model.TrainingLesson;
 import com.microservice.trainingservice.model.TrainingModule;
 import com.microservice.trainingservice.model.TrainingPath;
 import com.microservice.trainingservice.model.UserBadge;
 import com.microservice.trainingservice.model.UserXPTracker;
 import com.microservice.trainingservice.repository.BadgeRepository;
 import com.microservice.trainingservice.repository.DailyActivityRepository;
+import com.microservice.trainingservice.repository.TrainingLessonRepository;
 import com.microservice.trainingservice.repository.TrainingModuleRepository;
 import com.microservice.trainingservice.repository.TrainingPathRepository;
 import com.microservice.trainingservice.repository.UserBadgeRepository;
@@ -42,10 +48,46 @@ public class TrainingAdminContentService {
     private final BadgeRepository badgeRepository;
     private final TrainingModuleRepository trainingModuleRepository;
     private final TrainingPathRepository trainingPathRepository;
+    private final TrainingLessonRepository trainingLessonRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final UserXPTrackerRepository userXPTrackerRepository;
     private final DailyActivityRepository dailyActivityRepository;
     private final TrainingMapper trainingMapper;
+
+    @Transactional(readOnly = true)
+    public List<TrainingLessonResponse> getAllLessons(Boolean active) {
+        List<TrainingLesson> lessons = (active == null)
+            ? trainingLessonRepository.findAll()
+            : (active ? trainingLessonRepository.findByActiveTrueOrderByIdAsc() : trainingLessonRepository.findAll());
+        return lessons.stream().map(trainingMapper::trainingLessonToResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingLessonResponse getLessonById(Long id) {
+        TrainingLesson lesson = trainingLessonRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Training lesson not found: " + id));
+        return trainingMapper.trainingLessonToResponse(lesson);
+    }
+
+    public TrainingLessonResponse createLesson(TrainingLessonUpsertRequest request) {
+        TrainingLesson lesson = new TrainingLesson();
+        applyLessonRequest(lesson, request);
+        return trainingMapper.trainingLessonToResponse(trainingLessonRepository.save(lesson));
+    }
+
+    public TrainingLessonResponse updateLesson(Long id, TrainingLessonUpsertRequest request) {
+        TrainingLesson lesson = trainingLessonRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Training lesson not found: " + id));
+        applyLessonRequest(lesson, request);
+        return trainingMapper.trainingLessonToResponse(trainingLessonRepository.save(lesson));
+    }
+
+    public void deleteLesson(Long id) {
+        TrainingLesson lesson = trainingLessonRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Training lesson not found: " + id));
+        lesson.setActive(false);
+        trainingLessonRepository.save(lesson);
+    }
 
     @Transactional(readOnly = true)
     public List<TrainingPathResponse> getAllPaths() {
@@ -60,8 +102,8 @@ public class TrainingAdminContentService {
     }
 
     public TrainingPathResponse createPath(TrainingPathUpsertRequest request) {
-        if (trainingPathRepository.findByUserId(request.getUserId()).isPresent()) {
-            throw new BusinessException("Training path already exists for user " + request.getUserId());
+        if (trainingPathRepository.existsByUserIdAndStatusNot(request.getUserId(), PathStatus.ARCHIVED)) {
+            throw new BusinessException("Non-archived training path already exists for user " + request.getUserId());
         }
 
         TrainingPath path = TrainingPath.builder()
@@ -77,14 +119,21 @@ public class TrainingAdminContentService {
         TrainingPath path = trainingPathRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Training path not found: " + id));
 
-        trainingPathRepository.findByUserId(request.getUserId())
-            .filter(existing -> !existing.getId().equals(id))
-            .ifPresent(existing -> {
-                throw new BusinessException("Training path already exists for user " + request.getUserId());
-            });
+        String targetUserId = request.getUserId();
+        if (targetUserId == null || targetUserId.isBlank()) {
+            throw new BusinessException("userId is required");
+        }
 
-        path.setUserId(request.getUserId());
-        path.setStatus(request.getStatus());
+        PathStatus targetStatus = request.getStatus() == null ? path.getStatus() : request.getStatus();
+        if (targetStatus != PathStatus.ARCHIVED
+            && trainingPathRepository.existsByUserIdAndStatusNotAndIdNot(targetUserId, PathStatus.ARCHIVED, id)) {
+            throw new BusinessException("Non-archived training path already exists for user " + targetUserId);
+        }
+
+        path.setUserId(targetUserId);
+        if (request.getStatus() != null) {
+            path.setStatus(request.getStatus());
+        }
         path.setXpThreshold(request.getXpThreshold());
 
         return trainingMapper.trainingPathToResponse(trainingPathRepository.save(path));
@@ -375,5 +424,46 @@ public class TrainingAdminContentService {
 
         module.setProgress(computedProgress);
         module.setStatus(effectiveStatus);
+    }
+
+    private void applyLessonRequest(TrainingLesson lesson, TrainingLessonUpsertRequest request) {
+        if (request.getCategory() == null) {
+            throw new BusinessException("category is required");
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new BusinessException("title is required");
+        }
+        LessonFormat format = request.getFormat();
+        if (format == null) {
+            throw new BusinessException("format is required");
+        }
+        if (format == LessonFormat.TEXT && (request.getContentMarkdown() == null || request.getContentMarkdown().isBlank())) {
+            throw new BusinessException("contentMarkdown is required for TEXT lessons");
+        }
+        if (format == LessonFormat.VIDEO && (request.getVideoUrl() == null || request.getVideoUrl().isBlank())) {
+            throw new BusinessException("videoUrl is required for VIDEO lessons");
+        }
+
+        lesson.setCategory(request.getCategory());
+        lesson.setTitle(request.getTitle());
+        lesson.setFormat(format);
+        lesson.setSummary(request.getSummary());
+        lesson.setContentMarkdown(request.getContentMarkdown());
+        lesson.setVideoUrl(request.getVideoUrl());
+        lesson.setEstimatedMinutes(request.getEstimatedMinutes() == null ? 5 : Math.max(0, request.getEstimatedMinutes()));
+        lesson.setDifficulty(request.getDifficulty() == null ? lesson.getDifficulty() : request.getDifficulty());
+        if (lesson.getDifficulty() == null) {
+            lesson.setDifficulty(com.microservice.trainingservice.model.LessonDifficulty.BEGINNER);
+        }
+        lesson.setLanguage(request.getLanguage() == null || request.getLanguage().isBlank() ? "en" : request.getLanguage());
+        lesson.setActive(request.getActive() == null ? true : request.getActive());
+
+        lesson.getTags().clear();
+        if (request.getTags() != null) {
+            request.getTags().stream()
+                .filter(t -> t != null && !t.isBlank())
+                .map(String::trim)
+                .forEach(lesson.getTags()::add);
+        }
     }
 }

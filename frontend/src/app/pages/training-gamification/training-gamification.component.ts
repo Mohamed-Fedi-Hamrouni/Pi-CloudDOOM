@@ -1,12 +1,14 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { BadgeCardComponent } from '../../shared/components/badge-card/badge-card.component';
 import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../core/data/mock-data';
 import { AuthService } from '../../core/auth/auth.service';
 import { TrainingApiService } from '../../core/services/training-api.service';
-import { DailyActivityResponse, TrainingPathResponse, UserXPTrackerResponse } from '../../core/models/training.models';
-import { catchError, forkJoin, of } from 'rxjs';
+import { Badge } from '../../core/models/models';
+import { BadgeResponse, DailyActivityResponse, TrainingPathResponse, TrainingPreferencesRequest, TrainingPreferencesResponse, UserBadgeResponse, UserXPTrackerResponse } from '../../core/models/training.models';
+import { catchError, firstValueFrom, forkJoin, of, timeout } from 'rxjs';
 
 type LeaderboardEntry = {
   rank: number;
@@ -28,7 +30,7 @@ type DailyGoal = {
 @Component({
   selector: 'app-training-gamification',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent, BadgeCardComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent, BadgeCardComponent],
   template: `
     <div class="training-page animate-fade">
       <div class="page-header">
@@ -58,9 +60,12 @@ type DailyGoal = {
             <div class="xp-title">Level {{ user.level }} Candidate · {{ user.xp.toLocaleString() }} XP</div>
             <div class="xp-bar-wrap">
               <div class="progress-bar">
-                <div class="progress-fill" style="width: 64%"></div>
+                <div class="progress-fill" [style.width]="xpProgressPercent + '%'"></div>
               </div>
-              <div class="xp-bar-label">{{ user.xp.toLocaleString() }} / 6,000 XP to Level {{ user.level + 1 }}</div>
+              <div class="xp-bar-label">
+                {{ xpIntoLevel.toLocaleString() }} / {{ xpLevelTotal.toLocaleString() }} XP to Level {{ user.level + 1 }}
+                · {{ xpToNextLevel.toLocaleString() }} XP to go
+              </div>
             </div>
           </div>
         </div>
@@ -75,7 +80,7 @@ type DailyGoal = {
               <div class="xp-stat-label">Badges</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">📅 Day 7</div>
+              <div class="xp-stat-val">📅 {{ bestStreak }}</div>
               <div class="xp-stat-label">Best Streak</div>
             </div>
           </div>
@@ -111,7 +116,83 @@ type DailyGoal = {
 
           <!-- Learning path -->
           <div class="card learning-path">
-            <app-section-header title="Your Learning Path" icon="🗺️" subtitle="Personalized based on your goals and performance" actionLabel="Edit Path"></app-section-header>
+            <app-section-header
+              title="Your Learning Path"
+              icon="🗺️"
+              subtitle="Personalized based on your goals and performance"
+              actionLabel="Preferences"
+              (actionClick)="togglePreferences()"
+            ></app-section-header>
+
+            <div class="prefs-editor" *ngIf="showPreferences">
+              <div class="prefs-grid">
+                <label class="prefs-field">
+                  <span class="prefs-label">Goal</span>
+                  <select class="input" [(ngModel)]="preferencesForm.goal" [ngModelOptions]="{standalone:true}">
+                    <option value="">No preference</option>
+                    <option value="TECHNICAL">TECHNICAL</option>
+                    <option value="BEHAVIORAL">BEHAVIORAL</option>
+                    <option value="CONFIDENCE">CONFIDENCE</option>
+                  </select>
+                </label>
+
+                <label class="prefs-field">
+                  <span class="prefs-label">Target role</span>
+                  <input class="input" [(ngModel)]="preferencesForm.targetRole" [ngModelOptions]="{standalone:true}" placeholder="e.g. Backend" />
+                </label>
+
+                <label class="prefs-field">
+                  <span class="prefs-label">Seniority</span>
+                  <select class="input" [(ngModel)]="preferencesForm.seniority" [ngModelOptions]="{standalone:true}">
+                    <option value="">No preference</option>
+                    <option value="JUNIOR">JUNIOR</option>
+                    <option value="MID">MID</option>
+                    <option value="SENIOR">SENIOR</option>
+                  </select>
+                </label>
+
+                <label class="prefs-field">
+                  <span class="prefs-label">Minutes per day</span>
+                  <input class="input" type="number" min="0" max="600" [(ngModel)]="preferencesForm.minutesPerDay" [ngModelOptions]="{standalone:true}" />
+                </label>
+              </div>
+
+              <div class="prefs-actions">
+                <button class="btn btn-primary" type="button" (click)="savePreferencesAndRegenerate()" [disabled]="isSavingPreferences || isGeneratingPath">
+                  {{ isGeneratingPath ? 'Regenerating...' : (isSavingPreferences ? 'Saving...' : 'Save & Regenerate') }}
+                </button>
+
+                <button class="btn btn-ghost" type="button" (click)="createNewPath()" [disabled]="isSavingPreferences || isGeneratingPath || isCreatingNewPath">
+                  {{ isCreatingNewPath ? 'Creating...' : 'Create New Path' }}
+                </button>
+
+                <button class="btn btn-ghost" type="button" (click)="toggleHistory()" [disabled]="isSavingPreferences || isGeneratingPath || isCreatingNewPath">
+                  {{ showHistory ? 'Hide History' : 'Show History' }}
+                </button>
+
+                <button class="btn btn-ghost" type="button" (click)="showPreferences = false" [disabled]="isSavingPreferences || isGeneratingPath">Close</button>
+                <span class="prefs-meta" *ngIf="preferencesUpdatedAt">Updated {{ preferencesUpdatedAt }}</span>
+              </div>
+
+              <div class="prefs-history" *ngIf="showHistory">
+                <div class="prefs-history-loading" *ngIf="isLoadingHistory">Loading path history...</div>
+                <div class="prefs-history-loading" *ngIf="!isLoadingHistory && historyErrorMessage">{{ historyErrorMessage }}</div>
+                <div class="prefs-history-empty" *ngIf="!isLoadingHistory && !historyErrorMessage && pathHistory.length === 0">No saved paths yet.</div>
+
+                <div class="prefs-history-list" *ngIf="!isLoadingHistory && !historyErrorMessage && pathHistory.length">
+                  <div class="prefs-history-row" *ngFor="let p of pathHistory">
+                    <div class="prefs-history-left">
+                      <span class="chip" [class]="historyChip(p.status)">{{ p.id === activePathId ? 'Current' : p.status }}</span>
+                      <span class="prefs-history-date">{{ formatEarnedDate(p.createdAt) }}</span>
+                    </div>
+                    <div class="prefs-history-right">
+                      <span class="prefs-history-meta">{{ countCompleted(p) }}/{{ p.modules.length }} completed</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="path-timeline">
               <div class="path-item" *ngFor="let m of modules; let i = index" [class]="'path-' + m.status">
                 <div class="pi-connector" *ngIf="i > 0" [class.done]="modules[i-1].status === 'completed'"></div>
@@ -124,20 +205,72 @@ type DailyGoal = {
                     <span class="chip" [class]="statusChip(m.status)">{{ m.status === 'completed' ? '✓ Done' : m.status === 'in-progress' ? 'In Progress' : '🔒 Locked' }}</span>
                   </div>
                   <div class="pi-meta">{{ m.category }} · {{ m.completedLessons }}/{{ m.lessons }} lessons</div>
+
+                  <div class="pi-lessons" *ngIf="(m.moduleLessons?.length ?? 0) > 0; else fallbackLessons">
+                    <div class="pi-lesson" *ngFor="let l of m.moduleLessons" [class.done]="l.status === 'COMPLETED'">
+                      <span class="pi-lesson-check">{{ l.status === 'COMPLETED' ? '✓' : '' }}</span>
+                      <div class="pi-lesson-body">
+                        <a
+                          *ngIf="l.format === 'VIDEO' && l.videoUrl"
+                          class="pi-lesson-title pi-lesson-link"
+                          [href]="l.videoUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          >{{ l.title }}</a
+                        >
+
+                        <button
+                          *ngIf="l.format === 'TEXT' && (l.contentMarkdown ?? '').trim().length > 0"
+                          type="button"
+                          class="pi-lesson-title pi-lesson-toggle"
+                          (click)="toggleLessonContent(l.id)"
+                        >
+                          {{ l.title }}
+                        </button>
+
+                        <span
+                          *ngIf="(l.format !== 'VIDEO' || !l.videoUrl) && (l.format !== 'TEXT' || (l.contentMarkdown ?? '').trim().length === 0)"
+                          class="pi-lesson-title"
+                        >
+                          {{ l.title }}
+                        </span>
+
+                        <div class="pi-lesson-sub" *ngIf="l.format === 'VIDEO' && l.videoUrl">
+                          Video · {{ l.estimatedMinutes ?? 5 }} min
+                        </div>
+
+                        <div
+                          class="pi-lesson-content"
+                          *ngIf="l.format === 'TEXT' && isLessonContentOpen(l.id) && (l.contentMarkdown ?? '').trim().length > 0"
+                        >
+                          <pre class="pi-lesson-markdown">{{ l.contentMarkdown }}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ng-template #fallbackLessons>
+                    <div class="pi-lessons" *ngIf="m.lessons > 0">
+                      <div class="pi-lesson" *ngFor="let n of lessonRange(m.lessons); let idx = index" [class.done]="idx < m.completedLessons">
+                        <span class="pi-lesson-check">{{ idx < m.completedLessons ? '✓' : '' }}</span>
+                        <span class="pi-lesson-title">Lesson {{ n }}</span>
+                      </div>
+                    </div>
+                  </ng-template>
+
                   <div class="pi-progress" *ngIf="m.status !== 'locked'">
                     <div class="progress-bar" style="height:5px;">
                       <div class="progress-fill" [style.width]="m.progress + '%'" [class.fill-full]="m.progress === 100"></div>
                     </div>
                     <span class="pi-pct">{{ m.progress }}%</span>
                   </div>
+
                   <div class="pi-xp">+{{ m.xp }} XP on completion</div>
                   <div class="pi-actions" *ngIf="m.status !== 'locked'">
                     <button class="module-action" [disabled]="m.status === 'completed' || updatingModuleId === m.id" (click)="completeNextLesson(m)">
                       {{ updatingModuleId === m.id ? 'Updating...' : (m.status === 'completed' ? 'Completed' : '+1 Lesson') }}
                     </button>
                   </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -191,9 +324,20 @@ type DailyGoal = {
 
           <!-- Badges -->
           <div class="card">
-            <app-section-header title="Badges" icon="🏅" subtitle="{{ earnedCount }}/{{ allBadges.length }} earned" actionLabel="All Badges"></app-section-header>
-            <div class="badges-grid-2">
-              <app-badge-card *ngFor="let badge of allBadges.slice(0,6)" [badge]="badge"></app-badge-card>
+            <div id="badges-section">
+              <app-section-header
+                title="Badges"
+                icon="🏅"
+                subtitle="{{ earnedCount }}/{{ allBadges.length }} earned"
+                actionLabel="All Badges"
+                (actionClick)="onAllBadgesClick()"
+              ></app-section-header>
+              <div class="badges-grid-2">
+                <app-badge-card
+                  *ngFor="let badge of (showAllBadges ? allBadges : allBadges.slice(0,6))"
+                  [badge]="badge"
+                ></app-badge-card>
+              </div>
             </div>
           </div>
 
@@ -314,6 +458,73 @@ type DailyGoal = {
     .pi-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: 4px; }
     .pi-title { font-size: var(--text-sm); font-weight: 600; }
     .pi-meta { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
+
+    .pi-lessons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 10px;
+      margin-bottom: var(--space-2);
+    }
+
+    .pi-lesson {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border-light);
+      background: white;
+    }
+
+    .pi-lesson.done {
+      color: var(--teal-700);
+      border-color: var(--teal-100);
+      background: var(--teal-50);
+    }
+
+    .pi-lesson-check {
+      width: 14px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--teal-600);
+      flex-shrink: 0;
+    }
+
+    .pi-lesson-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .pi-lesson-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pi-lesson-link { color: inherit; text-decoration: underline; }
+    .pi-lesson-toggle {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      text-align: left;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-decoration: underline;
+    }
+    .pi-lesson-sub { font-size: 11px; color: var(--color-text-muted); }
+    .pi-lesson-content {
+      border-top: 1px dashed var(--color-border-light);
+      padding-top: 6px;
+      margin-top: 4px;
+      color: var(--neutral-800);
+    }
+    .pi-lesson-markdown {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--neutral-800);
+    }
     .pi-progress { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 4px; }
     .pi-pct { font-size: var(--text-xs); font-weight: 600; color: var(--teal-600); white-space: nowrap; }
     .pi-xp { font-size: var(--text-xs); color: var(--teal-600); }
@@ -338,6 +549,42 @@ type DailyGoal = {
       cursor: not-allowed;
     }
     .fill-full { background: var(--teal-400) !important; }
+
+    /* Preferences editor */
+    .prefs-editor {
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+      background: var(--neutral-50);
+    }
+    .prefs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+    .prefs-field { display: flex; flex-direction: column; gap: 6px; }
+    .prefs-label { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
+    .prefs-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+    .prefs-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+    .prefs-history { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+    .prefs-history-loading, .prefs-history-empty { font-size: var(--text-xs); color: var(--color-text-muted); }
+    .prefs-history-list { display: flex; flex-direction: column; gap: var(--space-2); }
+    .prefs-history-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border-light);
+      background: white;
+    }
+    .prefs-history-left { display: flex; align-items: center; gap: var(--space-3); }
+    .prefs-history-date { font-size: var(--text-xs); color: var(--color-text-muted); }
+    .prefs-history-meta { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
 
     /* Challenges */
     .challenges-list { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -386,16 +633,18 @@ type DailyGoal = {
     @media (max-width: 1024px) {
       .training-grid { grid-template-columns: 1fr; }
       .xp-banner { flex-direction: column; align-items: flex-start; }
+      .prefs-grid { grid-template-columns: 1fr; }
     }
   `]
 })
 export class TrainingGamificationComponent implements OnInit {
   private authService = inject(AuthService);
   private trainingApi = inject(TrainingApiService);
+  private cdr = inject(ChangeDetectorRef);
 
   user = MOCK_USER;
   modules = MOCK_TRAINING;
-  allBadges = MOCK_BADGES;
+  allBadges: Badge[] = MOCK_BADGES;
   leaderboard: LeaderboardEntry[] = MOCK_LEADERBOARD;
   isLoading = true;
   errorMessage: string | null = null;
@@ -403,9 +652,68 @@ export class TrainingGamificationComponent implements OnInit {
   activePathId: number | null = null;
   currentUserId: string | null = null;
   updatingModuleId: string | null = null;
+  private badgeCatalog: BadgeResponse[] = [];
+  showAllBadges = false;
+
+  private lessonRangeCache = new Map<number, number[]>();
+
+  private openLessonContentIds = new Set<string>();
+
+  showPreferences = false;
+  isSavingPreferences = false;
+  isGeneratingPath = false;
+  isCreatingNewPath = false;
+  private preferencesActionSeq = 0;
+  preferencesUpdatedAt: string | null = null;
+  showHistory = false;
+  isLoadingHistory = false;
+  historyErrorMessage: string | null = null;
+  pathHistory: TrainingPathResponse[] = [];
+  preferencesForm: {
+    goal: string;
+    targetRole: string;
+    seniority: string;
+    minutesPerDay: number | null;
+  } = {
+    goal: '',
+    targetRole: '',
+    seniority: '',
+    minutesPerDay: null,
+  };
+
+  // Tracker-derived (live) stats used by the XP banner
+  readonly xpLevelTotal = 1000;
+  xpToNextLevel = 0;
+  xpIntoLevel = 0;
+  xpProgressPercent = 0;
+  bestStreak = 0;
 
   ngOnInit(): void {
     this.loadTrainingData();
+  }
+
+  lessonRange(total: number): number[] {
+    const safeTotal = Math.max(0, Math.min(50, Math.floor(Number(total) || 0)));
+    const cached = this.lessonRangeCache.get(safeTotal);
+    if (cached) {
+      return cached;
+    }
+    const arr = Array.from({ length: safeTotal }, (_, i) => i + 1);
+    this.lessonRangeCache.set(safeTotal, arr);
+    return arr;
+  }
+
+  toggleLessonContent(lessonId: string): void {
+    if (!lessonId) return;
+    if (this.openLessonContentIds.has(lessonId)) {
+      this.openLessonContentIds.delete(lessonId);
+      return;
+    }
+    this.openLessonContentIds.add(lessonId);
+  }
+
+  isLessonContentOpen(lessonId: string): boolean {
+    return !!lessonId && this.openLessonContentIds.has(lessonId);
   }
 
   get earnedCount() { return this.allBadges.filter(b => b.earned).length; }
@@ -434,6 +742,15 @@ export class TrainingGamificationComponent implements OnInit {
     return `lb-rank rank-${rank}`;
   }
 
+  onAllBadgesClick(): void {
+    this.showAllBadges = true;
+    setTimeout(() => {
+      document
+        .getElementById('badges-section')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  }
+
   private loadTrainingData(): void {
     const userId = this.authService.getKeycloakId();
     this.currentUserId = userId;
@@ -450,28 +767,160 @@ export class TrainingGamificationComponent implements OnInit {
     }
 
     forkJoin({
-      path: this.trainingApi.getOrCreatePath(userId),
-      leaderboard: this.trainingApi.getLeaderboard(10).pipe(catchError(() => of([] as UserXPTrackerResponse[]))),
-      activity: this.trainingApi.getTodayActivity(userId).pipe(catchError(() => of(null))),
+      path: this.trainingApi.getOrCreatePath(userId).pipe(timeout(20000)),
+      preferences: this.trainingApi.getMyPreferences().pipe(timeout(20000), catchError(() => of(null))),
+      tracker: this.trainingApi.getUserXpTracker(userId).pipe(timeout(20000), catchError(() => of(null))),
+      leaderboard: this.trainingApi.getLeaderboard(10).pipe(timeout(20000), catchError(() => of([] as UserXPTrackerResponse[]))),
+      activity: this.trainingApi.getTodayActivity(userId).pipe(timeout(20000), catchError(() => of(null))),
+      badgeCatalog: this.trainingApi.getActiveBadges().pipe(timeout(20000), catchError(() => of([] as BadgeResponse[]))),
+      userBadges: this.trainingApi.getUserBadges(userId).pipe(timeout(20000), catchError(() => of([] as UserBadgeResponse[]))),
     }).subscribe({
-      next: ({ path, leaderboard, activity }) => {
-        this.activePathId = path.id;
-        this.applyPathData(path);
-        this.applyLeaderboardData(leaderboard, userId);
-        this.applyDailyGoals(activity);
-        this.applyBadgeProgress();
-        this.isLoading = false;
-        this.errorMessage = null;
+      next: ({ path, preferences, tracker, leaderboard, activity, badgeCatalog, userBadges }) => {
+        try {
+          this.activePathId = path.id;
+          this.applyPathData(path);
+          this.applyPreferencesData(preferences);
+          if (tracker) {
+            this.applyTrackerData(tracker);
+          }
+          this.applyLeaderboardData(leaderboard, userId);
+          this.applyDailyGoals(activity);
+          this.applyBadges(badgeCatalog, userBadges);
+          this.errorMessage = null;
+        } catch (e) {
+          console.error('Failed to map training data payload', e);
+          this.errorMessage = 'Training data received but could not be rendered completely.';
+        } finally {
+          this.isLoading = false;
+          this.cdr.detectChanges();
+        }
       },
       error: () => {
         this.activePathId = null;
         this.isLoading = false;
         this.errorMessage = 'Unable to load live training data. Showing fallback content.';
+        this.cdr.detectChanges();
       },
     });
   }
 
-  completeNextLesson(module: { id: string; lessons: number; completedLessons: number; progress: number; status: string; xp: number }): void {
+  togglePreferences(): void {
+    this.showPreferences = !this.showPreferences;
+  }
+
+  async createNewPath(): Promise<void> {
+    if (this.isSavingPreferences || this.isGeneratingPath || this.isCreatingNewPath) {
+      return;
+    }
+
+    this.infoMessage = null;
+    this.errorMessage = null;
+    this.isCreatingNewPath = true;
+    this.cdr.detectChanges();
+
+    try {
+      const path = await firstValueFrom(this.trainingApi.createNewMyPath().pipe(timeout(20000)));
+      this.activePathId = path.id;
+      this.applyPathData(path);
+      this.infoMessage = 'A fresh learning path was created. Your previous path was saved in history.';
+
+      if (this.showHistory) {
+        await this.loadHistory();
+      }
+    } catch {
+      this.errorMessage = 'Could not create a new learning path. Please try again.';
+    } finally {
+      this.isCreatingNewPath = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  toggleHistory(): void {
+    this.showHistory = !this.showHistory;
+    this.historyErrorMessage = null;
+    if (this.showHistory) {
+      this.loadHistory();
+    }
+  }
+
+  private async loadHistory(): Promise<void> {
+    if (this.isLoadingHistory) {
+      return;
+    }
+
+    this.isLoadingHistory = true;
+    this.historyErrorMessage = null;
+    this.cdr.detectChanges();
+
+    try {
+      const history = await firstValueFrom(this.trainingApi.getMyPathHistory().pipe(timeout(20000)));
+      this.pathHistory = Array.isArray(history) ? history : [];
+    } catch {
+      this.historyErrorMessage = 'Could not load path history.';
+      this.pathHistory = [];
+    } finally {
+      this.isLoadingHistory = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  countCompleted(path: TrainingPathResponse): number {
+    return (path.modules ?? []).filter((m) => m.status === 'COMPLETED').length;
+  }
+
+  historyChip(status: TrainingPathResponse['status']): string {
+    return status === 'ARCHIVED' ? 'chip chip-neutral' : status === 'COMPLETED' ? 'chip chip-teal' : 'chip chip-cyan';
+  }
+
+  async savePreferencesAndRegenerate(): Promise<void> {
+    if (this.isSavingPreferences || this.isGeneratingPath) {
+      return;
+    }
+
+    this.infoMessage = null;
+    this.errorMessage = null;
+
+    this.isSavingPreferences = true;
+    this.isGeneratingPath = false;
+    const actionId = ++this.preferencesActionSeq;
+    const payload: TrainingPreferencesRequest = {
+      goal: this.normalizeOptional(this.preferencesForm.goal),
+      targetRole: this.normalizeOptional(this.preferencesForm.targetRole),
+      seniority: this.normalizeOptional(this.preferencesForm.seniority),
+      minutesPerDay: this.preferencesForm.minutesPerDay ?? null,
+    };
+
+    let preferencesSaved = false;
+
+    try {
+      const saved = await firstValueFrom(this.trainingApi.putMyPreferences(payload).pipe(timeout(20000)));
+      preferencesSaved = true;
+      this.applyPreferencesData(saved);
+
+      if (actionId === this.preferencesActionSeq) {
+        this.isSavingPreferences = false;
+        this.isGeneratingPath = true;
+        this.cdr.detectChanges();
+      }
+
+      const path = await firstValueFrom(this.trainingApi.generateMyPath().pipe(timeout(20000)));
+      this.activePathId = path.id;
+      this.applyPathData(path);
+      this.infoMessage = 'Your learning path has been regenerated.';
+    } catch {
+      this.errorMessage = preferencesSaved
+        ? 'Preferences saved, but path regeneration failed. Please try again.'
+        : 'Could not save preferences. Please try again.';
+    } finally {
+      if (actionId === this.preferencesActionSeq) {
+        this.isSavingPreferences = false;
+        this.isGeneratingPath = false;
+        this.cdr.detectChanges();
+      }
+    }
+  }
+
+  async completeNextLesson(module: { id: string; title: string; lessons: number; completedLessons: number; progress: number; status: string; xp: number }): Promise<void> {
     if (!this.activePathId || !this.currentUserId) {
       this.errorMessage = 'Training path is not ready yet. Please reload.';
       return;
@@ -489,60 +938,86 @@ export class TrainingGamificationComponent implements OnInit {
     this.updatingModuleId = module.id;
     this.infoMessage = null;
     this.errorMessage = null;
+    this.cdr.detectChanges();
 
-    this.trainingApi.updateModuleProgress(this.activePathId, moduleId, this.currentUserId, {
-      completedLessons: nextCompleted,
-      progress: nextProgress,
-    }).subscribe({
-      next: (updated) => {
-        this.modules = this.modules.map((existing) => {
-          if (Number(existing.id) !== updated.id) return existing;
-          return {
-            ...existing,
-            completedLessons: updated.completedLessons,
-            progress: updated.progress,
-            status: this.mapModuleStatus(updated.status),
-          };
-        });
+    try {
+      const updated = await firstValueFrom(
+        this.trainingApi.updateModuleProgress(this.activePathId, moduleId, this.currentUserId, {
+          completedLessons: nextCompleted,
+          progress: nextProgress,
+        }).pipe(timeout(20000)),
+      );
 
-        const isCompleted = updated.status === 'COMPLETED';
-        this.trainingApi.recordDailyActivity({
-          userId: currentUserId,
-          xpEarned: isCompleted ? updated.xpReward : 0,
-          sessionCompleted: isCompleted,
-          goalsCompleted: isCompleted ? 1 : 0,
-          behavioralCount: isCompleted ? 1 : 0,
-          libraryCount: 0,
-          quizCount: 0,
-        }).subscribe({
-          next: (tracker) => {
-            this.applyTrackerData(tracker);
-            this.trainingApi.getTodayActivity(currentUserId).pipe(catchError(() => of(null))).subscribe({
-              next: (activity) => {
-                this.applyDailyGoals(activity);
-                this.applyBadgeProgress();
-                this.infoMessage = `${updated.title} updated to ${updated.progress}% progress.`;
-                this.updatingModuleId = null;
-              },
-              error: () => {
-                this.applyBadgeProgress();
-                this.infoMessage = `${updated.title} updated, but goal sync failed. Reload to refresh goals.`;
-                this.updatingModuleId = null;
-              },
-            });
-          },
-          error: () => {
-            this.applyBadgeProgress();
-            this.infoMessage = `${updated.title} updated, but activity sync failed. Reload to refresh tracker stats.`;
-            this.updatingModuleId = null;
-          },
-        });
-      },
-      error: () => {
-        this.errorMessage = 'Could not update module progress. Please try again.';
-        this.updatingModuleId = null;
-      },
-    });
+      this.modules = this.modules.map((existing) => {
+        if (Number(existing.id) !== updated.id) return existing;
+
+        const updatedModuleLessons = (updated as any).moduleLessons as
+          | Array<{ id: number; title: string; status: string; orderIndex?: number | null }>
+          | undefined;
+
+        return {
+          ...existing,
+          completedLessons: updated.completedLessons,
+          progress: updated.progress,
+          status: this.mapModuleStatus(updated.status),
+          moduleLessons: this.mergeUpdatedModuleLessons(
+            existing.moduleLessons,
+            updatedModuleLessons,
+            updated.completedLessons
+          ),
+        };
+      });
+
+      const isCompleted = updated.status === 'COMPLETED';
+
+      if (isCompleted) {
+        try {
+          const path = await firstValueFrom(
+            this.trainingApi.getPathByUserId(currentUserId).pipe(timeout(20000)),
+          );
+          this.activePathId = path.id;
+          this.applyPathData(path);
+        } catch {
+          // Non-blocking: keep local module update.
+        }
+      }
+
+      try {
+        const tracker = await firstValueFrom(
+          this.trainingApi.recordDailyActivity({
+            userId: currentUserId,
+            xpEarned: isCompleted ? updated.xpReward : 0,
+            sessionCompleted: isCompleted,
+            goalsCompleted: isCompleted ? 1 : 0,
+            behavioralCount: isCompleted ? 1 : 0,
+            libraryCount: 0,
+            quizCount: 0,
+          }).pipe(timeout(20000)),
+        );
+        this.applyTrackerData(tracker);
+      } catch {
+        this.infoMessage = `${updated.title} updated, but activity sync failed. Reload to refresh tracker stats.`;
+      }
+
+      try {
+        const activity = await firstValueFrom(
+          this.trainingApi.getTodayActivity(currentUserId).pipe(timeout(20000), catchError(() => of(null))),
+        );
+        this.applyDailyGoals(activity);
+      } catch {
+        // Non-blocking
+      }
+
+      this.refreshBadges(currentUserId);
+      if (!this.infoMessage) {
+        this.infoMessage = `${updated.title} updated to ${updated.progress}% progress.`;
+      }
+    } catch {
+      this.errorMessage = 'Could not update module progress. Please try again.';
+    } finally {
+      this.updatingModuleId = null;
+      this.cdr.detectChanges();
+    }
   }
 
   private applyPathData(path: TrainingPathResponse): void {
@@ -556,7 +1031,79 @@ export class TrainingGamificationComponent implements OnInit {
       completedLessons: module.completedLessons,
       status: this.mapModuleStatus(module.status),
       icon: this.iconForCategory(module.category),
+      moduleLessons: (module.moduleLessons ?? [])
+        .slice()
+        .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+        .map((l) => ({
+          id: String(l.id),
+          title: l.title,
+          status: l.status,
+          orderIndex: l.orderIndex,
+          format: l.format,
+          contentMarkdown: l.contentMarkdown ?? null,
+          videoUrl: l.videoUrl ?? null,
+          estimatedMinutes: l.estimatedMinutes,
+        })),
     }));
+  }
+
+  private mergeUpdatedModuleLessons(
+    existingModuleLessons: any,
+    updatedModuleLessons:
+      | Array<{
+          id: number;
+          title: string;
+          status: string;
+          orderIndex?: number | null;
+          format?: 'TEXT' | 'VIDEO' | string;
+          contentMarkdown?: string | null;
+          videoUrl?: string | null;
+          estimatedMinutes?: number;
+        }>
+      | undefined,
+    completedLessons: number,
+  ): any {
+    if (Array.isArray(updatedModuleLessons) && updatedModuleLessons.length > 0) {
+      return updatedModuleLessons
+        .slice()
+        .sort((a, b) => (Number(a.orderIndex ?? 0) - Number(b.orderIndex ?? 0)))
+        .map((l) => ({
+          id: String(l.id),
+          title: l.title,
+          status: l.status,
+          orderIndex: l.orderIndex,
+          format: (l as any).format,
+          contentMarkdown: (l as any).contentMarkdown ?? null,
+          videoUrl: (l as any).videoUrl ?? null,
+          estimatedMinutes: (l as any).estimatedMinutes,
+        }));
+    }
+
+    if (!Array.isArray(existingModuleLessons) || existingModuleLessons.length === 0) {
+      return existingModuleLessons;
+    }
+
+    return existingModuleLessons.map((l: any, index: number) => ({
+      ...l,
+      status: index < completedLessons ? 'COMPLETED' : 'PENDING',
+    }));
+  }
+
+  private applyPreferencesData(preferences: TrainingPreferencesResponse | null): void {
+    if (!preferences) {
+      return;
+    }
+
+    this.preferencesForm = {
+      goal: preferences.goal ?? '',
+      targetRole: preferences.targetRole ?? '',
+      seniority: preferences.seniority ?? '',
+      minutesPerDay: preferences.minutesPerDay ?? null,
+    };
+
+    this.preferencesUpdatedAt = preferences.updatedAt
+      ? this.formatEarnedDate(preferences.updatedAt)
+      : null;
   }
 
   private applyLeaderboardData(entries: UserXPTrackerResponse[], currentUserId: string): void {
@@ -586,6 +1133,14 @@ export class TrainingGamificationComponent implements OnInit {
     this.user.xp = tracker.totalXp;
     this.user.level = tracker.currentLevel;
     this.user.streak = tracker.currentStreak;
+
+    this.xpToNextLevel = Math.max(0, Number(tracker.xpToNextLevel ?? 0));
+    this.bestStreak = Math.max(0, Number(tracker.longestStreak ?? tracker.currentStreak ?? 0));
+
+    const into = this.xpLevelTotal - this.xpToNextLevel;
+    this.xpIntoLevel = Math.min(this.xpLevelTotal, Math.max(0, into));
+    this.xpProgressPercent = Math.round((this.xpIntoLevel / this.xpLevelTotal) * 100);
+
     this.syncCurrentUserLeaderboard(tracker);
   }
 
@@ -632,21 +1187,57 @@ export class TrainingGamificationComponent implements OnInit {
     });
   }
 
-  private applyBadgeProgress(): void {
-    const completedModules = this.modules.filter((m) => m.status === 'completed').length;
-    this.allBadges = MOCK_BADGES.map((badge) => {
-      const normalized = badge.name.toLowerCase();
-      let earned = badge.earned;
+  private applyBadges(catalog: BadgeResponse[], userBadges: UserBadgeResponse[]): void {
+    if (!catalog.length) {
+      // Backend unavailable or no seed data: keep mock catalog so UI still renders.
+      this.allBadges = MOCK_BADGES;
+      return;
+    }
 
-      if (normalized.includes('first interview') && completedModules >= 1) earned = true;
-      if (normalized.includes('interview veteran') && completedModules >= 3) earned = true;
-      if (normalized.includes('consistent learner') && this.user.streak >= 7) earned = true;
-      if (normalized.includes('unstoppable') && this.user.streak >= 30) earned = true;
-      if (normalized.includes('dedicated learner') && this.user.xp >= 10000) earned = true;
-      if (normalized.includes('master level') && this.user.level >= 10) earned = true;
+    this.badgeCatalog = catalog;
+    const earnedByBadgeId = new Map<number, UserBadgeResponse>();
+    for (const ub of userBadges) {
+      earnedByBadgeId.set(ub.badgeId, ub);
+    }
 
-      return { ...badge, earned };
+    this.allBadges = catalog.map((b) => {
+      const earned = earnedByBadgeId.get(b.id);
+      return {
+        id: String(b.id),
+        name: b.name,
+        description: b.description,
+        icon: b.icon,
+        color: '',
+        earned: Boolean(earned),
+        earnedDate: earned?.earnedDate ? this.formatEarnedDate(earned.earnedDate) : undefined,
+        xpReward: b.xpReward ?? 0,
+      };
     });
+  }
+
+  private refreshBadges(userId: string): void {
+    // Avoid flicker if we already have a catalog; just refresh earned list.
+    const catalog$ = this.badgeCatalog.length
+      ? of(this.badgeCatalog)
+      : this.trainingApi.getActiveBadges().pipe(catchError(() => of([] as BadgeResponse[])));
+
+    forkJoin({
+      badgeCatalog: catalog$,
+      userBadges: this.trainingApi.getUserBadges(userId).pipe(catchError(() => of([] as UserBadgeResponse[]))),
+    }).subscribe({
+      next: ({ badgeCatalog, userBadges }) => this.applyBadges(badgeCatalog, userBadges),
+      error: () => {
+        // Non-blocking: keep whatever badges are currently displayed.
+      },
+    });
+  }
+
+  formatEarnedDate(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   private mapModuleStatus(status: string): 'locked' | 'in-progress' | 'completed' {
@@ -673,5 +1264,10 @@ export class TrainingGamificationComponent implements OnInit {
     if (!parts.length) return 'NA';
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+
+  private normalizeOptional(value: string): string | null {
+    const trimmed = (value ?? '').trim();
+    return trimmed ? trimmed : null;
   }
 }

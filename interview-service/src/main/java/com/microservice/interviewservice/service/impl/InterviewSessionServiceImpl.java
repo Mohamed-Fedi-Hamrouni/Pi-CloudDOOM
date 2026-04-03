@@ -191,8 +191,6 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
             throw new BusinessException("Session is not active.");
         }
         List<Long> askedIds = responseRepository.findQuestionIdsBySessionId(sessionId);
-        if (askedIds.isEmpty()) return questionSelectionService.selectFirstQuestion(session);
-
         Question next = questionSelectionService.selectNextQuestion(session, askedIds);
         if (next == null) throw new BusinessException("No more questions available for this session.");
         return next;

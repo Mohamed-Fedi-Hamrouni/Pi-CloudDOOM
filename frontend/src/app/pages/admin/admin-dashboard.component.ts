@@ -16,6 +16,15 @@ import {
     PerformanceReport,
     ProgressTracker,
 } from "../../core/models/interview.models";
+import {
+    BadgeResponse,
+    DailyActivityResponse,
+    TrainingLessonResponse,
+    TrainingModuleResponse,
+    TrainingPathResponse,
+    UserBadgeResponse,
+    UserXPTrackerResponse,
+} from "../../core/models/training.models";
 
 interface UserItem {
     id: string;
@@ -39,7 +48,7 @@ interface UserItem {
     lastLoginAt: string;
 }
 
-type AdminTab = "users" | "interviews";
+type AdminTab = "users" | "interviews" | "training";
 
 @Component({
     selector: "app-admin-dashboard",
@@ -53,16 +62,23 @@ type AdminTab = "users" | "interviews";
                 <button
                     class="adm-tab"
                     [class.active]="activeTab === 'users'"
-                    (click)="activeTab = 'users'"
+                    (click)="setTab('users')"
                 >
                     👥 Users
                 </button>
                 <button
                     class="adm-tab"
                     [class.active]="activeTab === 'interviews'"
-                    (click)="activeTab = 'interviews'"
+                    (click)="setTab('interviews')"
                 >
                     🎙️ Interviews
+                </button>
+                <button
+                    class="adm-tab"
+                    [class.active]="activeTab === 'training'"
+                    (click)="setTab('training')"
+                >
+                    🎯 Training
                 </button>
             </div>
 
@@ -735,6 +751,763 @@ type AdminTab = "users" | "interviews";
                     </div>
                 </ng-container>
             </ng-container>
+
+            <!-- ════════════════════ TRAINING TAB ════════════════════ -->
+            <ng-container *ngIf="activeTab === 'training'">
+                <div class="training-head">
+                    <div>
+                        <h3 class="training-title">Training Content</h3>
+                        <p class="training-sub">
+                            Manage badges, paths, modules, trackers, activities, and user badges (admin only).
+                        </p>
+                    </div>
+                    <div class="training-views">
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'badges'"
+                            (click)="setTrainingView('badges')"
+                        >
+                            🏅 Badges
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'paths'"
+                            (click)="setTrainingView('paths')"
+                        >
+                            🗺️ Paths
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'modules'"
+                            (click)="setTrainingView('modules')"
+                        >
+                            📚 Modules
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'lessons'"
+                            (click)="setTrainingView('lessons')"
+                        >
+                            📄 Lessons
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'xp-trackers'"
+                            (click)="setTrainingView('xp-trackers')"
+                        >
+                            🧠 XP Trackers
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'activities'"
+                            (click)="setTrainingView('activities')"
+                        >
+                            📅 Activities
+                        </button>
+                        <button
+                            class="sub-tab"
+                            [class.active]="trainingView === 'user-badges'"
+                            (click)="setTrainingView('user-badges')"
+                        >
+                            🎖️ User Badges
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-loading" *ngIf="trainingLoading">
+                    Loading training content...
+                </div>
+                <div class="report-error" *ngIf="!trainingLoading && trainingError">
+                    ⚠️ {{ trainingError }}
+                </div>
+
+                <div class="admin-toolbar" *ngIf="!trainingLoading">
+                    <div class="search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input
+                            class="input search-input"
+                            type="search"
+                            [placeholder]="trainingSearchPlaceholder()"
+                            [(ngModel)]="trainingSearchQuery"
+                            (input)="onTrainingSearchInput()"
+                        />
+                    </div>
+                    <div class="filter-wrap">
+                        <select
+                            class="input filter-select"
+                            [(ngModel)]="trainingPageSize"
+                            (change)="onTrainingPageSizeChange()"
+                        >
+                            <option [ngValue]="10">10 / page</option>
+                            <option [ngValue]="25">25 / page</option>
+                            <option [ngValue]="50">50 / page</option>
+                        </select>
+                    </div>
+                    <div class="filter-wrap">
+                        <span class="user-email">{{ trainingTotalItems }} items</span>
+                    </div>
+                </div>
+
+                <div
+                    class="admin-pagination"
+                    *ngIf="!trainingLoading && trainingTotalPages > 1"
+                >
+                    <button
+                        class="page-btn"
+                        [disabled]="trainingPage === 0"
+                        (click)="trainingPrevPage()"
+                    >
+                        ← Prev
+                    </button>
+                    <span class="page-info"
+                        >Page {{ trainingPage + 1 }} of
+                        {{ trainingTotalPages }}</span
+                    >
+                    <button
+                        class="page-btn"
+                        [disabled]="trainingPage >= trainingTotalPages - 1"
+                        (click)="trainingNextPage()"
+                    >
+                        Next →
+                    </button>
+                </div>
+
+                <!-- Badges CRUD -->
+                <ng-container *ngIf="trainingView === 'badges'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('name')">Name {{ sortIndicator('name') }}</th>
+                                    <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
+                                    <th (click)="setTrainingSort('xpReward')">XP {{ sortIndicator('xpReward') }}</th>
+                                    <th (click)="setTrainingSort('isActive')">Active {{ sortIndicator('isActive') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let b of visibleBadges" class="user-row" (click)="editBadge(b)">
+                                    <td>{{ b.id }}</td>
+                                    <td>
+                                        <div class="user-name">{{ b.name }}</div>
+                                        <div class="user-email" *ngIf="b.description">{{ b.description }}</div>
+                                    </td>
+                                    <td><span class="badge badge-role">{{ b.category }}</span></td>
+                                    <td>{{ b.xpReward }}</td>
+                                    <td>
+                                        <span class="badge" [ngClass]="b.isActive ? 'badge-active' : 'badge-suspended'">
+                                            {{ b.isActive ? 'ACTIVE' : 'INACTIVE' }}
+                                        </span>
+                                    </td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editBadge(b)">
+                                                ✏️ Edit
+                                            </button>
+                                            <button class="action-btn action-btn-red" (click)="deleteBadge(b)">
+                                                🗑 Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No badges found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingBadgeId ? 'Edit Badge' : 'Create Badge' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetBadgeForm()">
+                                ✕ Clear
+                            </button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Name</span>
+                                <input class="input" [(ngModel)]="badgeForm.name" [ngModelOptions]="{standalone:true}" placeholder="e.g. Mock Interview Rookie" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Icon</span>
+                                <input class="input" [(ngModel)]="badgeForm.icon" [ngModelOptions]="{standalone:true}" placeholder="e.g. 🏅" />
+                            </div>
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Description</span>
+                                <input class="input" [(ngModel)]="badgeForm.description" [ngModelOptions]="{standalone:true}" placeholder="Short description" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <select class="input" [(ngModel)]="badgeForm.category" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let c of badgeCategories" [value]="c">{{ c }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">XP Reward</span>
+                                <input class="input" type="number" [(ngModel)]="badgeForm.xpReward" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Active</span>
+                                <select class="input" [(ngModel)]="badgeForm.isActive" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="true">true</option>
+                                    <option [ngValue]="false">false</option>
+                                </select>
+                            </div>
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Criteria JSON (optional)</span>
+                                <input class="input" [(ngModel)]="badgeForm.criteriaJson" [ngModelOptions]="{standalone:true}" placeholder='{"type":"sessions","min":1}' />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveBadge()">
+                                💾 {{ editingBadgeId ? 'Update' : 'Create' }}
+                            </button>
+                            <button class="action-btn action-btn-neutral" (click)="resetBadgeForm()">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- Paths CRUD -->
+                <ng-container *ngIf="trainingView === 'paths'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('status')">Status {{ sortIndicator('status') }}</th>
+                                    <th (click)="setTrainingSort('xpThreshold')">XP Threshold {{ sortIndicator('xpThreshold') }}</th>
+                                    <th (click)="setTrainingSort('modulesCount')">Modules {{ sortIndicator('modulesCount') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let p of visiblePaths" class="user-row" (click)="editPath(p)">
+                                    <td>{{ p.id }}</td>
+                                    <td>{{ p.userId }}</td>
+                                    <td><span class="badge badge-plan">{{ p.status }}</span></td>
+                                    <td>{{ p.xpThreshold }}</td>
+                                    <td>{{ p.modules.length }}</td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editPath(p)">✏️ Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deletePath(p)">🗑 Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No paths found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingPathId ? 'Edit Path' : 'Create Path' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetPathForm()">✕ Clear</button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">User ID (Keycloak sub)</span>
+                                <input class="input" [(ngModel)]="pathForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Status</span>
+                                <select class="input" [(ngModel)]="pathForm.status" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let s of pathStatuses" [value]="s">{{ s }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">XP Threshold</span>
+                                <input class="input" type="number" [(ngModel)]="pathForm.xpThreshold" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="savePath()">💾 {{ editingPathId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetPathForm()">Cancel</button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- Lessons CRUD -->
+                <ng-container *ngIf="trainingView === 'lessons'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('title')">Title {{ sortIndicator('title') }}</th>
+                                    <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
+                                    <th (click)="setTrainingSort('format')">Format {{ sortIndicator('format') }}</th>
+                                    <th (click)="setTrainingSort('difficulty')">Difficulty {{ sortIndicator('difficulty') }}</th>
+                                    <th (click)="setTrainingSort('estimatedMinutes')">Minutes {{ sortIndicator('estimatedMinutes') }}</th>
+                                    <th (click)="setTrainingSort('language')">Lang {{ sortIndicator('language') }}</th>
+                                    <th (click)="setTrainingSort('active')">Active {{ sortIndicator('active') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let l of visibleLessons" class="user-row" (click)="editLesson(l)">
+                                    <td>{{ l.id }}</td>
+                                    <td>
+                                        <div class="user-name">{{ l.title }}</div>
+                                        <div class="user-email" *ngIf="l.summary">{{ l.summary }}</div>
+                                        <div class="user-email" *ngIf="l.tags?.length">Tags: {{ (l.tags ?? []).join(', ') }}</div>
+                                    </td>
+                                    <td><span class="badge badge-role">{{ l.category }}</span></td>
+                                    <td><span class="badge badge-plan">{{ l.format }}</span></td>
+                                    <td>{{ l.difficulty }}</td>
+                                    <td>{{ l.estimatedMinutes }}</td>
+                                    <td>{{ l.language }}</td>
+                                    <td>
+                                        <span class="badge" [ngClass]="l.active ? 'badge-active' : 'badge-suspended'">
+                                            {{ l.active ? 'ACTIVE' : 'INACTIVE' }}
+                                        </span>
+                                    </td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editLesson(l)">
+                                                ✏️ Edit
+                                            </button>
+                                            <button class="action-btn action-btn-red" (click)="deleteLesson(l)">
+                                                🗑 Disable
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No lessons found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingLessonId ? 'Edit Lesson' : 'Create Lesson' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetLessonForm()">
+                                ✕ Clear
+                            </button>
+                        </div>
+
+                        <div class="crud-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <select class="input" [(ngModel)]="lessonForm.category" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let c of trainingCategories" [value]="c">{{ c }}</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-item">
+                                <span class="detail-label">Format</span>
+                                <select class="input" [(ngModel)]="lessonForm.format" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let f of lessonFormats" [value]="f">{{ f }}</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Title</span>
+                                <input class="input" [(ngModel)]="lessonForm.title" [ngModelOptions]="{standalone:true}" placeholder="e.g. Answering STAR questions" />
+                            </div>
+
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Summary (optional)</span>
+                                <input class="input" [(ngModel)]="lessonForm.summary" [ngModelOptions]="{standalone:true}" placeholder="Short summary" />
+                            </div>
+
+                            <div class="detail-item" *ngIf="lessonForm.format === 'VIDEO'">
+                                <span class="detail-label">Video URL</span>
+                                <input class="input" [(ngModel)]="lessonForm.videoUrl" [ngModelOptions]="{standalone:true}" placeholder="https://..." />
+                            </div>
+
+                            <div class="detail-item" *ngIf="lessonForm.format === 'TEXT'">
+                                <span class="detail-label">Content (Markdown)</span>
+                                <textarea class="input" rows="6" [(ngModel)]="lessonForm.contentMarkdown" [ngModelOptions]="{standalone:true}" placeholder="# Lesson\n...\n"></textarea>
+                            </div>
+
+                            <div class="detail-item">
+                                <span class="detail-label">Estimated Minutes</span>
+                                <input class="input" type="number" min="0" [(ngModel)]="lessonForm.estimatedMinutes" [ngModelOptions]="{standalone:true}" />
+                            </div>
+
+                            <div class="detail-item">
+                                <span class="detail-label">Difficulty</span>
+                                <select class="input" [(ngModel)]="lessonForm.difficulty" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let d of lessonDifficulties" [value]="d">{{ d }}</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-item">
+                                <span class="detail-label">Language</span>
+                                <input class="input" [(ngModel)]="lessonForm.language" [ngModelOptions]="{standalone:true}" placeholder="en" />
+                            </div>
+
+                            <div class="detail-item">
+                                <span class="detail-label">Active</span>
+                                <select class="input" [(ngModel)]="lessonForm.active" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="true">true</option>
+                                    <option [ngValue]="false">false</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Tags (comma-separated)</span>
+                                <input class="input" [(ngModel)]="lessonForm.tagsCsv" [ngModelOptions]="{standalone:true}" placeholder="behavioral, star, communication" />
+                            </div>
+                        </div>
+
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveLesson()">
+                                💾 {{ editingLessonId ? 'Update' : 'Create' }}
+                            </button>
+                            <button class="action-btn action-btn-neutral" (click)="resetLessonForm()">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- Modules CRUD -->
+                <ng-container *ngIf="trainingView === 'modules'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('pathId')">Path {{ sortIndicator('pathId') }}</th>
+                                    <th (click)="setTrainingSort('title')">Title {{ sortIndicator('title') }}</th>
+                                    <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
+                                    <th (click)="setTrainingSort('status')">Status {{ sortIndicator('status') }}</th>
+                                    <th (click)="setTrainingSort('progress')">Progress {{ sortIndicator('progress') }}</th>
+                                    <th (click)="setTrainingSort('xpReward')">XP {{ sortIndicator('xpReward') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let m of visibleModules" class="user-row" (click)="editModule(m)">
+                                    <td>{{ m.id }}</td>
+                                    <td>{{ m.pathId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ m.title }}</div>
+                                        <div class="user-email" *ngIf="m.lessons">{{ m.completedLessons }}/{{ m.lessons }} lessons</div>
+                                    </td>
+                                    <td><span class="badge badge-role">{{ m.category }}</span></td>
+                                    <td><span class="badge badge-plan">{{ m.status }}</span></td>
+                                    <td>{{ m.progress }}%</td>
+                                    <td>{{ m.xpReward }}</td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editModule(m)">✏️ Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteModule(m)">🗑 Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No modules found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingModuleId ? 'Edit Module' : 'Create Module' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetModuleForm()">✕ Clear</button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Path ID</span>
+                                <input class="input" type="number" [(ngModel)]="moduleForm.pathId" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <select class="input" [(ngModel)]="moduleForm.category" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let c of trainingCategories" [value]="c">{{ c }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Title</span>
+                                <input class="input" [(ngModel)]="moduleForm.title" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Description</span>
+                                <input class="input" [(ngModel)]="moduleForm.description" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Lessons</span>
+                                <input class="input" type="number" [(ngModel)]="moduleForm.lessons" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Completed Lessons</span>
+                                <input class="input" type="number" [(ngModel)]="moduleForm.completedLessons" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Progress (0-100)</span>
+                                <input class="input" type="number" [(ngModel)]="moduleForm.progress" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">XP Reward</span>
+                                <input class="input" type="number" [(ngModel)]="moduleForm.xpReward" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Status</span>
+                                <select class="input" [(ngModel)]="moduleForm.status" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let s of moduleStatuses" [value]="s">{{ s }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Unlocked At (optional)</span>
+                                <input class="input" [(ngModel)]="moduleForm.unlockedAt" [ngModelOptions]="{standalone:true}" placeholder="2026-03-31T10:00:00" />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveModule()">💾 {{ editingModuleId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetModuleForm()">Cancel</button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- XP Trackers CRUD -->
+                <ng-container *ngIf="trainingView === 'xp-trackers'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('totalXp')">Total XP {{ sortIndicator('totalXp') }}</th>
+                                    <th (click)="setTrainingSort('currentLevel')">Level {{ sortIndicator('currentLevel') }}</th>
+                                    <th (click)="setTrainingSort('xpToNextLevel')">To Next {{ sortIndicator('xpToNextLevel') }}</th>
+                                    <th (click)="setTrainingSort('currentStreak')">Streak {{ sortIndicator('currentStreak') }}</th>
+                                    <th (click)="setTrainingSort('longestStreak')">Best {{ sortIndicator('longestStreak') }}</th>
+                                    <th (click)="setTrainingSort('lastActivityDate')">Last Activity {{ sortIndicator('lastActivityDate') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let t of visibleTrackers" class="user-row" (click)="editTracker(t)">
+                                    <td>{{ t.id }}</td>
+                                    <td>{{ t.userId }}</td>
+                                    <td>{{ t.totalXp }}</td>
+                                    <td>{{ t.currentLevel }}</td>
+                                    <td>{{ t.xpToNextLevel }}</td>
+                                    <td>{{ t.currentStreak }}</td>
+                                    <td>{{ t.longestStreak }}</td>
+                                    <td>{{ t.lastActivityDate || '-' }}</td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editTracker(t)">✏️ Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteTracker(t)">🗑 Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No trackers found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingTrackerId ? 'Edit Tracker' : 'Create Tracker' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetTrackerForm()">✕ Clear</button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">User ID (Keycloak sub)</span>
+                                <input class="input" [(ngModel)]="trackerForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Total XP</span>
+                                <input class="input" type="number" [(ngModel)]="trackerForm.totalXp" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Current Level</span>
+                                <input class="input" type="number" [(ngModel)]="trackerForm.currentLevel" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">XP To Next Level</span>
+                                <input class="input" type="number" [(ngModel)]="trackerForm.xpToNextLevel" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Current Streak</span>
+                                <input class="input" type="number" [(ngModel)]="trackerForm.currentStreak" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Longest Streak</span>
+                                <input class="input" type="number" [(ngModel)]="trackerForm.longestStreak" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Last Activity Date (optional)</span>
+                                <input class="input" [(ngModel)]="trackerForm.lastActivityDate" [ngModelOptions]="{standalone:true}" placeholder="YYYY-MM-DD" />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveTracker()">💾 {{ editingTrackerId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetTrackerForm()">Cancel</button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- Activities CRUD -->
+                <ng-container *ngIf="trainingView === 'activities'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('activityDate')">Date {{ sortIndicator('activityDate') }}</th>
+                                    <th (click)="setTrainingSort('xpEarned')">XP {{ sortIndicator('xpEarned') }}</th>
+                                    <th (click)="setTrainingSort('sessionCompleted')">Session {{ sortIndicator('sessionCompleted') }}</th>
+                                    <th (click)="setTrainingSort('goalsCompleted')">Goals {{ sortIndicator('goalsCompleted') }}</th>
+                                    <th (click)="setTrainingSort('behavioralCount')">Behavioral {{ sortIndicator('behavioralCount') }}</th>
+                                    <th (click)="setTrainingSort('libraryCount')">Library {{ sortIndicator('libraryCount') }}</th>
+                                    <th (click)="setTrainingSort('quizCount')">Quiz {{ sortIndicator('quizCount') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let a of visibleActivities" class="user-row" (click)="editActivity(a)">
+                                    <td>{{ a.id }}</td>
+                                    <td>{{ a.userId }}</td>
+                                    <td>{{ a.activityDate }}</td>
+                                    <td>{{ a.xpEarned }}</td>
+                                    <td>{{ a.sessionCompleted ? 'YES' : 'NO' }}</td>
+                                    <td>{{ a.goalsCompleted }}</td>
+                                    <td>{{ a.behavioralCount }}</td>
+                                    <td>{{ a.libraryCount }}</td>
+                                    <td>{{ a.quizCount }}</td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editActivity(a)">✏️ Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteActivity(a)">🗑 Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No activities found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingActivityId ? 'Edit Activity' : 'Create Activity' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetActivityForm()">✕ Clear</button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">User ID (Keycloak sub)</span>
+                                <input class="input" [(ngModel)]="activityForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Activity Date</span>
+                                <input class="input" [(ngModel)]="activityForm.activityDate" [ngModelOptions]="{standalone:true}" placeholder="YYYY-MM-DD" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">XP Earned</span>
+                                <input class="input" type="number" [(ngModel)]="activityForm.xpEarned" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Session Completed</span>
+                                <select class="input" [(ngModel)]="activityForm.sessionCompleted" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="true">true</option>
+                                    <option [ngValue]="false">false</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Goals Completed</span>
+                                <input class="input" type="number" [(ngModel)]="activityForm.goalsCompleted" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Behavioral Count</span>
+                                <input class="input" type="number" [(ngModel)]="activityForm.behavioralCount" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Library Count</span>
+                                <input class="input" type="number" [(ngModel)]="activityForm.libraryCount" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Quiz Count</span>
+                                <input class="input" type="number" [(ngModel)]="activityForm.quizCount" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveActivity()">💾 {{ editingActivityId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetActivityForm()">Cancel</button>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- User Badges CRUD -->
+                <ng-container *ngIf="trainingView === 'user-badges'">
+                    <div class="admin-table-wrap">
+                        <table class="admin-table" *ngIf="!trainingLoading">
+                            <thead>
+                                <tr>
+                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
+                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('badgeId')">Badge ID {{ sortIndicator('badgeId') }}</th>
+                                    <th (click)="setTrainingSort('progress')">Progress {{ sortIndicator('progress') }}</th>
+                                    <th (click)="setTrainingSort('earnedDate')">Earned Date {{ sortIndicator('earnedDate') }}</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let ub of visibleUserBadges" class="user-row" (click)="editUserBadge(ub)">
+                                    <td>{{ ub.id }}</td>
+                                    <td>{{ ub.userId }}</td>
+                                    <td>{{ ub.badgeId }}</td>
+                                    <td>{{ ub.progress ?? '-' }}</td>
+                                    <td>{{ ub.earnedDate || '-' }}</td>
+                                    <td (click)="$event.stopPropagation()">
+                                        <div class="action-buttons">
+                                            <button class="action-btn action-btn-teal" (click)="editUserBadge(ub)">✏️ Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteUserBadge(ub)">🗑 Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="table-empty" *ngIf="!trainingLoading && trainingTotalItems === 0">
+                            No user badges found.
+                        </div>
+                    </div>
+
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>{{ editingUserBadgeId ? 'Edit User Badge' : 'Create User Badge' }}</strong>
+                            <button class="action-btn action-btn-neutral" (click)="resetUserBadgeForm()">✕ Clear</button>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">User ID (Keycloak sub)</span>
+                                <input class="input" [(ngModel)]="userBadgeForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Badge ID</span>
+                                <input class="input" type="number" [(ngModel)]="userBadgeForm.badgeId" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Progress (optional)</span>
+                                <input class="input" type="number" [(ngModel)]="userBadgeForm.progress" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="saveUserBadge()">💾 {{ editingUserBadgeId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetUserBadgeForm()">Cancel</button>
+                        </div>
+                    </div>
+                </ng-container>
+            </ng-container>
         </div>
 
         <!-- User Detail Modal -->
@@ -940,6 +1713,85 @@ type AdminTab = "users" | "interviews";
             .adm-tab.active {
                 color: var(--teal-600);
                 border-bottom-color: var(--teal-500);
+            }
+
+            /* Training tab */
+            .training-head {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: var(--space-4);
+                flex-wrap: wrap;
+            }
+            .training-title {
+                margin: 0;
+                font-size: var(--text-lg);
+                font-weight: 700;
+                color: var(--color-text);
+            }
+            .training-sub {
+                margin: 2px 0 0;
+                font-size: var(--text-sm);
+                color: var(--color-text-muted);
+            }
+            .training-views {
+                display: flex;
+                gap: var(--space-2);
+                flex-wrap: wrap;
+            }
+            .sub-tab {
+                padding: 0.4rem 0.75rem;
+                font-size: var(--text-xs);
+                font-weight: 700;
+                border-radius: var(--radius-full);
+                border: 1px solid var(--color-border);
+                background: var(--color-surface);
+                color: var(--color-text-muted);
+                cursor: pointer;
+                transition: all 0.15s;
+            }
+            .sub-tab:hover {
+                color: var(--teal-700);
+                border-color: var(--teal-200);
+                background: var(--teal-50);
+            }
+            .sub-tab.active {
+                color: var(--teal-700);
+                border-color: var(--teal-300);
+                background: var(--teal-50);
+            }
+
+            .crud-card {
+                background: var(--color-surface);
+                border: 1px solid var(--color-border);
+                border-radius: var(--radius-lg);
+                padding: var(--space-5);
+                margin-top: var(--space-5);
+            }
+            .crud-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: var(--space-3);
+                margin-bottom: var(--space-4);
+            }
+            .crud-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-4);
+            }
+            .crud-actions {
+                display: flex;
+                align-items: center;
+                gap: var(--space-3);
+                margin-top: var(--space-4);
+                flex-wrap: wrap;
+            }
+
+            @media (max-width: 900px) {
+                .crud-grid {
+                    grid-template-columns: 1fr;
+                }
             }
 
             .admin-panel {
@@ -1812,10 +2664,461 @@ export class AdminDashboardComponent implements OnInit {
     userProgress: ProgressTracker | null = null;
     userProgressLoading = false;
 
+    // ── Training tab ─────────────────────────────────────────────────────────
+    trainingView:
+        | "badges"
+        | "paths"
+        | "modules"
+        | "lessons"
+        | "xp-trackers"
+        | "activities"
+        | "user-badges" = "badges";
+    trainingLoading = false;
+    trainingError: string | null = null;
+
+    adminBadges: BadgeResponse[] = [];
+    adminPaths: TrainingPathResponse[] = [];
+    adminModules: TrainingModuleResponse[] = [];
+    adminLessons: TrainingLessonResponse[] = [];
+
+    adminTrackers: UserXPTrackerResponse[] = [];
+    adminActivities: DailyActivityResponse[] = [];
+    adminUserBadges: UserBadgeResponse[] = [];
+
+    // Training table UI (search/sort/pagination) — client-side over loaded lists
+    trainingSearchQuery = "";
+    trainingSearchTimeout: any;
+    trainingPage = 0;
+    trainingPageSize = 10;
+    trainingSortKey = "id";
+    trainingSortDir: "asc" | "desc" = "asc";
+    trainingTotalItems = 0;
+    trainingTotalPages = 1;
+
+    visibleBadges: BadgeResponse[] = [];
+    visiblePaths: TrainingPathResponse[] = [];
+    visibleModules: TrainingModuleResponse[] = [];
+    visibleLessons: TrainingLessonResponse[] = [];
+    visibleTrackers: UserXPTrackerResponse[] = [];
+    visibleActivities: DailyActivityResponse[] = [];
+    visibleUserBadges: UserBadgeResponse[] = [];
+
+    editingBadgeId: number | null = null;
+    badgeCategories = [
+        "SIMULATION",
+        "COMMUNITY",
+        "STREAK",
+        "PERFORMANCE",
+        "MILESTONE",
+    ];
+    badgeForm: {
+        name: string;
+        description: string;
+        icon: string;
+        category: string;
+        xpReward: number;
+        criteriaJson: string;
+        isActive: boolean;
+    } = {
+        name: "",
+        description: "",
+        icon: "",
+        category: "SIMULATION",
+        xpReward: 0,
+        criteriaJson: "",
+        isActive: true,
+    };
+
+    editingPathId: number | null = null;
+    pathStatuses = ["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"];
+    pathForm: { userId: string; status: string; xpThreshold: number } = {
+        userId: "",
+        status: "ACTIVE",
+        xpThreshold: 200,
+    };
+
+    editingModuleId: number | null = null;
+    trainingCategories = [
+        "COMMUNICATION",
+        "STRESS_MANAGEMENT",
+        "CONTENT_PREP",
+        "BODY_LANGUAGE",
+        "INDUSTRY_SPECIFIC",
+    ];
+
+    lessonFormats = ["TEXT", "VIDEO"];
+    lessonDifficulties = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
+
+    editingLessonId: number | null = null;
+    lessonForm: {
+        category: string;
+        title: string;
+        format: "TEXT" | "VIDEO";
+        summary: string;
+        contentMarkdown: string;
+        videoUrl: string;
+        estimatedMinutes: number;
+        difficulty: string;
+        language: string;
+        active: boolean;
+        tagsCsv: string;
+    } = {
+        category: "COMMUNICATION",
+        title: "",
+        format: "TEXT",
+        summary: "",
+        contentMarkdown: "",
+        videoUrl: "",
+        estimatedMinutes: 5,
+        difficulty: "BEGINNER",
+        language: "en",
+        active: true,
+        tagsCsv: "",
+    };
+    moduleStatuses = ["LOCKED", "IN_PROGRESS", "COMPLETED", "SKIPPED"];
+    moduleForm: {
+        pathId: number | null;
+        category: string;
+        title: string;
+        description: string;
+        lessons: number;
+        completedLessons: number;
+        progress: number | null;
+        xpReward: number;
+        status: string;
+        unlockedAt: string;
+    } = {
+        pathId: null,
+        category: "COMMUNICATION",
+        title: "",
+        description: "",
+        lessons: 1,
+        completedLessons: 0,
+        progress: null,
+        xpReward: 0,
+        status: "LOCKED",
+        unlockedAt: "",
+    };
+
+    editingTrackerId: number | null = null;
+    trackerForm: {
+        userId: string;
+        totalXp: number;
+        currentLevel: number;
+        xpToNextLevel: number;
+        currentStreak: number;
+        longestStreak: number;
+        lastActivityDate: string;
+    } = {
+        userId: "",
+        totalXp: 0,
+        currentLevel: 1,
+        xpToNextLevel: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastActivityDate: "",
+    };
+
+    editingActivityId: number | null = null;
+    activityForm: {
+        userId: string;
+        activityDate: string;
+        xpEarned: number;
+        sessionCompleted: boolean;
+        goalsCompleted: number;
+        behavioralCount: number;
+        libraryCount: number;
+        quizCount: number;
+    } = {
+        userId: "",
+        activityDate: "",
+        xpEarned: 0,
+        sessionCompleted: false,
+        goalsCompleted: 0,
+        behavioralCount: 0,
+        libraryCount: 0,
+        quizCount: 0,
+    };
+
+    editingUserBadgeId: number | null = null;
+    userBadgeForm: { userId: string; badgeId: number | null; progress: number | null } = {
+        userId: "",
+        badgeId: null,
+        progress: null,
+    };
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     ngOnInit(): void {
         this.loadUsers();
         this.loadStats();
+    }
+
+    setTab(tab: AdminTab): void {
+        this.activeTab = tab;
+        if (tab === "training") {
+            this.setTrainingView(this.trainingView);
+        }
+    }
+
+    setTrainingView(
+        view:
+            | "badges"
+            | "paths"
+            | "modules"
+            | "lessons"
+            | "xp-trackers"
+            | "activities"
+            | "user-badges",
+    ): void {
+        const changed = this.trainingView !== view;
+        this.trainingView = view;
+        if (changed) {
+            this.resetTrainingTableState();
+        }
+        if (view === "badges") {
+            this.loadBadges();
+        } else if (view === "paths") {
+            this.loadPaths();
+        } else if (view === "modules") {
+            this.loadModules();
+        } else if (view === "lessons") {
+            this.loadLessons();
+        } else if (view === "xp-trackers") {
+            this.loadTrackers();
+        } else if (view === "activities") {
+            this.loadActivities();
+        } else {
+            this.loadUserBadges();
+        }
+    }
+
+    onTrainingSearchInput(): void {
+        clearTimeout(this.trainingSearchTimeout);
+        this.trainingSearchTimeout = setTimeout(() => {
+            this.trainingPage = 0;
+            this.refreshTrainingTable();
+        }, 200);
+    }
+
+    onTrainingPageSizeChange(): void {
+        this.trainingPage = 0;
+        this.refreshTrainingTable();
+    }
+
+    trainingPrevPage(): void {
+        if (this.trainingPage <= 0) return;
+        this.trainingPage -= 1;
+        this.refreshTrainingTable();
+    }
+
+    trainingNextPage(): void {
+        if (this.trainingPage >= this.trainingTotalPages - 1) return;
+        this.trainingPage += 1;
+        this.refreshTrainingTable();
+    }
+
+    setTrainingSort(key: string): void {
+        if (!key) return;
+        if (this.trainingSortKey === key) {
+            this.trainingSortDir = this.trainingSortDir === "asc" ? "desc" : "asc";
+        } else {
+            this.trainingSortKey = key;
+            this.trainingSortDir = "asc";
+        }
+        this.trainingPage = 0;
+        this.refreshTrainingTable();
+    }
+
+    sortIndicator(key: string): string {
+        if (this.trainingSortKey !== key) return "";
+        return this.trainingSortDir === "asc" ? "▲" : "▼";
+    }
+
+    trainingSearchPlaceholder(): string {
+        const label =
+            {
+                badges: "badges",
+                paths: "paths",
+                modules: "modules",
+                lessons: "lessons",
+                "xp-trackers": "trackers",
+                activities: "activities",
+                "user-badges": "user badges",
+            }[this.trainingView] || "items";
+        return `Search ${label}...`;
+    }
+
+    private resetTrainingTableState(): void {
+        this.trainingSearchQuery = "";
+        this.trainingPage = 0;
+        this.trainingSortKey = "id";
+        this.trainingSortDir = "asc";
+        this.trainingTotalItems = 0;
+        this.trainingTotalPages = 1;
+        this.visibleBadges = [];
+        this.visiblePaths = [];
+        this.visibleModules = [];
+        this.visibleLessons = [];
+        this.visibleTrackers = [];
+        this.visibleActivities = [];
+        this.visibleUserBadges = [];
+    }
+
+    private normalizeText(v: any): string {
+        return String(v ?? "")
+            .trim()
+            .toLowerCase();
+    }
+
+    private compareValues(a: any, b: any): number {
+        if (a === b) return 0;
+        if (a === null || a === undefined) return 1;
+        if (b === null || b === undefined) return -1;
+
+        if (typeof a === "number" && typeof b === "number") return a - b;
+        if (typeof a === "boolean" && typeof b === "boolean")
+            return a === b ? 0 : a ? 1 : -1;
+
+        const as = this.normalizeText(a);
+        const bs = this.normalizeText(b);
+        return as.localeCompare(bs);
+    }
+
+    private applyTrainingTable<T>(
+        rows: T[],
+        matches: (row: T, q: string) => boolean,
+        sortValue: (row: T, key: string) => any,
+    ): T[] {
+        const q = this.normalizeText(this.trainingSearchQuery);
+        const filtered = q ? rows.filter((r) => matches(r, q)) : [...rows];
+
+        const key = this.trainingSortKey;
+        const dir = this.trainingSortDir;
+        const sorted = key
+            ? [...filtered].sort((ra: T, rb: T) => {
+                  const va = sortValue(ra, key);
+                  const vb = sortValue(rb, key);
+                  const cmp = this.compareValues(va, vb);
+                  return dir === "asc" ? cmp : -cmp;
+              })
+            : filtered;
+
+        this.trainingTotalItems = sorted.length;
+        this.trainingTotalPages = Math.max(
+            1,
+            Math.ceil(sorted.length / Math.max(1, this.trainingPageSize)),
+        );
+
+        if (this.trainingPage > this.trainingTotalPages - 1) {
+            this.trainingPage = this.trainingTotalPages - 1;
+        }
+
+        const start = this.trainingPage * Math.max(1, this.trainingPageSize);
+        const end = start + Math.max(1, this.trainingPageSize);
+        return sorted.slice(start, end);
+    }
+
+    private refreshTrainingTable(): void {
+        if (this.trainingView === "badges") {
+            this.visibleBadges = this.applyTrainingTable<BadgeResponse>(
+                this.adminBadges,
+                (b, q) =>
+                    this.normalizeText(b.id).includes(q) ||
+                    this.normalizeText(b.name).includes(q) ||
+                    this.normalizeText(b.category).includes(q) ||
+                    this.normalizeText(b.description).includes(q) ||
+                    this.normalizeText(b.xpReward).includes(q) ||
+                    this.normalizeText(b.isActive ? "active" : "inactive").includes(q),
+                (b, key) => (b as any)[key],
+            );
+        } else if (this.trainingView === "paths") {
+            this.visiblePaths = this.applyTrainingTable<TrainingPathResponse>(
+                this.adminPaths,
+                (p, q) =>
+                    this.normalizeText(p.id).includes(q) ||
+                    this.normalizeText(p.userId).includes(q) ||
+                    this.normalizeText(p.status).includes(q) ||
+                    this.normalizeText(p.xpThreshold).includes(q) ||
+                    this.normalizeText(p.modules?.length ?? 0).includes(q),
+                (p, key) => {
+                    if (key === "modulesCount") return p.modules?.length ?? 0;
+                    return (p as any)[key];
+                },
+            );
+        } else if (this.trainingView === "modules") {
+            this.visibleModules = this.applyTrainingTable<TrainingModuleResponse>(
+                this.adminModules,
+                (m, q) =>
+                    this.normalizeText(m.id).includes(q) ||
+                    this.normalizeText(m.pathId).includes(q) ||
+                    this.normalizeText(m.title).includes(q) ||
+                    this.normalizeText(m.category).includes(q) ||
+                    this.normalizeText(m.status).includes(q) ||
+                    this.normalizeText(m.progress).includes(q) ||
+                    this.normalizeText(m.xpReward).includes(q) ||
+                    this.normalizeText(m.lessons).includes(q) ||
+                    this.normalizeText(m.completedLessons).includes(q),
+                (m, key) => (m as any)[key],
+            );
+        } else if (this.trainingView === "lessons") {
+            this.visibleLessons = this.applyTrainingTable<TrainingLessonResponse>(
+                this.adminLessons,
+                (l, q) =>
+                    this.normalizeText(l.id).includes(q) ||
+                    this.normalizeText(l.title).includes(q) ||
+                    this.normalizeText(l.category).includes(q) ||
+                    this.normalizeText(l.format).includes(q) ||
+                    this.normalizeText(l.difficulty).includes(q) ||
+                    this.normalizeText(l.estimatedMinutes).includes(q) ||
+                    this.normalizeText(l.language).includes(q) ||
+                    this.normalizeText(l.active ? "active" : "inactive").includes(q) ||
+                    this.normalizeText(l.summary).includes(q) ||
+                    this.normalizeText((l.tags || []).join(",")).includes(q),
+                (l, key) => (l as any)[key],
+            );
+        } else if (this.trainingView === "xp-trackers") {
+            this.visibleTrackers = this.applyTrainingTable<UserXPTrackerResponse>(
+                this.adminTrackers,
+                (t, q) =>
+                    this.normalizeText(t.id).includes(q) ||
+                    this.normalizeText(t.userId).includes(q) ||
+                    this.normalizeText(t.totalXp).includes(q) ||
+                    this.normalizeText(t.currentLevel).includes(q) ||
+                    this.normalizeText(t.xpToNextLevel).includes(q) ||
+                    this.normalizeText(t.currentStreak).includes(q) ||
+                    this.normalizeText(t.longestStreak).includes(q) ||
+                    this.normalizeText(t.lastActivityDate).includes(q),
+                (t, key) => (t as any)[key],
+            );
+        } else if (this.trainingView === "activities") {
+            this.visibleActivities = this.applyTrainingTable<DailyActivityResponse>(
+                this.adminActivities,
+                (a, q) =>
+                    this.normalizeText(a.id).includes(q) ||
+                    this.normalizeText(a.userId).includes(q) ||
+                    this.normalizeText(a.activityDate).includes(q) ||
+                    this.normalizeText(a.xpEarned).includes(q) ||
+                    this.normalizeText(a.sessionCompleted ? "true" : "false").includes(q) ||
+                    this.normalizeText(a.goalsCompleted).includes(q) ||
+                    this.normalizeText(a.behavioralCount).includes(q) ||
+                    this.normalizeText(a.libraryCount).includes(q) ||
+                    this.normalizeText(a.quizCount).includes(q),
+                (a, key) => (a as any)[key],
+            );
+        } else {
+            this.visibleUserBadges = this.applyTrainingTable<UserBadgeResponse>(
+                this.adminUserBadges,
+                (ub, q) =>
+                    this.normalizeText(ub.id).includes(q) ||
+                    this.normalizeText(ub.userId).includes(q) ||
+                    this.normalizeText(ub.badgeId).includes(q) ||
+                    this.normalizeText(ub.progress).includes(q) ||
+                    this.normalizeText(ub.earnedDate).includes(q),
+                (ub, key) => (ub as any)[key],
+            );
+        }
+
+        this.cdr.markForCheck();
     }
 
     // ── Users ─────────────────────────────────────────────────────────────────
@@ -2028,6 +3331,115 @@ export class AdminDashboardComponent implements OnInit {
         }
     }
 
+    loadLessons(): void {
+        this.setTrainingBusy(true, null);
+        this.http.get<TrainingLessonResponse[]>(`${this.trainingAdminBase()}/lessons`).subscribe({
+            next: (res) => {
+                this.adminLessons = res || [];
+                this.refreshTrainingTable();
+                this.setTrainingBusy(false, null);
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    editLesson(l: TrainingLessonResponse): void {
+        this.editingLessonId = l.id;
+        this.lessonForm = {
+            category: String(l.category || "COMMUNICATION"),
+            title: l.title || "",
+            format: (l.format as any) === "VIDEO" ? "VIDEO" : "TEXT",
+            summary: (l.summary as any) || "",
+            contentMarkdown: (l.contentMarkdown as any) || "",
+            videoUrl: (l.videoUrl as any) || "",
+            estimatedMinutes: Number(l.estimatedMinutes ?? 5),
+            difficulty: String(l.difficulty || "BEGINNER"),
+            language: (l.language as any) || "en",
+            active: Boolean((l as any).active ?? true),
+            tagsCsv: (l.tags || []).join(", "),
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetLessonForm(): void {
+        this.editingLessonId = null;
+        this.lessonForm = {
+            category: "COMMUNICATION",
+            title: "",
+            format: "TEXT",
+            summary: "",
+            contentMarkdown: "",
+            videoUrl: "",
+            estimatedMinutes: 5,
+            difficulty: "BEGINNER",
+            language: "en",
+            active: true,
+            tagsCsv: "",
+        };
+        this.cdr.markForCheck();
+    }
+
+    private parseTagsCsv(csv: string): string[] {
+        return String(csv || "")
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => !!t);
+    }
+
+    saveLesson(): void {
+        this.trainingError = null;
+
+        const payload: any = {
+            category: this.lessonForm.category,
+            title: this.lessonForm.title?.trim(),
+            format: this.lessonForm.format,
+            summary: this.lessonForm.summary?.trim() || null,
+            contentMarkdown: this.lessonForm.format === "TEXT" ? (this.lessonForm.contentMarkdown || "") : null,
+            videoUrl: this.lessonForm.format === "VIDEO" ? (this.lessonForm.videoUrl || "") : null,
+            estimatedMinutes: Number(this.lessonForm.estimatedMinutes ?? 5),
+            difficulty: this.lessonForm.difficulty,
+            language: this.lessonForm.language?.trim() || "en",
+            active: Boolean(this.lessonForm.active),
+            tags: this.parseTagsCsv(this.lessonForm.tagsCsv),
+        };
+
+        const url = this.editingLessonId
+            ? `${this.trainingAdminBase()}/lessons/${this.editingLessonId}`
+            : `${this.trainingAdminBase()}/lessons`;
+
+        const req = this.editingLessonId
+            ? this.http.put<TrainingLessonResponse>(url, payload)
+            : this.http.post<TrainingLessonResponse>(url, payload);
+
+        req.subscribe({
+            next: () => {
+                this.resetLessonForm();
+                this.loadLessons();
+            },
+            error: (err) => {
+                this.trainingError = this.formatTrainingError(err);
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
+    deleteLesson(l: TrainingLessonResponse): void {
+        if (!l?.id) return;
+        if (!confirm(`Disable lesson #${l.id} (${l.title})?`)) return;
+        this.trainingError = null;
+        this.http.delete(`${this.trainingAdminBase()}/lessons/${l.id}`).subscribe({
+            next: () => {
+                this.loadLessons();
+            },
+            error: (err) => {
+                this.trainingError = this.formatTrainingError(err);
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
     loadIntReport(s: InterviewSessionResponse): void {
         this.intReportLoading = true;
         this.intReport = null;
@@ -2072,6 +3484,591 @@ export class AdminDashboardComponent implements OnInit {
                 this.cdr.markForCheck();
             },
         });
+    }
+
+    // ── Training tab (admin) ────────────────────────────────────────────────
+    private trainingAdminBase(): string {
+        return `${environment.trainingApiUrl}/api/v1/admin/training`;
+    }
+
+    private setTrainingBusy(busy: boolean, error: string | null = null): void {
+        this.trainingLoading = busy;
+        this.trainingError = error;
+        this.cdr.markForCheck();
+    }
+
+    loadBadges(): void {
+        this.setTrainingBusy(true, null);
+        this.http.get<BadgeResponse[]>(`${this.trainingAdminBase()}/badges`).subscribe({
+            next: (res) => {
+                this.adminBadges = res || [];
+                this.refreshTrainingTable();
+                this.setTrainingBusy(false, null);
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    editBadge(b: BadgeResponse): void {
+        this.editingBadgeId = b.id;
+        this.badgeForm = {
+            name: b.name || "",
+            description: b.description || "",
+            icon: b.icon || "",
+            category: String(b.category || "SIMULATION"),
+            xpReward: Number(b.xpReward ?? 0),
+            criteriaJson: (b.criteriaJson as any) || "",
+            isActive: Boolean((b as any).isActive ?? true),
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetBadgeForm(): void {
+        this.editingBadgeId = null;
+        this.badgeForm = {
+            name: "",
+            description: "",
+            icon: "",
+            category: "SIMULATION",
+            xpReward: 0,
+            criteriaJson: "",
+            isActive: true,
+        };
+        this.cdr.markForCheck();
+    }
+
+    saveBadge(): void {
+        this.trainingError = null;
+        const payload = {
+            name: this.badgeForm.name?.trim(),
+            description: this.badgeForm.description?.trim() || null,
+            icon: this.badgeForm.icon?.trim() || null,
+            category: this.badgeForm.category,
+            xpReward: Number(this.badgeForm.xpReward ?? 0),
+            criteriaJson: this.badgeForm.criteriaJson?.trim() || null,
+            isActive: Boolean(this.badgeForm.isActive),
+        };
+
+        const req$ = this.editingBadgeId
+            ? this.http.put<BadgeResponse>(
+                  `${this.trainingAdminBase()}/badges/${this.editingBadgeId}`,
+                  payload,
+              )
+            : this.http.post<BadgeResponse>(
+                  `${this.trainingAdminBase()}/badges`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetBadgeForm();
+                this.loadBadges();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deleteBadge(b: BadgeResponse): void {
+        if (!confirm(`Delete badge #${b.id} (${b.name})?`)) return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/badges/${b.id}`)
+            .subscribe({
+                next: () => this.loadBadges(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    loadPaths(): void {
+        this.setTrainingBusy(true, null);
+        this.http
+            .get<TrainingPathResponse[]>(`${this.trainingAdminBase()}/paths`)
+            .subscribe({
+                next: (res) => {
+                    this.adminPaths = res || [];
+                    this.refreshTrainingTable();
+                    this.setTrainingBusy(false, null);
+                },
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    editPath(p: TrainingPathResponse): void {
+        this.editingPathId = p.id;
+        this.pathForm = {
+            userId: p.userId || "",
+            status: String(p.status || "ACTIVE"),
+            xpThreshold: Number(p.xpThreshold ?? 0),
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetPathForm(): void {
+        this.editingPathId = null;
+        this.pathForm = { userId: "", status: "ACTIVE", xpThreshold: 200 };
+        this.cdr.markForCheck();
+    }
+
+    savePath(): void {
+        const payload = {
+            userId: this.pathForm.userId?.trim(),
+            status: this.pathForm.status,
+            xpThreshold: Number(this.pathForm.xpThreshold ?? 0),
+        };
+
+        const req$ = this.editingPathId
+            ? this.http.put<TrainingPathResponse>(
+                  `${this.trainingAdminBase()}/paths/${this.editingPathId}`,
+                  payload,
+              )
+            : this.http.post<TrainingPathResponse>(
+                  `${this.trainingAdminBase()}/paths`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetPathForm();
+                this.loadPaths();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deletePath(p: TrainingPathResponse): void {
+        if (!confirm(`Delete path #${p.id} for user ${p.userId}?`)) return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/paths/${p.id}`)
+            .subscribe({
+                next: () => this.loadPaths(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    loadModules(): void {
+        this.setTrainingBusy(true, null);
+        this.http
+            .get<TrainingModuleResponse[]>(`${this.trainingAdminBase()}/modules`)
+            .subscribe({
+                next: (res) => {
+                    this.adminModules = res || [];
+                    this.refreshTrainingTable();
+                    this.setTrainingBusy(false, null);
+                },
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    editModule(m: TrainingModuleResponse): void {
+        this.editingModuleId = m.id;
+        this.moduleForm = {
+            pathId: Number(m.pathId ?? 0),
+            category: String(m.category || "COMMUNICATION"),
+            title: m.title || "",
+            description: (m as any).description || "",
+            lessons: Number(m.lessons ?? 1),
+            completedLessons: Number(m.completedLessons ?? 0),
+            progress: Number.isFinite(m.progress as any)
+                ? Number(m.progress)
+                : null,
+            xpReward: Number(m.xpReward ?? 0),
+            status: String(m.status || "LOCKED"),
+            unlockedAt: (m.unlockedAt as any) || "",
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetModuleForm(): void {
+        this.editingModuleId = null;
+        this.moduleForm = {
+            pathId: null,
+            category: "COMMUNICATION",
+            title: "",
+            description: "",
+            lessons: 1,
+            completedLessons: 0,
+            progress: null,
+            xpReward: 0,
+            status: "LOCKED",
+            unlockedAt: "",
+        };
+        this.cdr.markForCheck();
+    }
+
+    saveModule(): void {
+        const pathId = Number(this.moduleForm.pathId);
+        if (!Number.isFinite(pathId) || pathId <= 0) {
+            this.trainingError = "Path ID is required for modules.";
+            this.cdr.markForCheck();
+            return;
+        }
+
+        const progressValue =
+            this.moduleForm.progress === null || this.moduleForm.progress === ("" as any)
+                ? null
+                : Number(this.moduleForm.progress);
+
+        const payload: any = {
+            pathId,
+            category: this.moduleForm.category,
+            title: this.moduleForm.title?.trim(),
+            description: this.moduleForm.description?.trim() || null,
+            lessons: Number(this.moduleForm.lessons ?? 1),
+            completedLessons: Number(this.moduleForm.completedLessons ?? 0),
+            progress: progressValue,
+            xpReward: Number(this.moduleForm.xpReward ?? 0),
+            status: this.moduleForm.status,
+            unlockedAt: this.moduleForm.unlockedAt?.trim() || null,
+        };
+
+        const req$ = this.editingModuleId
+            ? this.http.put<TrainingModuleResponse>(
+                  `${this.trainingAdminBase()}/modules/${this.editingModuleId}`,
+                  payload,
+              )
+            : this.http.post<TrainingModuleResponse>(
+                  `${this.trainingAdminBase()}/modules`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetModuleForm();
+                this.loadModules();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deleteModule(m: TrainingModuleResponse): void {
+        if (!confirm(`Delete module #${m.id} (${m.title})?`)) return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/modules/${m.id}`)
+            .subscribe({
+                next: () => this.loadModules(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    loadTrackers(): void {
+        this.setTrainingBusy(true, null);
+        this.http
+            .get<UserXPTrackerResponse[]>(
+                `${this.trainingAdminBase()}/xp-trackers`,
+            )
+            .subscribe({
+                next: (res) => {
+                    this.adminTrackers = res || [];
+                    this.refreshTrainingTable();
+                    this.setTrainingBusy(false, null);
+                },
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    editTracker(t: UserXPTrackerResponse): void {
+        this.editingTrackerId = t.id;
+        this.trackerForm = {
+            userId: t.userId || "",
+            totalXp: Number(t.totalXp ?? 0),
+            currentLevel: Number(t.currentLevel ?? 1),
+            xpToNextLevel: Number(t.xpToNextLevel ?? 0),
+            currentStreak: Number(t.currentStreak ?? 0),
+            longestStreak: Number(t.longestStreak ?? 0),
+            lastActivityDate: (t.lastActivityDate as any) || "",
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetTrackerForm(): void {
+        this.editingTrackerId = null;
+        this.trackerForm = {
+            userId: "",
+            totalXp: 0,
+            currentLevel: 1,
+            xpToNextLevel: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastActivityDate: "",
+        };
+        this.cdr.markForCheck();
+    }
+
+    saveTracker(): void {
+        const payload: any = {
+            userId: this.trackerForm.userId?.trim(),
+            totalXp: Number(this.trackerForm.totalXp ?? 0),
+            currentLevel: Number(this.trackerForm.currentLevel ?? 1),
+            xpToNextLevel: Number(this.trackerForm.xpToNextLevel ?? 0),
+            currentStreak: Number(this.trackerForm.currentStreak ?? 0),
+            longestStreak: Number(this.trackerForm.longestStreak ?? 0),
+            lastActivityDate: this.trackerForm.lastActivityDate?.trim() || null,
+        };
+
+        const req$ = this.editingTrackerId
+            ? this.http.put<UserXPTrackerResponse>(
+                  `${this.trainingAdminBase()}/xp-trackers/${this.editingTrackerId}`,
+                  payload,
+              )
+            : this.http.post<UserXPTrackerResponse>(
+                  `${this.trainingAdminBase()}/xp-trackers`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetTrackerForm();
+                this.loadTrackers();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deleteTracker(t: UserXPTrackerResponse): void {
+        if (!confirm(`Delete tracker #${t.id} for user ${t.userId}?`)) return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/xp-trackers/${t.id}`)
+            .subscribe({
+                next: () => this.loadTrackers(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    loadActivities(): void {
+        this.setTrainingBusy(true, null);
+        this.http
+            .get<DailyActivityResponse[]>(
+                `${this.trainingAdminBase()}/activities`,
+            )
+            .subscribe({
+                next: (res) => {
+                    this.adminActivities = res || [];
+                    this.refreshTrainingTable();
+                    this.setTrainingBusy(false, null);
+                },
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    editActivity(a: DailyActivityResponse): void {
+        this.editingActivityId = (a.id as any) ?? null;
+        this.activityForm = {
+            userId: a.userId || "",
+            activityDate: (a.activityDate as any) || "",
+            xpEarned: Number(a.xpEarned ?? 0),
+            sessionCompleted: Boolean(a.sessionCompleted),
+            goalsCompleted: Number(a.goalsCompleted ?? 0),
+            behavioralCount: Number(a.behavioralCount ?? 0),
+            libraryCount: Number(a.libraryCount ?? 0),
+            quizCount: Number(a.quizCount ?? 0),
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetActivityForm(): void {
+        this.editingActivityId = null;
+        this.activityForm = {
+            userId: "",
+            activityDate: "",
+            xpEarned: 0,
+            sessionCompleted: false,
+            goalsCompleted: 0,
+            behavioralCount: 0,
+            libraryCount: 0,
+            quizCount: 0,
+        };
+        this.cdr.markForCheck();
+    }
+
+    saveActivity(): void {
+        const payload: any = {
+            userId: this.activityForm.userId?.trim(),
+            activityDate: this.activityForm.activityDate?.trim(),
+            xpEarned: Number(this.activityForm.xpEarned ?? 0),
+            sessionCompleted: Boolean(this.activityForm.sessionCompleted),
+            goalsCompleted: Number(this.activityForm.goalsCompleted ?? 0),
+            behavioralCount: Number(this.activityForm.behavioralCount ?? 0),
+            libraryCount: Number(this.activityForm.libraryCount ?? 0),
+            quizCount: Number(this.activityForm.quizCount ?? 0),
+        };
+
+        const req$ = this.editingActivityId
+            ? this.http.put<DailyActivityResponse>(
+                  `${this.trainingAdminBase()}/activities/${this.editingActivityId}`,
+                  payload,
+              )
+            : this.http.post<DailyActivityResponse>(
+                  `${this.trainingAdminBase()}/activities`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetActivityForm();
+                this.loadActivities();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deleteActivity(a: DailyActivityResponse): void {
+        const id = (a.id as any) ?? null;
+        if (!id) {
+            this.trainingError = "Cannot delete an activity without an ID.";
+            this.cdr.markForCheck();
+            return;
+        }
+        if (!confirm(`Delete activity #${id} for user ${a.userId} (${a.activityDate})?`)) return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/activities/${id}`)
+            .subscribe({
+                next: () => this.loadActivities(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    loadUserBadges(): void {
+        this.setTrainingBusy(true, null);
+        this.http
+            .get<UserBadgeResponse[]>(
+                `${this.trainingAdminBase()}/user-badges`,
+            )
+            .subscribe({
+                next: (res) => {
+                    this.adminUserBadges = res || [];
+                    this.refreshTrainingTable();
+                    this.setTrainingBusy(false, null);
+                },
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    editUserBadge(ub: UserBadgeResponse): void {
+        this.editingUserBadgeId = ub.id;
+        this.userBadgeForm = {
+            userId: ub.userId || "",
+            badgeId: Number(ub.badgeId ?? 0),
+            progress:
+                ub.progress === null || ub.progress === undefined
+                    ? null
+                    : Number(ub.progress),
+        };
+        this.cdr.markForCheck();
+    }
+
+    resetUserBadgeForm(): void {
+        this.editingUserBadgeId = null;
+        this.userBadgeForm = { userId: "", badgeId: null, progress: null };
+        this.cdr.markForCheck();
+    }
+
+    saveUserBadge(): void {
+        const badgeId = Number(this.userBadgeForm.badgeId);
+        if (!Number.isFinite(badgeId) || badgeId <= 0) {
+            this.trainingError = "Badge ID is required for user badges.";
+            this.cdr.markForCheck();
+            return;
+        }
+
+        const payload: any = {
+            userId: this.userBadgeForm.userId?.trim(),
+            badgeId,
+            progress:
+                this.userBadgeForm.progress === null ||
+                this.userBadgeForm.progress === ("" as any)
+                    ? null
+                    : Number(this.userBadgeForm.progress),
+        };
+
+        const req$ = this.editingUserBadgeId
+            ? this.http.put<UserBadgeResponse>(
+                  `${this.trainingAdminBase()}/user-badges/${this.editingUserBadgeId}`,
+                  payload,
+              )
+            : this.http.post<UserBadgeResponse>(
+                  `${this.trainingAdminBase()}/user-badges`,
+                  payload,
+              );
+
+        this.setTrainingBusy(true, null);
+        req$.subscribe({
+            next: () => {
+                this.resetUserBadgeForm();
+                this.loadUserBadges();
+            },
+            error: (err) => {
+                this.setTrainingBusy(false, this.formatTrainingError(err));
+            },
+        });
+    }
+
+    deleteUserBadge(ub: UserBadgeResponse): void {
+        if (!confirm(`Delete user-badge #${ub.id} for user ${ub.userId}?`))
+            return;
+        this.setTrainingBusy(true, null);
+        this.http
+            .delete(`${this.trainingAdminBase()}/user-badges/${ub.id}`)
+            .subscribe({
+                next: () => this.loadUserBadges(),
+                error: (err) => {
+                    this.setTrainingBusy(false, this.formatTrainingError(err));
+                },
+            });
+    }
+
+    private formatTrainingError(err: any): string {
+        const status = err?.status;
+        if (status === 401) return "Unauthorized (login required).";
+        if (status === 403) return "Forbidden (ADMIN role required).";
+        if (status === 0) return "Network error (service unreachable).";
+
+        const msg =
+            err?.error?.message ||
+            err?.error?.error ||
+            err?.message ||
+            "Request failed.";
+        return status ? `HTTP ${status}: ${msg}` : msg;
     }
 
     loadUserProgress(userId: string): void {

@@ -5,6 +5,7 @@ import com.microservice.userservice.messaging.event.UserEvent;
 import com.microservice.userservice.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
@@ -53,21 +54,27 @@ public class UserEventProducer {
         UserEvent event = UserEvent.from(eventType, user);
         String key = user.getId().toString();
 
-        CompletableFuture<SendResult<String, UserEvent>> future =
-            kafkaTemplate.send(topic, key, event);
+        try {
+            CompletableFuture<SendResult<String, UserEvent>> future =
+                kafkaTemplate.send(topic, key, event);
 
-        future.whenComplete((result, ex) -> {
-            if (ex != null) {
-                log.error("Failed to publish {} event for user {}: {}",
-                    eventType, user.getId(), ex.getMessage());
-            } else {
-                log.info("Published {} event for user {} to topic {} partition {} offset {}",
-                    eventType,
-                    user.getId(),
-                    result.getRecordMetadata().topic(),
-                    result.getRecordMetadata().partition(),
-                    result.getRecordMetadata().offset());
-            }
-        });
+            future.whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to publish {} event for user {}: {}",
+                        eventType, user.getId(), ex.getMessage());
+                } else {
+                    log.info("Published {} event for user {} to topic {} partition {} offset {}",
+                        eventType,
+                        user.getId(),
+                        result.getRecordMetadata().topic(),
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset());
+                }
+            });
+        } catch (KafkaException ex) {
+            // Never fail the user request because event publication is unavailable.
+            log.error("Kafka send skipped for {} user {} on topic {}: {}",
+                eventType, user.getId(), topic, ex.getMessage());
+        }
     }
 }

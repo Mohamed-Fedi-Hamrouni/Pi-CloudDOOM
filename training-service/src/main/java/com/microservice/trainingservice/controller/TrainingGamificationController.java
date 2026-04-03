@@ -8,6 +8,8 @@ import com.microservice.trainingservice.dto.DebugBadgeSimulationRequest;
 import com.microservice.trainingservice.dto.DebugBadgeSimulationResponse;
 import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
+import com.microservice.trainingservice.dto.TrainingPreferencesRequest;
+import com.microservice.trainingservice.dto.TrainingPreferencesResponse;
 import com.microservice.trainingservice.dto.UpdateModuleProgressRequest;
 import com.microservice.trainingservice.dto.UserBadgeResponse;
 import com.microservice.trainingservice.dto.UserXPTrackerResponse;
@@ -15,6 +17,8 @@ import com.microservice.trainingservice.service.TrainingGamificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,9 +44,36 @@ public class TrainingGamificationController {
         return trainingGamificationService.createTrainingPath(request);
     }
 
+    @PostMapping("/paths/generate")
+    public TrainingPathResponse generateMyPath(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return trainingGamificationService.generatePersonalizedPathForUser(authentication.getName());
+    }
+
     @GetMapping("/paths/user/{userId}")
-    public TrainingPathResponse getPathByUserId(@PathVariable String userId) {
+    public TrainingPathResponse getPathByUserId(@PathVariable String userId, Authentication authentication) {
+        if (!canAccessUser(userId, authentication)) {
+            throw new AccessDeniedException("Not allowed to access path for user " + userId);
+        }
         return trainingGamificationService.getPathByUserId(userId);
+    }
+
+    @PostMapping("/paths/new")
+    public TrainingPathResponse createNewMyPath(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return trainingGamificationService.createNewPathForUser(authentication.getName());
+    }
+
+    @GetMapping("/paths/me/history")
+    public List<TrainingPathResponse> getMyPathHistory(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return trainingGamificationService.getPathHistoryForUser(authentication.getName());
     }
 
     @PutMapping("/paths/{pathId}/modules/{moduleId}")
@@ -61,6 +92,19 @@ public class TrainingGamificationController {
         return trainingGamificationService.awardBadge(request);
     }
 
+    @GetMapping("/badges")
+    public List<com.microservice.trainingservice.dto.BadgeResponse> getActiveBadges() {
+        return trainingGamificationService.getActiveBadges();
+    }
+
+    @GetMapping("/user-badges/user/{userId}")
+    public List<UserBadgeResponse> getUserBadges(@PathVariable String userId, Authentication authentication) {
+        if (!canAccessUser(userId, authentication)) {
+            throw new AccessDeniedException("Not allowed to access badges for user " + userId);
+        }
+        return trainingGamificationService.getUserBadges(userId);
+    }
+
     @PostMapping("/activities")
     public UserXPTrackerResponse recordDailyActivity(@Valid @RequestBody CreateDailyActivityRequest request) {
         return trainingGamificationService.recordDailyActivity(request);
@@ -76,8 +120,48 @@ public class TrainingGamificationController {
         return trainingGamificationService.getLeaderboard(topN);
     }
 
+    @GetMapping("/xp-tracker/user/{userId}")
+    public UserXPTrackerResponse getUserXpTracker(@PathVariable String userId, Authentication authentication) {
+        if (!canAccessUser(userId, authentication)) {
+            throw new AccessDeniedException("Not allowed to access XP tracker for user " + userId);
+        }
+        return trainingGamificationService.getUserXpTracker(userId);
+    }
+
+    @GetMapping("/preferences/me")
+    public TrainingPreferencesResponse getMyPreferences(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return trainingGamificationService.getPreferencesForUser(authentication.getName());
+    }
+
+    @PutMapping("/preferences/me")
+    public TrainingPreferencesResponse putMyPreferences(
+        Authentication authentication,
+        @Valid @RequestBody TrainingPreferencesRequest request
+    ) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return trainingGamificationService.upsertPreferencesForUser(authentication.getName(), request);
+    }
+
     @PostMapping("/debug/badges/simulate")
     public DebugBadgeSimulationResponse simulateBadges(@RequestBody DebugBadgeSimulationRequest request) {
         return trainingGamificationService.simulateBadgeTriggersForQa(request);
+    }
+
+    private boolean canAccessUser(String userId, Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+
+        if (authentication.getAuthorities() != null
+            && authentication.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
+            return true;
+        }
+
+        return userId != null && userId.equals(authentication.getName());
     }
 }

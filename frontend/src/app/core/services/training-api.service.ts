@@ -3,12 +3,16 @@ import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { Observable, catchError, throwError } from "rxjs";
 import { environment } from "../../../environments/environment";
 import {
+    BadgeResponse,
     CreateDailyActivityRequest,
     CreateTrainingPathRequest,
     DailyActivityResponse,
     TrainingModuleResponse,
     TrainingPathResponse,
+    TrainingPreferencesRequest,
+    TrainingPreferencesResponse,
     UpdateModuleProgressRequest,
+    UserBadgeResponse,
     UserXPTrackerResponse,
 } from "../models/training.models";
 
@@ -38,10 +42,54 @@ export class TrainingApiService {
                         userId,
                         status: "ACTIVE",
                         xpThreshold: 200,
-                    });
+                    }).pipe(
+                        catchError((createError: HttpErrorResponse) => {
+                            // Race condition guard: if another request created the path first,
+                            // simply load the existing one instead of failing the page.
+                            if (createError.status === 422) {
+                                return this.getPathByUserId(userId);
+                            }
+                            return throwError(() => createError);
+                        }),
+                    );
                 }
                 return throwError(() => error);
             }),
+        );
+    }
+
+    generateMyPath(): Observable<TrainingPathResponse> {
+        return this.http.post<TrainingPathResponse>(
+            `${this.baseUrl}/api/v1/training/paths/generate`,
+            null,
+        );
+    }
+
+    createNewMyPath(): Observable<TrainingPathResponse> {
+        return this.http.post<TrainingPathResponse>(
+            `${this.baseUrl}/api/v1/training/paths/new`,
+            null,
+        );
+    }
+
+    getMyPathHistory(): Observable<TrainingPathResponse[]> {
+        return this.http.get<TrainingPathResponse[]>(
+            `${this.baseUrl}/api/v1/training/paths/me/history`,
+        );
+    }
+
+    getMyPreferences(): Observable<TrainingPreferencesResponse> {
+        return this.http.get<TrainingPreferencesResponse>(
+            `${this.baseUrl}/api/v1/training/preferences/me`,
+        );
+    }
+
+    putMyPreferences(
+        request: TrainingPreferencesRequest,
+    ): Observable<TrainingPreferencesResponse> {
+        return this.http.put<TrainingPreferencesResponse>(
+            `${this.baseUrl}/api/v1/training/preferences/me`,
+            request,
         );
     }
 
@@ -75,6 +123,24 @@ export class TrainingApiService {
     getLeaderboard(topN = 10): Observable<UserXPTrackerResponse[]> {
         return this.http.get<UserXPTrackerResponse[]>(
             `${this.baseUrl}/api/v1/training/leaderboard?topN=${topN}`,
+        );
+    }
+
+    getUserXpTracker(userId: string): Observable<UserXPTrackerResponse> {
+        return this.http.get<UserXPTrackerResponse>(
+            `${this.baseUrl}/api/v1/training/xp-tracker/user/${encodeURIComponent(userId)}`,
+        );
+    }
+
+    getActiveBadges(): Observable<BadgeResponse[]> {
+        return this.http.get<BadgeResponse[]>(
+            `${this.baseUrl}/api/v1/training/badges`,
+        );
+    }
+
+    getUserBadges(userId: string): Observable<UserBadgeResponse[]> {
+        return this.http.get<UserBadgeResponse[]>(
+            `${this.baseUrl}/api/v1/training/user-badges/user/${encodeURIComponent(userId)}`,
         );
     }
 }

@@ -4,6 +4,7 @@ import com.microservice.trainingservice.model.ModuleStatus;
 import com.microservice.trainingservice.model.TrainingCategory;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -22,4 +23,5 @@ public class TrainingModuleResponse {
     private LocalDateTime unlockedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<TrainingModuleLessonResponse> moduleLessons;
 }

@@ -6,6 +6,7 @@ import com.microservice.trainingservice.dto.DebugBadgeSimulationResponse;
 import com.microservice.trainingservice.dto.CreateDailyActivityRequest;
 import com.microservice.trainingservice.dto.CreateTrainingPathRequest;
 import com.microservice.trainingservice.dto.DailyActivityResponse;
+import com.microservice.trainingservice.dto.BadgeResponse;
 import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
 import com.microservice.trainingservice.dto.UpdateModuleProgressRequest;
@@ -21,20 +22,33 @@ import com.microservice.trainingservice.exception.ResourceNotFoundException;
 import com.microservice.trainingservice.mapper.TrainingMapper;
 import com.microservice.trainingservice.model.Badge;
 import com.microservice.trainingservice.model.DailyActivity;
+import com.microservice.trainingservice.model.LessonDifficulty;
+import com.microservice.trainingservice.model.LessonFormat;
+import com.microservice.trainingservice.model.LessonProgressStatus;
 import com.microservice.trainingservice.model.ModuleStatus;
 import com.microservice.trainingservice.model.PathStatus;
+import com.microservice.trainingservice.model.TrainingPreferences;
+import com.microservice.trainingservice.model.TrainingUserSignal;
 import com.microservice.trainingservice.model.TrainingModule;
+import com.microservice.trainingservice.model.TrainingModuleLesson;
 import com.microservice.trainingservice.model.TrainingPath;
+import com.microservice.trainingservice.model.TrainingCategory;
+import com.microservice.trainingservice.model.TrainingLesson;
 import com.microservice.trainingservice.model.UserBadge;
 import com.microservice.trainingservice.model.UserXPTracker;
 import com.microservice.trainingservice.repository.BadgeRepository;
 import com.microservice.trainingservice.repository.DailyActivityRepository;
+import com.microservice.trainingservice.repository.TrainingLessonRepository;
 import com.microservice.trainingservice.repository.TrainingModuleRepository;
+import com.microservice.trainingservice.repository.TrainingModuleLessonRepository;
 import com.microservice.trainingservice.repository.TrainingPathRepository;
+import com.microservice.trainingservice.repository.TrainingPreferencesRepository;
+import com.microservice.trainingservice.repository.TrainingUserSignalRepository;
 import com.microservice.trainingservice.repository.UserBadgeRepository;
 import com.microservice.trainingservice.repository.UserXPTrackerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,8 +56,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,19 +77,155 @@ public class TrainingGamificationService {
 
 	private final TrainingPathRepository trainingPathRepository;
 	private final TrainingModuleRepository trainingModuleRepository;
+	private final TrainingLessonRepository trainingLessonRepository;
+	private final TrainingModuleLessonRepository trainingModuleLessonRepository;
 	private final BadgeRepository badgeRepository;
 	private final UserBadgeRepository userBadgeRepository;
 	private final UserXPTrackerRepository userXPTrackerRepository;
 	private final DailyActivityRepository dailyActivityRepository;
+	private final TrainingPreferencesRepository trainingPreferencesRepository;
+	private final TrainingUserSignalRepository trainingUserSignalRepository;
 	private final TrainingMapper trainingMapper;
 	private final TrainingEventPublisher eventPublisher;
 	private final TrainingPersonalizationRuleEngine personalizationRuleEngine;
+
+	@Transactional(readOnly = true)
+	public com.microservice.trainingservice.dto.TrainingPreferencesResponse getPreferencesForUser(String userId) {
+		TrainingPreferences preferences = trainingPreferencesRepository.findById(userId)
+			.orElseGet(() -> TrainingPreferences.builder().userId(userId).build());
+		return toPreferencesResponse(preferences);
+	}
+
+	public com.microservice.trainingservice.dto.TrainingPreferencesResponse upsertPreferencesForUser(
+		String userId,
+		com.microservice.trainingservice.dto.TrainingPreferencesRequest request
+	) {
+		TrainingPreferences preferences = trainingPreferencesRepository.findById(userId)
+			.orElseGet(() -> TrainingPreferences.builder().userId(userId).build());
+
+		preferences.setGoal(normalizeOptional(request.getGoal()));
+		preferences.setTargetRole(normalizeOptional(request.getTargetRole()));
+		preferences.setSeniority(normalizeOptional(request.getSeniority()));
+		preferences.setMinutesPerDay(request.getMinutesPerDay());
+
+		TrainingPreferences saved = trainingPreferencesRepository.saveAndFlush(preferences);
+		return toPreferencesResponse(saved);
+	}
+
+	public TrainingPathResponse generatePersonalizedPathForUser(String userId) {
+		TrainingPreferences preferences = trainingPreferencesRepository.findById(userId).orElse(null);
+		TrainingUserSignal signal = trainingUserSignalRepository.findById(userId).orElse(null);
+		String preferredLanguage = resolvePreferredLanguage();
+
+		InterviewSessionCompletedEvent pseudoEvent = signal == null ? null : InterviewSessionCompletedEvent.builder()
+			.sessionId(signal.getLastSessionId())
+			.userId(userId)
+			.sessionType(signal.getSessionType())
+			.globalScore(signal.getGlobalScore())
+			.preparationLevel(signal.getPreparationLevel())
+			.totalSessionsCompleted(signal.getTotalSessionsCompleted())
+			.generatedAt(signal.getEventGeneratedAt())
+			.build();
+
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> basePlans = pseudoEvent == null
+			? personalizationRuleEngine.buildDefaultPlan()
+			: personalizationRuleEngine.buildPlan(pseudoEvent);
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> personalizedPlans =
+			applyPreferencesToPlans(basePlans, preferences);
+
+		TrainingPath path = getCurrentPathEntityForUser(userId)
+			.orElseGet(() -> createPathInternal(
+				userId,
+				PathStatus.ACTIVE,
+				pseudoEvent == null ? 0 : personalizationRuleEngine.recommendXpThreshold(pseudoEvent),
+				personalizedPlans
+			));
+
+		Integer recommendedThreshold = pseudoEvent == null ? null : personalizationRuleEngine.recommendXpThreshold(pseudoEvent);
+		if (recommendedThreshold != null) {
+			path.setXpThreshold(recommendedThreshold);
+		}
+		if (path.getStatus() == null) {
+			path.setStatus(PathStatus.ACTIVE);
+		}
+
+		boolean hasInProgressModule = path.getModules().stream().anyMatch(m -> m.getStatus() == ModuleStatus.IN_PROGRESS);
+		TrainingCategory categoryToUnlock = null;
+		if (!hasInProgressModule) {
+			for (TrainingPersonalizationRuleEngine.PersonalizedModulePlan plan : personalizedPlans) {
+				TrainingModule module = path.getModules().stream()
+					.filter(m -> m.getCategory() == plan.category())
+					.findFirst()
+					.orElse(null);
+				if (module == null || module.getStatus() == ModuleStatus.LOCKED) {
+					categoryToUnlock = plan.category();
+					break;
+				}
+			}
+		}
+
+		// Update only locked modules to avoid losing user progress.
+		Set<Long> usedLessonIds = new HashSet<>();
+		for (TrainingPersonalizationRuleEngine.PersonalizedModulePlan plan : personalizedPlans) {
+			TrainingModule module = path.getModules().stream()
+				.filter(m -> m.getCategory() == plan.category())
+				.findFirst()
+				.orElse(null);
+			if (module == null) {
+				ModuleStatus status = ModuleStatus.LOCKED;
+				java.time.LocalDateTime unlockedAt = null;
+				if (categoryToUnlock != null && categoryToUnlock == plan.category()) {
+					status = ModuleStatus.IN_PROGRESS;
+					unlockedAt = java.time.LocalDateTime.now();
+				}
+				TrainingModule newModule = TrainingModule.builder()
+					.trainingPath(path)
+					.category(plan.category())
+					.title(plan.title())
+					.description(plan.description())
+					.lessons(plan.lessons())
+					.completedLessons(0)
+					.progress(0)
+					.xpReward(plan.xpReward())
+					.status(status)
+					.unlockedAt(unlockedAt)
+					.build();
+				populateModuleLessonsIfMissing(newModule, plan.lessons(), preferences, usedLessonIds, preferredLanguage);
+				path.addModule(newModule);
+				continue;
+			}
+
+			if (module.getStatus() == ModuleStatus.LOCKED) {
+				module.setTitle(plan.title());
+				module.setDescription(plan.description());
+				module.setXpReward(plan.xpReward());
+				// Keep existing snapshot to avoid DB constraint issues; only populate if missing.
+				populateModuleLessonsIfMissing(module, plan.lessons(), preferences, usedLessonIds, preferredLanguage);
+				normalizeModuleLessonCounts(module);
+				module.updateProgress();
+				if (categoryToUnlock != null && categoryToUnlock == plan.category()) {
+					module.setStatus(ModuleStatus.IN_PROGRESS);
+					if (module.getUnlockedAt() == null) {
+						module.setUnlockedAt(java.time.LocalDateTime.now());
+					}
+				}
+			}
+		}
+
+		TrainingPath saved = trainingPathRepository.save(path);
+		return trainingMapper.trainingPathToResponse(saved);
+	}
+
+	public TrainingPathResponse createNewPathForUser(String userId) {
+		archiveAllCurrentPaths(userId);
+		return generatePersonalizedPathForUser(userId);
+	}
 
 	public TrainingPathResponse createTrainingPath(CreateTrainingPathRequest request) {
 		if (request.getUserId() == null || request.getUserId().isBlank()) {
 			throw new BusinessException("userId is required");
 		}
-		if (trainingPathRepository.findByUserId(request.getUserId()).isPresent()) {
+		if (trainingPathRepository.existsByUserIdAndStatusNot(request.getUserId(), PathStatus.ARCHIVED)) {
 			throw new BusinessException("Training path already exists for user " + request.getUserId());
 		}
 
@@ -88,11 +241,51 @@ public class TrainingGamificationService {
 
 	@Transactional(readOnly = true)
 	public TrainingPathResponse getPathByUserId(String userId) {
-		TrainingPath path = trainingPathRepository.findByUserIdEagerModules(userId)
+		TrainingPath path = getCurrentPathEntityForUser(userId)
 			.orElseThrow(() -> new ResourceNotFoundException("Training path not found for user " + userId));
 		return trainingMapper.trainingPathToResponse(path);
 	}
 
+	@Transactional(readOnly = true)
+	public List<TrainingPathResponse> getPathHistoryForUser(String userId) {
+		return trainingPathRepository.findAllByUserIdEagerModulesOrderByCreatedAtDesc(userId).stream()
+			.map(trainingMapper::trainingPathToResponse)
+			.toList();
+	}
+
+	private Optional<TrainingPath> getCurrentPathEntityForUser(String userId) {
+		List<TrainingPath> paths = trainingPathRepository
+			.findNonArchivedByUserIdEagerModulesOrderByCreatedAtDesc(userId, PathStatus.ARCHIVED);
+		return paths.isEmpty() ? Optional.empty() : Optional.of(paths.getFirst());
+	}
+
+	private void archiveAllCurrentPaths(String userId) {
+		List<TrainingPath> paths = trainingPathRepository
+			.findNonArchivedByUserIdEagerModulesOrderByCreatedAtDesc(userId, PathStatus.ARCHIVED);
+		if (paths.isEmpty()) {
+			return;
+		}
+		for (TrainingPath path : paths) {
+			path.setStatus(PathStatus.ARCHIVED);
+		}
+		trainingPathRepository.saveAll(paths);
+	}
+
+	@Transactional(readOnly = true)
+	public List<BadgeResponse> getActiveBadges() {
+		return badgeRepository.findAllActiveBadges().stream()
+			.map(trainingMapper::badgeToResponse)
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<UserBadgeResponse> getUserBadges(String userId) {
+		return userBadgeRepository.findByUserId(userId).stream()
+			.map(trainingMapper::userBadgeToResponse)
+			.toList();
+	}
+
+	@Transactional
 	public TrainingModuleResponse updateModuleProgress(String userId, Long pathId, Long moduleId,
 													   UpdateModuleProgressRequest request) {
 		TrainingPath path = trainingPathRepository.findById(pathId)
@@ -106,14 +299,21 @@ public class TrainingGamificationService {
 			.orElseThrow(() -> new ResourceNotFoundException("Training module not found: " + moduleId));
 
 		ModuleStatus previousStatus = module.getStatus();
-		if (request.getCompletedLessons() != null) {
-			module.setCompletedLessons(Math.max(0, request.getCompletedLessons()));
+
+		Integer requestedCompleted = request.getCompletedLessons();
+		if (requestedCompleted != null) {
+			module.setCompletedLessons(Math.max(0, requestedCompleted));
 		}
 
-		module.updateProgress();
-		if (request.getProgress() != null) {
-			module.setProgress(Math.max(0, Math.min(100, request.getProgress())));
+		int desiredLessonCount = module.getLessons() == null ? 0 : module.getLessons();
+		if (desiredLessonCount <= 0 && module.getCompletedLessons() != null && module.getCompletedLessons() > 0) {
+			desiredLessonCount = module.getCompletedLessons();
 		}
+		populateModuleLessonsIfMissing(module, desiredLessonCount, null, null, resolvePreferredLanguage());
+		syncModuleLessonCompletionFromCounter(module);
+
+		normalizeModuleLessonCounts(module);
+		module.updateProgress();
 
 		if (module.getProgress() >= 100) {
 			module.setStatus(ModuleStatus.COMPLETED);
@@ -127,6 +327,7 @@ public class TrainingGamificationService {
 		if (previousStatus != ModuleStatus.COMPLETED && savedModule.getStatus() == ModuleStatus.COMPLETED) {
 			tracker.addXP(savedModule.getXpReward());
 			userXPTrackerRepository.save(tracker);
+			unlockNextModuleIfNeeded(pathId);
 		}
 
 		evaluateAndAwardAutomaticBadges(
@@ -152,6 +353,350 @@ public class TrainingGamificationService {
 			.build());
 
 		return trainingMapper.trainingModuleToResponse(savedModule);
+	}
+
+	private void populateModuleLessonsIfMissing(
+		TrainingModule module,
+		int desiredCount,
+		TrainingPreferences preferences,
+		Set<Long> usedLessonIds,
+		String preferredLanguage
+	) {
+		if (module == null) {
+			return;
+		}
+		if (module.getModuleLessons() != null && !module.getModuleLessons().isEmpty()) {
+			return;
+		}
+		if (module.getCategory() == null) {
+			return;
+		}
+		if (desiredCount <= 0) {
+			return;
+		}
+
+		List<TrainingLesson> candidates = trainingLessonRepository.findActiveByCategoryWithTags(module.getCategory());
+		if (candidates.isEmpty()) {
+			for (int i = 0; i < desiredCount; i++) {
+				module.addModuleLesson(TrainingModuleLesson.builder()
+					.module(module)
+					.lesson(null)
+					.title("Lesson " + (i + 1))
+					.format(LessonFormat.TEXT)
+					.contentMarkdown(null)
+					.videoUrl(null)
+					.estimatedMinutes(5)
+					.orderIndex(i)
+					.status(LessonProgressStatus.PENDING)
+					.completedAt(null)
+					.build());
+			}
+		} else {
+			List<TrainingLesson> selected = selectLessonsForModule(
+				candidates,
+				module.getCategory(),
+				desiredCount,
+				preferences,
+				preferredLanguage,
+				usedLessonIds
+			);
+			int count = selected.size();
+			for (int i = 0; i < count; i++) {
+				TrainingLesson lesson = selected.get(i);
+				module.addModuleLesson(TrainingModuleLesson.builder()
+					.module(module)
+					.lesson(lesson)
+					.title(lesson.getTitle())
+					.format(lesson.getFormat())
+					.contentMarkdown(lesson.getContentMarkdown())
+					.videoUrl(lesson.getVideoUrl())
+					.estimatedMinutes(lesson.getEstimatedMinutes() == null ? 5 : lesson.getEstimatedMinutes())
+					.orderIndex(i)
+					.status(LessonProgressStatus.PENDING)
+					.completedAt(null)
+					.build());
+			}
+			desiredCount = count;
+		}
+
+		if (module.getLessons() == null || !module.getLessons().equals(desiredCount)) {
+			module.setLessons(desiredCount);
+		}
+		if (module.getCompletedLessons() == null) {
+			module.setCompletedLessons(0);
+		}
+		module.updateProgress();
+	}
+
+	private void normalizeModuleLessonCounts(TrainingModule module) {
+		if (module == null) {
+			return;
+		}
+		int totalLessons = module.getLessons() == null ? 0 : module.getLessons();
+		if (module.getModuleLessons() != null && !module.getModuleLessons().isEmpty()) {
+			totalLessons = module.getModuleLessons().size();
+		}
+		if (totalLessons < 0) {
+			totalLessons = 0;
+		}
+		if (module.getLessons() == null || !module.getLessons().equals(totalLessons)) {
+			module.setLessons(totalLessons);
+		}
+		if (module.getCompletedLessons() == null) {
+			module.setCompletedLessons(0);
+		} else if (totalLessons > 0 && module.getCompletedLessons() > totalLessons) {
+			module.setCompletedLessons(totalLessons);
+		}
+		if (module.getCompletedLessons() < 0) {
+			module.setCompletedLessons(0);
+		}
+	}
+
+	private String resolvePreferredLanguage() {
+		try {
+			Locale locale = LocaleContextHolder.getLocale();
+			if (locale != null && locale.getLanguage() != null && !locale.getLanguage().isBlank()) {
+				return locale.getLanguage().toLowerCase(Locale.ROOT);
+			}
+		} catch (Exception ignored) {
+			// ignore
+		}
+		return "en";
+	}
+
+	private List<TrainingLesson> selectLessonsForModule(
+		List<TrainingLesson> candidates,
+		TrainingCategory category,
+		int desiredCount,
+		TrainingPreferences preferences,
+		String preferredLanguage,
+		Set<Long> usedLessonIds
+	) {
+		if (candidates == null || candidates.isEmpty() || desiredCount <= 0) {
+			return List.of();
+		}
+
+		Set<String> tokens = buildPreferenceTokens(preferences, category);
+		LessonDifficulty desiredDifficulty = inferDesiredDifficulty(preferences);
+		String safeLang = (preferredLanguage == null || preferredLanguage.isBlank()) ? "en" : preferredLanguage.toLowerCase(Locale.ROOT);
+
+		record Scored(TrainingLesson lesson, int score) {}
+		List<Scored> scored = new ArrayList<>(candidates.size());
+		for (TrainingLesson lesson : candidates) {
+			if (lesson == null) continue;
+			Long lessonId = lesson.getId();
+			if (lessonId != null && usedLessonIds != null && usedLessonIds.contains(lessonId)) {
+				continue;
+			}
+			scored.add(new Scored(lesson, scoreLesson(lesson, tokens, desiredDifficulty, safeLang)));
+		}
+
+		scored.sort((a, b) -> {
+			int byScore = Integer.compare(b.score(), a.score());
+			if (byScore != 0) return byScore;
+			Long aId = a.lesson().getId();
+			Long bId = b.lesson().getId();
+			if (aId == null && bId == null) return 0;
+			if (aId == null) return 1;
+			if (bId == null) return -1;
+			return Long.compare(aId, bId);
+		});
+
+		List<TrainingLesson> selected = scored.stream()
+			.limit(desiredCount)
+			.map(Scored::lesson)
+			.toList();
+
+		// If we filtered everything out due to usedLessonIds, allow repeats as a fallback.
+		if (selected.size() < desiredCount && usedLessonIds != null && !usedLessonIds.isEmpty()) {
+			List<Scored> rescored = new ArrayList<>(candidates.size());
+			for (TrainingLesson lesson : candidates) {
+				if (lesson == null) continue;
+				rescored.add(new Scored(lesson, scoreLesson(lesson, tokens, desiredDifficulty, safeLang)));
+			}
+			rescored.sort((a, b) -> {
+				int byScore = Integer.compare(b.score(), a.score());
+				if (byScore != 0) return byScore;
+				Long aId = a.lesson().getId();
+				Long bId = b.lesson().getId();
+				if (aId == null && bId == null) return 0;
+				if (aId == null) return 1;
+				if (bId == null) return -1;
+				return Long.compare(aId, bId);
+			});
+			selected = rescored.stream()
+				.limit(desiredCount)
+				.map(Scored::lesson)
+				.toList();
+		}
+
+		if (usedLessonIds != null) {
+			for (TrainingLesson lesson : selected) {
+				if (lesson != null && lesson.getId() != null) {
+					usedLessonIds.add(lesson.getId());
+				}
+			}
+		}
+
+		return selected;
+	}
+
+	private Set<String> buildPreferenceTokens(TrainingPreferences preferences, TrainingCategory category) {
+		Set<String> tokens = new HashSet<>();
+		if (category != null) {
+			String cat = category.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+			for (String t : cat.split("[^a-z0-9]+")) {
+				if (!t.isBlank()) tokens.add(t);
+			}
+		}
+		if (preferences == null) {
+			return tokens;
+		}
+		addTokens(tokens, preferences.getGoal());
+		addTokens(tokens, preferences.getTargetRole());
+		addTokens(tokens, preferences.getSeniority());
+		return tokens;
+	}
+
+	private void addTokens(Set<String> into, String value) {
+		if (into == null || value == null) return;
+		String normalized = value.toLowerCase(Locale.ROOT);
+		for (String t : normalized.split("[^a-z0-9]+")) {
+			if (!t.isBlank()) into.add(t);
+		}
+	}
+
+	private LessonDifficulty inferDesiredDifficulty(TrainingPreferences preferences) {
+		if (preferences == null || preferences.getSeniority() == null) {
+			return LessonDifficulty.BEGINNER;
+		}
+		String s = preferences.getSeniority().trim().toUpperCase(Locale.ROOT);
+		if (s.contains("SENIOR")) return LessonDifficulty.ADVANCED;
+		if (s.contains("MID")) return LessonDifficulty.INTERMEDIATE;
+		if (s.contains("INTER")) return LessonDifficulty.INTERMEDIATE;
+		if (s.contains("JUN")) return LessonDifficulty.BEGINNER;
+		return LessonDifficulty.BEGINNER;
+	}
+
+	private int scoreLesson(
+		TrainingLesson lesson,
+		Set<String> tokens,
+		LessonDifficulty desiredDifficulty,
+		String preferredLanguage
+	) {
+		int score = 0;
+
+		String lang = lesson.getLanguage() == null ? "" : lesson.getLanguage().toLowerCase(Locale.ROOT);
+		if (!preferredLanguage.isBlank() && lang.equals(preferredLanguage)) {
+			score += 40;
+		} else if (lang.equals("en")) {
+			score += 20;
+		}
+
+		LessonDifficulty diff = lesson.getDifficulty();
+		if (diff != null && desiredDifficulty != null) {
+			if (diff == desiredDifficulty) {
+				score += 30;
+			} else if (isAdjacentDifficulty(diff, desiredDifficulty)) {
+				score += 15;
+			}
+		}
+
+		int tagScore = 0;
+		if (tokens != null && !tokens.isEmpty() && lesson.getTags() != null) {
+			for (String tag : lesson.getTags()) {
+				if (tag == null) continue;
+				String t = tag.toLowerCase(Locale.ROOT);
+				if (tokens.contains(t)) {
+					tagScore += 10;
+					if (tagScore >= 60) break;
+				}
+			}
+		}
+		score += tagScore;
+
+		String title = lesson.getTitle() == null ? "" : lesson.getTitle().toLowerCase(Locale.ROOT);
+		if (!title.isBlank() && tokens != null && !tokens.isEmpty()) {
+			int titleScore = 0;
+			for (String token : tokens) {
+				if (token.length() < 3) continue;
+				if (title.contains(token)) {
+					titleScore += 2;
+					if (titleScore >= 20) break;
+				}
+			}
+			score += titleScore;
+		}
+
+		return score;
+	}
+
+	private boolean isAdjacentDifficulty(LessonDifficulty a, LessonDifficulty b) {
+		if (a == null || b == null) return false;
+		int ai = difficultyIndex(a);
+		int bi = difficultyIndex(b);
+		return Math.abs(ai - bi) == 1;
+	}
+
+	private int difficultyIndex(LessonDifficulty d) {
+		return switch (d) {
+			case BEGINNER -> 0;
+			case INTERMEDIATE -> 1;
+			case ADVANCED -> 2;
+		};
+	}
+
+	private void syncModuleLessonCompletionFromCounter(TrainingModule module) {
+		if (module == null || module.getModuleLessons() == null || module.getModuleLessons().isEmpty()) {
+			return;
+		}
+
+		List<TrainingModuleLesson> ordered = module.getModuleLessons().stream()
+			.sorted(Comparator.comparing(TrainingModuleLesson::getOrderIndex))
+			.toList();
+
+		int total = ordered.size();
+		int requestedCompleted = module.getCompletedLessons() == null ? 0 : module.getCompletedLessons();
+		int clampedCompleted = Math.max(0, Math.min(requestedCompleted, total));
+		module.setCompletedLessons(clampedCompleted);
+		module.setLessons(total);
+
+		LocalDateTime now = LocalDateTime.now();
+		for (int i = 0; i < ordered.size(); i++) {
+			TrainingModuleLesson ml = ordered.get(i);
+			if (i < clampedCompleted) {
+				if (ml.getStatus() != LessonProgressStatus.COMPLETED) {
+					ml.setStatus(LessonProgressStatus.COMPLETED);
+				}
+				if (ml.getCompletedAt() == null) {
+					ml.setCompletedAt(now);
+				}
+			} else {
+				ml.setStatus(LessonProgressStatus.PENDING);
+				ml.setCompletedAt(null);
+			}
+		}
+	}
+
+	private void unlockNextModuleIfNeeded(Long pathId) {
+		if (pathId == null) {
+			return;
+		}
+
+		boolean hasInProgress = !trainingModuleRepository.findByPathIdAndStatus(pathId, ModuleStatus.IN_PROGRESS).isEmpty();
+		if (hasInProgress) {
+			return;
+		}
+
+		trainingModuleRepository.findByPathIdAndStatus(pathId, ModuleStatus.LOCKED).stream()
+			.min(Comparator.comparing(TrainingModule::getId))
+			.ifPresent(next -> {
+				next.setStatus(ModuleStatus.IN_PROGRESS);
+				if (next.getUnlockedAt() == null) {
+					next.setUnlockedAt(LocalDateTime.now());
+				}
+				trainingModuleRepository.save(next);
+			});
 	}
 
 	public UserBadgeResponse awardBadge(AwardBadgeRequest request) {
@@ -267,6 +812,14 @@ public class TrainingGamificationService {
 			.toList();
 	}
 
+	public UserXPTrackerResponse getUserXpTracker(String userId) {
+		if (userId == null || userId.isBlank()) {
+			throw new BusinessException("userId is required");
+		}
+		UserXPTracker tracker = getOrCreateTracker(userId);
+		return trainingMapper.userXPTrackerToResponse(tracker);
+	}
+
 	public DebugBadgeSimulationResponse simulateBadgeTriggersForQa(DebugBadgeSimulationRequest request) {
 		if (!badgeSimulationEnabled) {
 			throw new BusinessException("Badge simulation endpoint is disabled");
@@ -276,7 +829,7 @@ public class TrainingGamificationService {
 			throw new BusinessException("userId is required");
 		}
 
-		TrainingPath path = trainingPathRepository.findByUserId(request.getUserId())
+		TrainingPath path = getCurrentPathEntityForUser(request.getUserId())
 			.orElseGet(() -> createPathInternal(
 				request.getUserId(),
 				PathStatus.ACTIVE,
@@ -353,7 +906,8 @@ public class TrainingGamificationService {
 	}
 
 	public void processInterviewCompleted(InterviewSessionCompletedEvent event) {
-		TrainingPath path = trainingPathRepository.findByUserId(event.getUserId())
+		upsertLastUserSignal(event);
+		TrainingPath path = getCurrentPathEntityForUser(event.getUserId())
 			.orElseGet(() -> createPersonalizedPathFromInterview(event));
 
 		int interviewXp = Math.max(20, event.getGlobalScore() == null ? 20 : (int) Math.round(event.getGlobalScore() * 2));
@@ -387,6 +941,126 @@ public class TrainingGamificationService {
 			.totalXp(getOrCreateTracker(path.getUserId()).getTotalXp())
 			.updatedAt(LocalDateTime.now())
 			.build());
+	}
+
+	private void upsertLastUserSignal(InterviewSessionCompletedEvent event) {
+		if (event == null || event.getUserId() == null || event.getUserId().isBlank()) {
+			return;
+		}
+
+		TrainingUserSignal signal = trainingUserSignalRepository.findById(event.getUserId())
+			.orElseGet(() -> TrainingUserSignal.builder().userId(event.getUserId()).build());
+		signal.setLastSessionId(event.getSessionId());
+		signal.setSessionType(normalizeOptional(event.getSessionType()));
+		signal.setGlobalScore(event.getGlobalScore());
+		signal.setPreparationLevel(normalizeOptional(event.getPreparationLevel()));
+		signal.setTotalSessionsCompleted(event.getTotalSessionsCompleted());
+		signal.setEventGeneratedAt(normalizeOptional(event.getGeneratedAt()));
+		trainingUserSignalRepository.save(signal);
+	}
+
+	private com.microservice.trainingservice.dto.TrainingPreferencesResponse toPreferencesResponse(TrainingPreferences preferences) {
+		return com.microservice.trainingservice.dto.TrainingPreferencesResponse.builder()
+			.userId(preferences.getUserId())
+			.goal(preferences.getGoal())
+			.targetRole(preferences.getTargetRole())
+			.seniority(preferences.getSeniority())
+			.minutesPerDay(preferences.getMinutesPerDay())
+			.updatedAt(preferences.getUpdatedAt())
+			.build();
+	}
+
+	private String normalizeOptional(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isBlank() ? null : trimmed;
+	}
+
+	private List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> applyPreferencesToPlans(
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> basePlans,
+		TrainingPreferences preferences
+	) {
+		if (preferences == null) {
+			return basePlans;
+		}
+
+		java.util.Map<TrainingCategory, Integer> boost = new java.util.EnumMap<>(TrainingCategory.class);
+		String goal = preferences.getGoal() == null ? "" : preferences.getGoal().trim().toUpperCase(Locale.ROOT);
+		switch (goal) {
+			case "TECHNICAL" -> {
+				boost.put(TrainingCategory.CONTENT_PREP, 2);
+				boost.put(TrainingCategory.INDUSTRY_SPECIFIC, 2);
+			}
+			case "BEHAVIORAL" -> {
+				boost.put(TrainingCategory.COMMUNICATION, 2);
+				boost.put(TrainingCategory.BODY_LANGUAGE, 1);
+			}
+			case "CONFIDENCE" -> {
+				boost.put(TrainingCategory.STRESS_MANAGEMENT, 2);
+				boost.put(TrainingCategory.COMMUNICATION, 1);
+			}
+			default -> {
+				// no-op
+			}
+		}
+
+		int minutes = preferences.getMinutesPerDay() == null ? 0 : preferences.getMinutesPerDay();
+		int lessonsDelta = 0;
+		if (minutes >= 90) {
+			lessonsDelta = 2;
+		} else if (minutes >= 45) {
+			lessonsDelta = 1;
+		} else if (minutes > 0 && minutes <= 15) {
+			lessonsDelta = -1;
+		}
+
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> enriched = new ArrayList<>();
+		for (int i = 0; i < basePlans.size(); i++) {
+			TrainingPersonalizationRuleEngine.PersonalizedModulePlan plan = basePlans.get(i);
+			int lessons = Math.max(3, plan.lessons() + lessonsDelta);
+			int xpReward = Math.max(20, plan.xpReward() + lessonsDelta * 10);
+			enriched.add(new TrainingPersonalizationRuleEngine.PersonalizedModulePlan(
+				plan.category(),
+				plan.title(),
+				plan.description(),
+				lessons,
+				xpReward,
+				false
+			));
+		}
+
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> ordered = new ArrayList<>(enriched);
+		ordered.sort(java.util.Comparator
+			.comparingInt((TrainingPersonalizationRuleEngine.PersonalizedModulePlan p) -> boost.getOrDefault(p.category(), 0))
+			.reversed()
+			.thenComparingInt(p -> indexOfCategory(enriched, p.category()))
+		);
+
+		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> finalPlans = new ArrayList<>();
+		for (int i = 0; i < ordered.size(); i++) {
+			TrainingPersonalizationRuleEngine.PersonalizedModulePlan p = ordered.get(i);
+			finalPlans.add(new TrainingPersonalizationRuleEngine.PersonalizedModulePlan(
+				p.category(),
+				p.title(),
+				p.description(),
+				p.lessons(),
+				p.xpReward(),
+				i == 0
+			));
+		}
+
+		return finalPlans;
+	}
+
+	private int indexOfCategory(List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> plans, TrainingCategory category) {
+		for (int i = 0; i < plans.size(); i++) {
+			if (plans.get(i).category() == category) {
+				return i;
+			}
+		}
+		return Integer.MAX_VALUE;
 	}
 
 	private void evaluateAndAwardAutomaticBadges(String userId, AutoBadgeContext context) {
@@ -485,7 +1159,7 @@ public class TrainingGamificationService {
 	}
 
 	private int countCompletedModulesForUser(String userId) {
-		return trainingPathRepository.findByUserId(userId)
+		return getCurrentPathEntityForUser(userId)
 			.map(path -> (int) trainingModuleRepository.findCompletedCountByPathId(path.getId()))
 			.orElse(0);
 	}
@@ -515,6 +1189,10 @@ public class TrainingGamificationService {
 		Integer xpThreshold,
 		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> modulePlans
 	) {
+		TrainingPreferences preferences = trainingPreferencesRepository.findById(userId).orElse(null);
+		String preferredLanguage = resolvePreferredLanguage();
+		Set<Long> usedLessonIds = new HashSet<>();
+
 		TrainingPath path = TrainingPath.builder()
 			.userId(userId)
 			.xpThreshold(xpThreshold)
@@ -524,8 +1202,21 @@ public class TrainingGamificationService {
 
 		List<TrainingModule> defaultModules = buildModulesFromPlans(path, modulePlans);
 		defaultModules.forEach(path::addModule);
+		defaultModules.forEach(m -> populateModuleLessonsIfMissing(
+			m,
+			m.getLessons() == null ? 0 : m.getLessons(),
+			preferences,
+			usedLessonIds,
+			preferredLanguage
+		));
 
 		TrainingPath savedPath = trainingPathRepository.save(path);
+		// Ensure snapshots are persisted (cascade from module -> moduleLessons).
+		for (TrainingModule module : defaultModules) {
+			if (module.getModuleLessons() != null && !module.getModuleLessons().isEmpty()) {
+				trainingModuleLessonRepository.saveAll(module.getModuleLessons());
+			}
+		}
 		getOrCreateTracker(userId);
 
 		eventPublisher.publishTrainingPathCreated(TrainingPathCreatedEvent.builder()
