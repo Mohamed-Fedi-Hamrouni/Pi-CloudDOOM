@@ -28,7 +28,7 @@ public class TrainingPath {
     @ToString.Include
     private Long id;
     
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", nullable = false)
     private String userId;
     
     @Column(name = "xp_threshold", nullable = false)

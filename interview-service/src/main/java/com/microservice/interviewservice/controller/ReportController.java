@@ -29,11 +29,16 @@ public class ReportController {
     public ResponseEntity<PerformanceReport> getReport(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
-        // Ownership is implicitly enforced: the session must belong to the caller.
-        // (The session controller's getSession already validates ownership;
-        //  here we just look up the report directly — if the session doesn't
-        //  belong to them, they simply won't find a report linked to a session
-        //  they shouldn't know the id of.)
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new ResourceNotFoundException("Interview session not found [id=" + id + "]");
+        }
+
+        // Enforce ownership: the session must belong to the caller.
+        sessionRepository.findById(id)
+                .filter(s -> jwt.getSubject().equals(s.getUserId()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Interview session not found [id=" + id + "]"));
+
         return ResponseEntity.ok(
                 reportRepository.findBySessionId(id)
                         .orElseThrow(() -> new ResourceNotFoundException(

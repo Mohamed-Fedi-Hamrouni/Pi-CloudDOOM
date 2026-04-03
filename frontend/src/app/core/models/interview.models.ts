@@ -17,7 +17,7 @@ export type IndustryType =
     | "ENGINEERING"
     | "CONSULTING"
     | "SALES_MARKETING";
-export type CareerLevel = "JUNIOR" | "MID" | "SENIOR";
+export type CareerLevel = "INTERN" | "JUNIOR" | "MID" | "SENIOR" | "LEAD";
 export type PreparationLevel =
     | "BEGINNER"
     | "INTERMEDIATE"
