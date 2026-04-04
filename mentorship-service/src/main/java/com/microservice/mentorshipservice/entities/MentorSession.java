@@ -1,7 +1,9 @@
 package com.microservice.mentorshipservice.entities;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import com.microservice.mentorshipservice.enums.SessionStatus;
 
@@ -11,6 +13,8 @@ import java.util.UUID;
 @Setter
 @Getter
 @Entity
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "mentor_sessions")
 public class MentorSession {
 

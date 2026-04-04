@@ -7,12 +7,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.UUID;
 
-@FeignClient(name = "user-service", url = "http://user-service:8081", configuration = FeignConfig.class, fallback = UserServiceFallback.class)
+@FeignClient(name = "user-service", url = "http://user-service:8081")
 public interface UserServiceClient {
 
     @GetMapping("/api/users/{id}")
     UserResponse getUserById(@PathVariable UUID id);
-
-    @GetMapping("/api/users/me")
-    UserResponse getCurrentUser();
 }

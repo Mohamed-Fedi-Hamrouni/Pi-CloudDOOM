@@ -26,20 +26,24 @@ public class MentorSessionService {
     public MentorSession createSession(UUID requestId, LocalDateTime scheduledAt, String meetingLink) {
         MentorRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
-    
-    if (!sessionRepository.findByRequestId(requestId).isEmpty()) {
-    throw new RuntimeException("Session already exists");
-    }
 
         if (request.getStatus() != MentorStatus.ACCEPTED) {
             throw new RuntimeException("Cannot create session for non-accepted request");
+        }
+        // REMOVE the "session already exists" check — mentor should be able to reschedule
+        // Only block if there's already a SCHEDULED (active) session
+        boolean hasActiveSession = sessionRepository.findByRequestId(requestId)
+                .stream()
+                .anyMatch(s -> s.getStatus() == SessionStatus.SCHEDULED);
+        if (hasActiveSession) {
+            throw new RuntimeException("An active session already exists. Cancel it before scheduling a new one.");
         }
 
         MentorSession session = new MentorSession();
         session.setRequestId(requestId);
         session.setScheduledAt(scheduledAt);
         session.setMeetingLink(meetingLink);
-        session.setStatus(com.microservice.mentorshipservice.enums.SessionStatus.SCHEDULED);
+        session.setStatus(SessionStatus.SCHEDULED);
 
         return sessionRepository.save(session);
     }

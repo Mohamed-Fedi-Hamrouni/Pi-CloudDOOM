@@ -1,6 +1,7 @@
 package com.microservice.mentorshipservice.services;
 
 import com.microservice.mentorshipservice.DTOs.MentorRequestDTO;
+import com.microservice.mentorshipservice.DTOs.MentorRequestResponseDTO;
 import com.microservice.mentorshipservice.DTOs.UserResponse;
 import com.microservice.mentorshipservice.clients.UserServiceClient;
 import com.microservice.mentorshipservice.entities.MentorRequest;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class MentorRequestService {
@@ -22,92 +24,77 @@ public class MentorRequestService {
     @Autowired
     private UserServiceClient userServiceClient;
 
-    @Autowired
-    private MentorSessionService sessionService;
-
     // CREATE
-    public MentorRequest createRequest(MentorRequestDTO dto) {
-        // Validate that mentee and mentor exist
-        try {
-            UserResponse mentee = userServiceClient.getUserById(dto.menteeId);
-            UserResponse mentor = userServiceClient.getUserById(dto.mentorId);
-        } catch (Exception e) {
-            throw new RuntimeException("Invalid user ID: " + e.getMessage());
-        }
-
-        // Prevent self-requests
-        if (dto.menteeId.equals(dto.mentorId)) {
+    public MentorRequestResponseDTO createRequest(MentorRequestDTO dto, UUID menteeId) {
+        // 1. Self-request guard
+        if (menteeId.equals(dto.getMentorId())) {
             throw new RuntimeException("Cannot request mentorship from yourself");
         }
 
+        // 2. Duplicate check
+        boolean exists = repository.findByMenteeId(menteeId)
+                .stream()
+                .anyMatch(r -> r.getMentorId().equals(dto.getMentorId())
+                        && r.getStatus() == MentorStatus.PENDING);
+        if (exists) {
+            throw new RuntimeException("A pending request to this mentor already exists");
+        }
+
+        // 3. REMOVE the Feign validation block — user service doesn't support keycloak ID lookup
+        // The mentorId is the Keycloak UUID coming from the token, trust it for now
+
+        // 4. Build and save
         MentorRequest request = new MentorRequest();
-        request.setMentorId(dto.mentorId);
-        request.setMenteeId(dto.menteeId);
+        request.setMentorId(dto.getMentorId());
+        request.setMenteeId(menteeId);
         request.setStatus(MentorStatus.PENDING);
-        request.setCreatedAt(LocalDateTime.now());
-    boolean exists = repository.findByMenteeId(dto.menteeId)
-    .stream()
-    .anyMatch(r -> r.getMentorId().equals(dto.mentorId)
-        && r.getStatus() == MentorStatus.PENDING);
-
-if (exists) {
-    throw new RuntimeException("Request already exists");
-}
-
-        return repository.save(request);
+        return toDTO(repository.save(request));
+    }    // READ
+    public List<MentorRequestResponseDTO> getRequestsByMentee(UUID menteeId) {
+        return repository.findByMenteeId(menteeId)
+                .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
-    // READ
-    public List<MentorRequest> getRequestsByMentee(UUID menteeId) {
-        return repository.findByMenteeId(menteeId);
-    }
-
-    public List<MentorRequest> getRequestsByMentor(UUID mentorId) {
-        return repository.findByMentorId(mentorId);
+    public List<MentorRequestResponseDTO> getRequestsByMentor(UUID mentorId) {
+        return repository.findByMentorId(mentorId)
+                .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     // UPDATE (ACCEPT)
-    public MentorRequest acceptRequest(UUID id) {
+    public MentorRequestResponseDTO acceptRequest(UUID id) {
         MentorRequest request = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
-
         if (request.getStatus() != MentorStatus.PENDING) {
             throw new RuntimeException("Request is not in pending status");
         }
-
         request.setStatus(MentorStatus.ACCEPTED);
-        MentorRequest savedRequest = repository.save(request);
-
-        // Create a default session (mentor can update later)
-        try {
-            sessionService.createSession(
-                id,
-                LocalDateTime.now().plusDays(7), // Default: 1 week from now
-                "TBD" // To be determined
-            );
-        } catch (Exception e) {
-            // Log but don't fail the request acceptance
-            System.err.println("Failed to create default session: " + e.getMessage());
-        }
-
-        return savedRequest;
+        return toDTO(repository.save(request));
+        // session creation is now the mentor's explicit action via MentorSessionController POST
     }
-
     // UPDATE (DECLINE)
-    public MentorRequest declineRequest(UUID id) {
+    public MentorRequestResponseDTO declineRequest(UUID id) {
         MentorRequest request = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Request not found"));
-
         if (request.getStatus() != MentorStatus.PENDING) {
             throw new RuntimeException("Request is not in pending status");
         }
-
         request.setStatus(MentorStatus.DECLINED);
-        return repository.save(request);
+        return toDTO(repository.save(request));
     }
 
     // DELETE
     public void deleteRequest(UUID id) {
         repository.deleteById(id);
+    }
+
+    // mapper — private helper
+    private MentorRequestResponseDTO toDTO(MentorRequest r) {
+        MentorRequestResponseDTO dto = new MentorRequestResponseDTO();
+        dto.setId(r.getId());
+        dto.setMentorId(r.getMentorId());
+        dto.setMenteeId(r.getMenteeId());
+        dto.setStatus(r.getStatus().name());
+        dto.setCreatedAt(r.getCreatedAt());
+        return dto;
     }
 }
