@@ -162,7 +162,7 @@ export class ProfileComponent implements OnInit {
                 );
                 this.refreshCompletion();
                 this.syncPreferences();
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             },
             error: (err) => {
                 console.error("Profile load error:", err);
@@ -265,7 +265,9 @@ export class ProfileComponent implements OnInit {
             city: this.editForm.city,
             bio: this.editForm.bio,
             avatarUrl: this.editForm.avatarUrl,
-            preferredIndustry: this.editForm.preferredIndustry,
+            preferredIndustry: this.editForm.preferredIndustry?.trim()
+                ? this.editForm.preferredIndustry
+                : null,
             preferredLanguage: this.editForm.preferredLanguage,
             emailNotificationsEnabled: this.editForm.emailNotificationsEnabled,
             pushNotificationsEnabled: this.editForm.pushNotificationsEnabled,
@@ -303,16 +305,16 @@ export class ProfileComponent implements OnInit {
                 this.saving = false;
                 this.saveSuccess = true;
                 this.syncPreferences();
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
                 setTimeout(() => {
                     this.saveSuccess = false;
-                    this.cdr.detectChanges();
+                    this.cdr.markForCheck();
                 }, 3000);
             },
             error: () => {
                 this.saving = false;
                 this.saveError = "Failed to save. Please try again.";
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             },
         });
     }
@@ -795,13 +797,13 @@ export class ProfileComponent implements OnInit {
                     this.avatarUploadError = "";
                     this.clearAvatarObjectUrl();
                     this.refreshCompletion();
-                    this.cdr.detectChanges();
+                    this.cdr.markForCheck();
                 },
                 error: () => {
                     this.avatarUploadLoading = false;
                     this.avatarUploadError =
                         "Avatar upload failed. Please try again.";
-                    this.cdr.detectChanges();
+                    this.cdr.markForCheck();
                 },
             });
     }
@@ -895,14 +897,14 @@ export class ProfileComponent implements OnInit {
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
                 this.refreshCompletion();
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             },
             error: (err) => {
                 this.cvUploadLoading = false;
                 this.cvUploadError =
                     err?.error?.message ||
                     "CV upload failed. Please try again.";
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             },
         });
     }
