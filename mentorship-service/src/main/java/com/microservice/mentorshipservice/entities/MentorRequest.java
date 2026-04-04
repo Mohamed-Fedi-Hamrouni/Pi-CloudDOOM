@@ -21,7 +21,7 @@ public class MentorRequest {
     private UUID mentorId;
 
     @Enumerated(EnumType.STRING)
-    private MentorStatus status; // PENDING, ACCEPTED, DECLINED
+    private MentorStatus status;
 
     private LocalDateTime createdAt;
 }

@@ -206,6 +206,27 @@ services:
         ports:
             - "${FRONTEND_PORT:-4200}:80"
 
+    mentorship-service:
+        build:
+            context: ../mentorship-service
+            dockerfile: Dockerfile
+        container_name: userservice-mentorship
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+        ports:
+            - "8082:8082"
+        environment:
+            SERVER_PORT: 8082
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mentorship_db
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+
 volumes:
     pgdata:
     redisdata:

@@ -1,0 +1,21 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mentorship_db
+    username: postgres
+    password: 0000
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/myapp-realm
+          jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
