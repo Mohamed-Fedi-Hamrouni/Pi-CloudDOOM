@@ -120,6 +120,29 @@
             accent-color: #14b8a6;
             cursor: pointer;
         }
+
+        /* ── Social login ── */
+        .social-divider {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin: 1.5rem 0; color: #94a3b8; font-size: 0.8125rem;
+        }
+        .social-divider::before,
+        .social-divider::after {
+            content: ''; flex: 1;
+            height: 1px; background: #e2e8f0;
+        }
+        .social-buttons { display: flex; flex-direction: column; gap: 0.75rem; }
+        .btn-social {
+            display: flex; align-items: center; gap: 0.75rem;
+            width: 100%; padding: 0.6875rem 1rem;
+            background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px;
+            color: #334155; font-size: 0.875rem; font-weight: 500;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer; text-decoration: none;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-social:hover { background: #ffffff; border-color: #14b8a6; }
+        .btn-social svg { flex-shrink: 0; }
     </style>
 </head>
 <body>

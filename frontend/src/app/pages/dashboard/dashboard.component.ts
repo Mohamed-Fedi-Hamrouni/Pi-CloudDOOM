@@ -240,12 +240,26 @@ export class DashboardComponent implements OnInit {
     get profileCompletionItems(): { label: string; done: boolean }[] {
         return [
             {
-                label: "Add target roles",
+                label: "Complete name",
+                done:
+                    this.hasText(this.currentUser?.firstName) &&
+                    this.hasText(this.currentUser?.lastName),
+            },
+            {
+                label: "Add city",
+                done: this.hasText(this.currentUser?.city),
+            },
+            {
+                label: "Set preferred industry",
                 done: this.hasText(this.currentUser?.preferredIndustry),
             },
             {
-                label: "Complete first mock session",
-                done: (this.currentUser?.simulationsUsedThisMonth ?? 0) > 0,
+                label: "Set preferred language",
+                done: this.hasText(this.currentUser?.preferredLanguage),
+            },
+            {
+                label: "Write strong bio",
+                done: this.hasStrongBio(this.currentUser?.bio),
             },
             {
                 label: "Upload profile photo",
@@ -254,6 +268,10 @@ export class DashboardComponent implements OnInit {
             {
                 label: "Add skills",
                 done: this.hasArray(this.currentUser?.skills),
+            },
+            {
+                label: "Upload CV",
+                done: this.hasText(this.currentUser?.cvUrl),
             },
             {
                 label: "Add work experience",
@@ -278,29 +296,36 @@ export class DashboardComponent implements OnInit {
     private computeProfileCompletion(): number {
         if (!this.currentUser) return 0;
 
+        const TOTAL_POINTS = 110;
         let score = 0;
 
         if (
             this.hasText(this.currentUser.firstName) &&
             this.hasText(this.currentUser.lastName)
-        )
+        ) {
             score += 15;
+        }
 
         if (this.hasText(this.currentUser.city)) score += 10;
         if (this.hasText(this.currentUser.preferredIndustry)) score += 10;
         if (this.hasText(this.currentUser.preferredLanguage)) score += 5;
-        if (this.hasText(this.currentUser.bio)) score += 15;
+        if (this.hasStrongBio(this.currentUser.bio)) score += 15;
         if (this.hasText(this.currentUser.avatarUrl)) score += 5;
         if (this.hasArray(this.currentUser.skills)) score += 15;
+        if (this.hasText(this.currentUser.cvUrl)) score += 10;
         if (this.hasJsonArray(this.currentUser.experiencesJson)) score += 10;
         if (this.hasJsonArray(this.currentUser.educationsJson)) score += 10;
         if (this.currentUser.isVerified) score += 5;
 
-        return score;
+        return Math.round((score / TOTAL_POINTS) * 100);
     }
 
     private hasText(value: unknown): boolean {
         return typeof value === "string" && value.trim().length > 0;
+    }
+
+    private hasStrongBio(value: unknown): boolean {
+        return typeof value === "string" && value.trim().length >= 30;
     }
 
     private hasArray(value: unknown): boolean {

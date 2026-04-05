@@ -147,4 +147,24 @@ export class AuthService {
     getLastName(): string {
         return this.keycloak.tokenParsed?.["family_name"] || "";
     }
+    loginWithGoogle(): void {
+        this.keycloak.login({
+            idpHint: "google",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithLinkedIn(): void {
+        this.keycloak.login({
+            idpHint: "linkedin-openid-connect",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithGitHub(): void {
+        this.keycloak.login({
+            idpHint: "github",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
 }

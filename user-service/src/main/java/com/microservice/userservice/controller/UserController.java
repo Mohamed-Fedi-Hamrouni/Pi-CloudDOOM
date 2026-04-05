@@ -21,14 +21,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
-import com.microservice.userservice.exception.UserNotFoundException;
 import com.microservice.userservice.service.AvatarStorageService;
 import com.microservice.userservice.service.UserService;
 
@@ -56,64 +54,15 @@ public class UserController {
     // ── CURRENT USER ──────────────────────────────────────────────────────────
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @AuthenticationPrincipal Jwt jwt) {
-        String keycloakId = jwt.getSubject();
-        try {
-            return ResponseEntity.ok(userService.findByKeycloakId(keycloakId));
-        } catch (UserNotFoundException ex) {
-            return ResponseEntity.ok(userService.create(buildProvisioningRequest(jwt), keycloakId));
-        }
-    }
-
-    private CreateUserRequest buildProvisioningRequest(Jwt jwt) {
-        String email = jwt.getClaimAsString("email");
-        if (email == null || email.isBlank()) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Missing email claim in JWT; configure Keycloak client to include 'email' scope");
-        }
-
-        String firstName = firstNonBlank(
-            jwt.getClaimAsString("given_name"),
-            jwt.getClaimAsString("first_name"),
-            jwt.getClaimAsString("preferred_username"));
-        String lastName = firstNonBlank(
-            jwt.getClaimAsString("family_name"),
-            jwt.getClaimAsString("last_name"));
-
-        CreateUserRequest request = new CreateUserRequest();
-        request.setEmail(email);
-        request.setFirstName(firstName != null ? firstName : "");
-        request.setLastName(lastName != null ? lastName : "");
-        request.setCity(null);
-        request.setPhoneNumber(null);
-        request.setPreferredIndustry(null);
-        String preferredLanguage = firstNonBlank(
-            jwt.getClaimAsString("locale"),
-            jwt.getClaimAsString("preferred_language"));
-        request.setPreferredLanguage(preferredLanguage != null ? preferredLanguage : "fr");
-        request.setSkills(java.util.List.of());
-        return request;
-    }
-
-    private String firstNonBlank(String... values) {
-        if (values == null) {
-            return null;
-        }
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
+    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
     }
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateCurrentUser(
             @Valid @RequestBody UpdateUserRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        UserResponse current = userService.findByKeycloakId(jwt.getSubject());
+        UserResponse current = userService.findOrProvisionFromJwt(jwt);
         return ResponseEntity.ok(
             userService.update(current.getId(), request));
     }
