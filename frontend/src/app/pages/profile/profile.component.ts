@@ -1,4 +1,10 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from "@angular/core";
+import {
+    Component,
+    inject,
+    OnInit,
+    ChangeDetectorRef,
+    ChangeDetectionStrategy,
+} from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HttpClient } from "@angular/common/http";
@@ -69,6 +75,7 @@ type ActiveEditSection =
     imports: [CommonModule, FormsModule, SectionHeaderComponent],
     templateUrl: "./profile.component.html",
     styleUrls: ["./profile.component.css"],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileComponent implements OnInit {
     private http = inject(HttpClient);
@@ -77,6 +84,8 @@ export class ProfileComponent implements OnInit {
     private currentUserStore = inject(CurrentUserStoreService);
 
     user: UserProfile | null = null;
+    initials = "";
+    memberSinceLabel = "";
     editing = false;
     saving = false;
     saveError = "";
@@ -86,6 +95,9 @@ export class ProfileComponent implements OnInit {
     cvUploadLoading = false;
     cvUploadError = "";
     selectedCvFileName = "";
+    cvLink = "";
+    cvFileName = "";
+    preferredLanguageLabel = "";
     completionScore = 0;
     completionSections: CompletionSection[] = [];
     avatarInputMode: "upload" | "url" = "upload";
@@ -152,6 +164,7 @@ export class ProfileComponent implements OnInit {
             next: (user) => {
                 user.skills = user.skills || [];
                 this.user = user;
+                this.initials = this.computeInitials(user.firstName, user.lastName);
                 this.currentUserStore.setCurrentUser(user);
                 this.avatarPreviewUrl = user.avatarUrl || "";
                 this.selectedSkills = [...user.skills];
@@ -160,6 +173,7 @@ export class ProfileComponent implements OnInit {
                 this.selectedCvFileName = this.extractFileNameFromUrl(
                     user.cvUrl || null,
                 );
+                this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();
                 this.cdr.markForCheck();
@@ -281,6 +295,7 @@ export class ProfileComponent implements OnInit {
             next: (updated) => {
                 updated.skills = updated.skills || [];
                 this.user = updated;
+                this.initials = this.computeInitials(updated.firstName, updated.lastName);
                 this.currentUserStore.setCurrentUser(updated);
                 this.avatarPreviewUrl = updated.avatarUrl || "";
                 this.avatarUploadLoading = false;
@@ -296,6 +311,7 @@ export class ProfileComponent implements OnInit {
                 this.selectedCvFileName = this.extractFileNameFromUrl(
                     updated.cvUrl || null,
                 );
+                this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.editing = false;
                 this.localDraftNotice = "";
@@ -342,6 +358,7 @@ export class ProfileComponent implements OnInit {
             this.clearAvatarObjectUrl();
             this.experiences = this.parseExperiences(this.user.experiencesJson);
             this.educations = this.parseEducations(this.user.educationsJson);
+            this.refreshDerivedFields();
             this.refreshCompletion();
         }
     }
@@ -602,10 +619,13 @@ export class ProfileComponent implements OnInit {
     }
 
     getInitials(): string {
-        if (!this.user) return "";
-        return (
-            (this.user.firstName?.[0] || "") + (this.user.lastName?.[0] || "")
-        ).toUpperCase();
+        return this.initials;
+    }
+
+    private computeInitials(firstName?: string | null, lastName?: string | null): string {
+        const first = firstName?.trim()?.[0] || "";
+        const last = lastName?.trim()?.[0] || "";
+        return (first + last).toUpperCase();
     }
 
     getLanguageLabel(lang: string): string {
@@ -796,6 +816,7 @@ export class ProfileComponent implements OnInit {
                     this.avatarUploadLoading = false;
                     this.avatarUploadError = "";
                     this.clearAvatarObjectUrl();
+                    this.refreshDerivedFields();
                     this.refreshCompletion();
                     this.cdr.markForCheck();
                 },
@@ -896,6 +917,7 @@ export class ProfileComponent implements OnInit {
                 );
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
+                this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.cdr.markForCheck();
             },
@@ -910,24 +932,46 @@ export class ProfileComponent implements OnInit {
     }
 
     getCvFileName(): string {
-        if (this.selectedCvFileName) {
-            return this.selectedCvFileName;
-        }
-
-        return this.extractFileNameFromUrl(this.user?.cvUrl || null);
+        return this.cvFileName;
     }
 
     getCvLink(): string {
-        const cvUrl = this.user?.cvUrl;
+        return this.cvLink;
+    }
+
+    private refreshDerivedFields(): void {
+        if (!this.user) {
+            this.memberSinceLabel = "";
+            this.cvLink = "";
+            this.cvFileName = "";
+            this.preferredLanguageLabel = "";
+            return;
+        }
+
+        this.memberSinceLabel = this.formatMonthYear(this.user.createdAt);
+
+        const cvUrl = this.user.cvUrl || "";
+        this.cvFileName =
+            this.selectedCvFileName || this.extractFileNameFromUrl(cvUrl || null);
+
         if (!cvUrl) {
-            return "";
+            this.cvLink = "";
+        } else if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
+            this.cvLink = cvUrl;
+        } else {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
         }
 
-        if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
-            return cvUrl;
-        }
+        this.preferredLanguageLabel = this.getLanguageLabel(
+            this.user.preferredLanguage,
+        );
+    }
 
-        return `${environment.apiUrl}${cvUrl}`;
+    private formatMonthYear(value: string | null | undefined): string {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleString(undefined, { month: "short", year: "numeric" });
     }
 
     private extractFileNameFromUrl(cvUrl: string | null): string {
@@ -976,6 +1020,7 @@ export class ProfileComponent implements OnInit {
 
             return parsed
                 .filter((item) => item && typeof item === "object")
+                .slice(0, 100)
                 .map((item) => ({
                     id: item.id || crypto.randomUUID(),
                     title: item.title || "",
@@ -1005,6 +1050,7 @@ export class ProfileComponent implements OnInit {
 
             return parsed
                 .filter((item) => item && typeof item === "object")
+                .slice(0, 100)
                 .map((item) => ({
                     id: item.id || crypto.randomUUID(),
                     school: item.school || "",
