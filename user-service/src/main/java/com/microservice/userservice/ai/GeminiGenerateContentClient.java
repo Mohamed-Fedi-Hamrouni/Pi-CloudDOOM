@@ -1,11 +1,15 @@
 package com.microservice.userservice.ai;
 
 import java.util.List;
+import java.util.Objects;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -30,7 +34,9 @@ public class GeminiGenerateContentClient {
                 contents,
                 new GenerationConfig(props.getTemperature(), props.getMaxOutputTokens()));
 
-        GenerateContentResponse response = restClient
+        GenerateContentResponse response;
+        try {
+            response = restClient
                 .post()
                 .uri("/v1beta/models/{model}:generateContent", props.getModel())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -39,6 +45,28 @@ public class GeminiGenerateContentClient {
                 .body(request)
                 .retrieve()
                 .body(GenerateContentResponse.class);
+        } catch (RestClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            String body = ex.getResponseBodyAsString();
+
+            if (status == 400 && body != null && body.contains("API_KEY_INVALID")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Gemini rejected the API key (API_KEY_INVALID). Verify GOOGLE_AI_API_KEY in infra/.env is the full key (usually starts with 'AIza' and is much longer than 10 chars). " +
+                "If it is full, check key restrictions / enabled APIs in Google AI Studio / Google Cloud.");
+            }
+
+            if (status == 429) {
+            throw new ResponseStatusException(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "Gemini rate-limited the request (429). Try again later.");
+            }
+
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Gemini request failed (provider HTTP " + status + ")",
+                ex);
+        }
 
         if (response == null || response.candidates == null || response.candidates.isEmpty()) {
             throw new IllegalStateException("Gemini returned no candidates");
@@ -49,12 +77,19 @@ public class GeminiGenerateContentClient {
             throw new IllegalStateException("Gemini response missing content");
         }
 
-        Part part = first.content.parts.getFirst();
-        if (part == null || part.text == null || part.text.isBlank()) {
+        // Gemini may return multiple text parts; concatenate them.
+        String text = first.content.parts.stream()
+                .filter(Objects::nonNull)
+                .map(Part::text)
+                .filter(StringUtils::hasText)
+                .reduce("", String::concat)
+                .trim();
+
+        if (text.isBlank()) {
             throw new IllegalStateException("Gemini response missing text");
         }
 
-        return part.text;
+        return text;
     }
 
     /** Google content message; role is typically "user" or "model". */

@@ -78,6 +78,7 @@ public class TrainingCoachAiService {
         sb.append("- Never invent facts not present in the snapshot.\n");
         sb.append("- If the user asks for a rewrite, produce an improved version and explain 2-3 key improvements.\n");
         sb.append("- Always propose 1-3 training drills relevant to the user.\n");
+        sb.append("- Always finish your reply with a complete sentence (do not cut off mid-sentence).\n");
 
         return sb.toString();
     }
