@@ -204,14 +204,12 @@ services:
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
 
-            # AI (OpenRouter) — set these in your shell or an uncommitted .env file
-            OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-            OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.6-plus:free}
-            OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-            OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
-            OPENROUTER_TITLE: ${OPENROUTER_TITLE:-Pi-CloudDOOM}
-            OPENROUTER_TEMPERATURE: ${OPENROUTER_TEMPERATURE:-0.4}
-            OPENROUTER_MAX_TOKENS: ${OPENROUTER_MAX_TOKENS:-600}
+            # AI (Google AI Studio / Gemini) — set these in your shell or an uncommitted infra/.env file
+            GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+            GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
+            GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
+            GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
 
     interview-service:
         build:

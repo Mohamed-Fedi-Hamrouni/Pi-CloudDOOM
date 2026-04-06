@@ -132,7 +132,7 @@ export class TrainingCoachChatComponent {
 
     if (status === 429) {
       return (
-        'AI is temporarily rate-limited (429). Try again in a minute, or set your own OpenRouter key in infra/.env and/or switch to a non-free model.'
+        'AI is temporarily rate-limited (429). Try again in a minute, or set your API key in infra/.env and/or switch to another model.'
       );
     }
 

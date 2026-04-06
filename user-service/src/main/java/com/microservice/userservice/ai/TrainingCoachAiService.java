@@ -6,7 +6,8 @@ import java.util.List;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
-import com.microservice.userservice.ai.OpenRouterChatClient.ChatMessage;
+import com.microservice.userservice.ai.GeminiGenerateContentClient.Content;
+import com.microservice.userservice.ai.GeminiGenerateContentClient.Part;
 import com.microservice.userservice.ai.dto.ChatMessageDto;
 import com.microservice.userservice.ai.dto.TrainingCoachChatRequest;
 import com.microservice.userservice.ai.dto.TrainingCoachChatResponse;
@@ -16,12 +17,12 @@ import com.microservice.userservice.service.UserService;
 @Service
 public class TrainingCoachAiService {
 
-    private final OpenRouterChatClient chatClient;
-    private final OpenRouterProperties props;
+    private final GeminiGenerateContentClient geminiClient;
+    private final GoogleAiProperties props;
     private final UserService userService;
 
-    public TrainingCoachAiService(OpenRouterChatClient chatClient, OpenRouterProperties props, UserService userService) {
-        this.chatClient = chatClient;
+    public TrainingCoachAiService(GeminiGenerateContentClient geminiClient, GoogleAiProperties props, UserService userService) {
+        this.geminiClient = geminiClient;
         this.props = props;
         this.userService = userService;
     }
@@ -29,22 +30,19 @@ public class TrainingCoachAiService {
     public TrainingCoachChatResponse chat(TrainingCoachChatRequest request, Jwt jwt) {
         UserResponse user = userService.findOrProvisionFromJwt(jwt);
 
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage("system", buildSystemPrompt(user)));
+        String systemInstruction = buildSystemPrompt(user);
+        List<Content> contents = new ArrayList<>();
 
         if (request.history() != null) {
             for (ChatMessageDto m : request.history()) {
                 String role = normalizeRole(m.role());
-                if (role.equals("system")) {
-                    continue;
-                }
-                messages.add(new ChatMessage(role, m.content()));
+                contents.add(new Content(role, List.of(new Part(m.content()))));
             }
         }
 
-        messages.add(new ChatMessage("user", request.message()));
+        contents.add(new Content("user", List.of(new Part(request.message()))));
 
-        String reply = chatClient.chat(messages);
+        String reply = geminiClient.generate(systemInstruction, contents);
         return new TrainingCoachChatResponse(reply, props.getModel());
     }
 
@@ -52,7 +50,8 @@ public class TrainingCoachAiService {
         if (role == null) return "user";
         String r = role.trim().toLowerCase();
         return switch (r) {
-            case "assistant", "user", "system" -> r;
+            case "assistant" -> "model";
+            case "model", "user" -> r;
             default -> "user";
         };
     }
@@ -60,7 +59,7 @@ public class TrainingCoachAiService {
     private String buildSystemPrompt(UserResponse user) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are an AI coach inside an interview-training platform. ");
-        sb.append("Your job is to coach the user on CV/profile quality and suggest concrete practice tasks. ");
+        sb.append("Coach the user on CV/profile quality and suggest concrete practice tasks. ");
         sb.append("Be concise and actionable. Prefer bullet points. Ask at most one clarifying question if needed.\n\n");
 
         sb.append("User profile snapshot:\n");

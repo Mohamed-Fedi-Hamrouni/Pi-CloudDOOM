@@ -6,11 +6,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-@EnableConfigurationProperties(OpenRouterProperties.class)
-public class OpenRouterConfig {
+@EnableConfigurationProperties(GoogleAiProperties.class)
+public class GoogleAiConfig {
 
     @Bean
-    public RestClient openRouterRestClient(OpenRouterProperties props) {
+    public RestClient googleAiRestClient(GoogleAiProperties props) {
         return RestClient.builder()
                 .baseUrl(props.getBaseUrl())
                 .build();

@@ -33,8 +33,8 @@ cp .env.example .env
 Pour activer le chatbot (coach CV/profil) dans la page Training, renseigner dans `infra/.env` :
 
 ```
-OPENROUTER_API_KEY=...   # ne jamais committer
-OPENROUTER_MODEL=qwen/qwen3.6-plus:free
+GOOGLE_AI_API_KEY=...   # ne jamais committer
+GOOGLE_AI_MODEL=gemini-flash-latest
 ```
 
 ### 2. Ajouter le realm Keycloak
