@@ -204,6 +204,15 @@ services:
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
 
+            # AI (OpenRouter) — set these in your shell or an uncommitted .env file
+            OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+            OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.6-plus:free}
+            OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+            OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
+            OPENROUTER_TITLE: ${OPENROUTER_TITLE:-Pi-CloudDOOM}
+            OPENROUTER_TEMPERATURE: ${OPENROUTER_TEMPERATURE:-0.4}
+            OPENROUTER_MAX_TOKENS: ${OPENROUTER_MAX_TOKENS:-600}
+
     interview-service:
         build:
             context: ../interview-service

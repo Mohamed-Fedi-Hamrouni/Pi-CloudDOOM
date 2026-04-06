@@ -77,3 +77,12 @@ logging:
 
 app:
     uploads-dir: ${APP_UPLOADS_DIR:uploads}
+
+openrouter:
+    base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    api-key: ${OPENROUTER_API_KEY:}
+    model: ${OPENROUTER_MODEL:qwen/qwen3.6-plus:free}
+    http-referer: ${OPENROUTER_HTTP_REFERER:}
+    title: ${OPENROUTER_TITLE:Pi-CloudDOOM}
+    temperature: ${OPENROUTER_TEMPERATURE:0.4}
+    max-tokens: ${OPENROUTER_MAX_TOKENS:600}

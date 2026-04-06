@@ -28,6 +28,15 @@ cd infra/
 cp .env.example .env
 ```
 
+**AI Coach (chatbot Training) — optionnel**
+
+Pour activer le chatbot (coach CV/profil) dans la page Training, renseigner dans `infra/.env` :
+
+```
+OPENROUTER_API_KEY=...   # ne jamais committer
+OPENROUTER_MODEL=qwen/qwen3.6-plus:free
+```
+
 ### 2. Ajouter le realm Keycloak
 
 Récupérer `realm-export.json` auprès de **Membre 1** et le placer dans :

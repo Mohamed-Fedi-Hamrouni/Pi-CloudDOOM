@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { BadgeCardComponent } from '../../shared/components/badge-card/badge-card.component';
+import { TrainingCoachChatComponent } from '../../shared/components/training-coach-chat/training-coach-chat.component';
 import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../core/data/mock-data';
 import { AuthService } from '../../core/auth/auth.service';
 import { TrainingApiService } from '../../core/services/training-api.service';
@@ -30,7 +31,7 @@ type DailyGoal = {
 @Component({
   selector: 'app-training-gamification',
   standalone: true,
-  imports: [CommonModule, FormsModule, SectionHeaderComponent, BadgeCardComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent, BadgeCardComponent, TrainingCoachChatComponent],
   template: `
     <div class="training-page animate-fade">
       <div class="page-header">
@@ -305,6 +306,9 @@ type DailyGoal = {
               <span>You're on a roll. Don't break the chain.</span>
             </div>
           </div>
+
+          <!-- AI Coach -->
+          <app-training-coach-chat></app-training-coach-chat>
 
           <!-- Leaderboard -->
           <div class="card leaderboard-card">
