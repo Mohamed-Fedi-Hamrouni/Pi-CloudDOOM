@@ -159,3 +159,31 @@ export interface PricingPlan {
   ctaLabel: string;
   color: string;
 }
+
+// ── Mentorship service DTOs ──────────────────────────────────────────────────
+
+export interface MentorRequest {
+  id: string;
+  mentorId: string;
+  menteeId: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  createdAt: string;
+}
+
+export interface MentorSession {
+  id: string;
+  requestId: string;
+  scheduledAt: string;
+  meetingLink: string;
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+}
+
+export interface CreateMentorRequestDTO {
+  mentorId: string;
+}
+
+export interface CreateMentorSessionDTO {
+  requestId: string;
+  scheduledAt: string;
+  meetingLink: string;
+}

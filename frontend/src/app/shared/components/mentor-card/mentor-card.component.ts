@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Mentor } from '../../../core/models/models';
 
@@ -44,8 +44,16 @@ import { Mentor } from '../../../core/models/models';
           <span class="price-amount">\${{ mentor.price }}</span>
           <span class="price-period">/session</span>
         </div>
-        <button class="btn btn-primary btn-sm" [disabled]="!mentor.available">
-          {{ mentor.available ? 'Book Session' : 'Unavailable' }}
+        <button
+            class="btn btn-primary btn-sm"
+            [disabled]="!mentor.available || requested || requesting"
+            (click)="onRequest()">
+          {{
+            !mentor.available ? 'Unavailable' :
+                requested ? '✓ Requested' :
+                    requesting ? 'Sending...' :
+                        'Request Mentor'
+          }}
         </button>
       </div>
 
@@ -66,23 +74,19 @@ import { Mentor } from '../../../core/models/models';
       gap: var(--space-4);
       transition: box-shadow var(--transition-base), transform var(--transition-base);
     }
-
     .mentor-card:hover {
       box-shadow: var(--shadow-lg);
       transform: translateY(-2px);
     }
-
     .mentor-header {
       display: flex;
       gap: var(--space-3);
       align-items: flex-start;
     }
-
     .mentor-avatar-wrap {
       position: relative;
       flex-shrink: 0;
     }
-
     .availability-dot {
       position: absolute;
       bottom: 2px;
@@ -93,45 +97,42 @@ import { Mentor } from '../../../core/models/models';
       background: var(--neutral-300);
       border: 2px solid white;
     }
-
-    .availability-dot.online { background: var(--success-500); }
-
+    .availability-dot.online {
+      background: var(--success-500);
+    }
     .mentor-name {
       font-size: var(--text-base);
       font-weight: var(--weight-semibold);
       color: var(--color-text);
     }
-
     .mentor-title {
       font-size: var(--text-sm);
       color: var(--color-text-muted);
     }
-
     .mentor-company {
       font-size: var(--text-xs);
       color: var(--teal-600);
       font-weight: var(--weight-medium);
     }
-
-    .mentor-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-
+    .mentor-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+    }
     .mentor-stats {
       display: flex;
       flex-direction: column;
       gap: var(--space-2);
     }
-
     .mentor-stat {
       display: flex;
       align-items: center;
       gap: var(--space-2);
     }
-
     .mentor-stat-val {
       font-size: var(--text-sm);
       color: var(--color-text-muted);
     }
-
     .mentor-bio {
       font-size: var(--text-sm);
       color: var(--color-text-muted);
@@ -141,26 +142,22 @@ import { Mentor } from '../../../core/models/models';
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-
     .mentor-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-top: auto;
     }
-
     .price-amount {
       font-size: var(--text-xl);
       font-weight: var(--weight-semibold);
       font-family: var(--font-display);
       color: var(--color-text);
     }
-
     .price-period {
       font-size: var(--text-sm);
       color: var(--color-text-muted);
     }
-
     .mentor-next {
       display: flex;
       align-items: center;
@@ -175,4 +172,13 @@ import { Mentor } from '../../../core/models/models';
 })
 export class MentorCardComponent {
   @Input() mentor!: Mentor;
+  @Input() requested = false;
+  @Input() requesting = false;
+  @Output() requestClicked = new EventEmitter<string>();
+
+  onRequest() {
+    if (!this.requested && !this.requesting && this.mentor.available) {
+      this.requestClicked.emit(this.mentor.id);
+    }
+  }
 }

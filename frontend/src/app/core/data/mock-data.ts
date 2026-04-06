@@ -284,9 +284,11 @@ export const MOCK_QUIZ_QUESTIONS: QuizQuestion[] = [
 ];
 
 // ── Mock Mentors ──
+// IMPORTANT: IDs must be valid UUIDs matching Keycloak user IDs
+// First mentor maps to real user haji@gmail.com in the system
 export const MOCK_MENTORS: Mentor[] = [
   {
-    id: 'm001',
+    id: 'af8e42ab-bd6f-4ff8-8b53-a3bb33bb49d4', // haji@gmail.com — real mentor
     name: 'Dr. Priya Kapoor',
     initials: 'PK',
     avatar: '',
@@ -302,7 +304,7 @@ export const MOCK_MENTORS: Mentor[] = [
     nextAvailable: 'Tomorrow, 10:00 AM'
   },
   {
-    id: 'm002',
+    id: '11111111-1111-1111-1111-111111111111', // placeholder
     name: 'James Okafor',
     initials: 'JO',
     avatar: '',
@@ -318,7 +320,7 @@ export const MOCK_MENTORS: Mentor[] = [
     nextAvailable: 'Thu, Jan 23'
   },
   {
-    id: 'm003',
+    id: '22222222-2222-2222-2222-222222222222', // placeholder
     name: 'Sofia Reyes',
     initials: 'SR',
     avatar: '',
@@ -334,7 +336,7 @@ export const MOCK_MENTORS: Mentor[] = [
     nextAvailable: 'Next Monday'
   },
   {
-    id: 'm004',
+    id: '33333333-3333-3333-3333-333333333333', // placeholder
     name: 'Raj Malhotra',
     initials: 'RM',
     avatar: '',
@@ -350,7 +352,7 @@ export const MOCK_MENTORS: Mentor[] = [
     nextAvailable: 'Today, 4:00 PM'
   },
   {
-    id: 'm005',
+    id: '44444444-4444-4444-4444-444444444444', // placeholder
     name: 'Léa Martin',
     initials: 'LM',
     avatar: '',
@@ -366,7 +368,7 @@ export const MOCK_MENTORS: Mentor[] = [
     nextAvailable: 'Tomorrow, 2:00 PM'
   },
   {
-    id: 'm006',
+    id: '55555555-5555-5555-5555-555555555555', // placeholder
     name: 'Tariq Ibrahim',
     initials: 'TI',
     avatar: '',
