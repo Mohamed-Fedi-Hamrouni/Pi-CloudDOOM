@@ -1,5 +1,10 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FullCalendarModule } from '@fullcalendar/angular';
+import { CalendarOptions, EventClickArg, EventInput } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
 import { UserApiService } from '../../../core/services/user-api.service';
@@ -8,7 +13,7 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
 @Component({
     selector: 'app-mentor-view',
     standalone: true,
-    imports: [CommonModule, SectionHeaderComponent],
+    imports: [CommonModule, SectionHeaderComponent, FullCalendarModule],
     template: `
     <div class="mentorship-page animate-fade">
 
@@ -35,6 +40,19 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
       <!-- Messages -->
       <div class="card error-card" *ngIf="errorMessage()">⚠️ {{ errorMessage() }}</div>
       <div class="card success-card" *ngIf="successMessage()">✅ {{ successMessage() }}</div>
+
+      <!-- Calendar -->
+      <div class="card">
+        <app-section-header title="My Calendar" icon="🗓️"></app-section-header>
+
+        <div class="empty-state" *ngIf="calendarEvents().length === 0">
+          <div class="empty-icon">🗓️</div>
+          <div class="empty-title">No scheduled sessions</div>
+          <div class="empty-desc">Scheduled mentorship sessions will appear here.</div>
+        </div>
+
+        <full-calendar *ngIf="calendarEvents().length > 0" [options]="calendarOptions()"></full-calendar>
+      </div>
 
       <!-- Incoming requests -->
       <div class="card">
@@ -219,6 +237,31 @@ export class MentorViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
     private userApi = inject(UserApiService);
 
+  calendarEvents = signal<EventInput[]>([]);
+  calendarOptions = signal<CalendarOptions>({
+    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    height: 'auto',
+    eventTimeFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    },
+    eventClick: (arg: EventClickArg) => {
+      const url = arg.event.url;
+      if (url) {
+        arg.jsEvent.preventDefault();
+        window.open(url, '_blank');
+      }
+    },
+    events: [],
+  });
+
     incomingRequests = signal<MentorRequest[]>([]);
     sessionMap = signal<Map<string, MentorSession>>(new Map());
     loadingRequests = signal(false);
@@ -268,6 +311,8 @@ export class MentorViewComponent implements OnInit {
       }
 
       this.loadingRequests.set(true);
+      this.sessionMap.set(new Map());
+      this.refreshCalendarEvents();
 
       this.mentorshipApi.getRequestsByMentor(userId).subscribe({
             next: (requests) => {
@@ -285,14 +330,32 @@ export class MentorViewComponent implements OnInit {
                                         newMap.set(r.id, active);
                                         return newMap;
                                     });
+                      this.refreshCalendarEvents();
                                 }
                             }
                         });
                     });
+
+            this.refreshCalendarEvents();
             },
             error: () => this.loadingRequests.set(false)
         });
     }
+
+      private refreshCalendarEvents() {
+        const sessions = Array.from(this.sessionMap().values());
+        const events: EventInput[] = sessions
+          .filter(s => s.status === 'SCHEDULED')
+          .map(s => ({
+            id: s.id,
+            title: 'Mentorship Session',
+            start: s.scheduledAt,
+            url: s.meetingLink,
+          }));
+
+        this.calendarEvents.set(events);
+        this.calendarOptions.update(opts => ({ ...opts, events }));
+      }
 
     getSession(requestId: string): MentorSession | undefined {
         return this.sessionMap().get(requestId);
@@ -372,6 +435,7 @@ export class MentorViewComponent implements OnInit {
         }).subscribe({
             next: (session) => {
                 this.sessionMap.update(map => { const m = new Map(map); m.set(requestId, session); return m; });
+            this.refreshCalendarEvents();
                 this.schedulingSession.set(false);
                 this.closeScheduleModal();
                 this.showSuccess('Session scheduled!');
@@ -411,6 +475,7 @@ export class MentorViewComponent implements OnInit {
                 }).subscribe({
                     next: (newSession) => {
                         this.sessionMap.update(map => { const m = new Map(map); m.set(requestId, newSession); return m; });
+                      this.refreshCalendarEvents();
                         this.schedulingSession.set(false);
                         this.editMode.set(false);
                         this.scheduledAt = '';
@@ -431,6 +496,7 @@ export class MentorViewComponent implements OnInit {
         this.mentorshipApi.cancelSession(sessionId).subscribe({
             next: () => {
                 this.sessionMap.update(map => { const m = new Map(map); m.delete(requestId); return m; });
+          this.refreshCalendarEvents();
                 this.viewingId.set(null);
                 this.showSuccess('Session cancelled.');
             },

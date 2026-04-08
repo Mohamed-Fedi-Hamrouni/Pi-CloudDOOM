@@ -1,5 +1,10 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FullCalendarModule } from '@fullcalendar/angular';
+import { CalendarOptions, EventClickArg, EventInput } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { MentorCardComponent } from '../../../shared/components/mentor-card/mentor-card.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
@@ -9,7 +14,7 @@ import { MentorRequest, MentorSession, Mentor } from '../../../core/models/model
 @Component({
     selector: 'app-mentee-view',
     standalone: true,
-    imports: [CommonModule, SectionHeaderComponent, MentorCardComponent],
+    imports: [CommonModule, SectionHeaderComponent, MentorCardComponent, FullCalendarModule],
     template: `
     <div class="mentorship-page animate-fade">
 
@@ -54,6 +59,19 @@ import { MentorRequest, MentorSession, Mentor } from '../../../core/models/model
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Calendar -->
+      <div class="card">
+        <app-section-header title="My Calendar" icon="🗓️"></app-section-header>
+
+        <div class="empty-state" *ngIf="calendarEvents().length === 0">
+          <div class="empty-icon">🗓️</div>
+          <div class="empty-title">No scheduled sessions</div>
+          <div class="empty-desc">Scheduled mentorship sessions will appear here.</div>
+        </div>
+
+        <full-calendar *ngIf="calendarEvents().length > 0" [options]="calendarOptions()"></full-calendar>
       </div>
 
       <!-- My requests + sessions -->
@@ -204,6 +222,31 @@ export class MenteeViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
   private userApi = inject(UserApiService);
 
+  calendarEvents = signal<EventInput[]>([]);
+  calendarOptions = signal<CalendarOptions>({
+    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    height: 'auto',
+    eventTimeFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    },
+    eventClick: (arg: EventClickArg) => {
+      const url = arg.event.url;
+      if (url) {
+        arg.jsEvent.preventDefault();
+        window.open(url, '_blank');
+      }
+    },
+    events: [],
+  });
+
     mentors: Mentor[] = [];
     myRequests = signal<MentorRequest[]>([]);
     sessionsByRequest = signal<Map<string, MentorSession[]>>(new Map());
@@ -286,6 +329,8 @@ export class MenteeViewComponent implements OnInit {
     loadMyRequests() {
       this.userApi.getCurrentUser().subscribe({
         next: (me) => {
+          this.sessionsByRequest.set(new Map());
+          this.refreshCalendarEvents();
           this.mentorshipApi.getRequestsByMentee(me.id).subscribe({
             next: (requests) => {
                 this.myRequests.set(requests);
@@ -303,15 +348,37 @@ export class MenteeViewComponent implements OnInit {
                                 // set upcoming session banner
                                 const scheduled = sessions.find(s => s.status === 'SCHEDULED');
                                 if (scheduled) this.upcomingSession.set(scheduled);
+
+                                this.refreshCalendarEvents();
                             }
                         });
                     });
+
+                this.refreshCalendarEvents();
             },
             error: () => {}
           });
         },
         error: () => {}
       });
+    }
+
+    private refreshCalendarEvents() {
+        const sessions: MentorSession[] = [];
+        for (const list of this.sessionsByRequest().values()) {
+            sessions.push(...list);
+        }
+
+        const scheduled = sessions.filter(s => s.status === 'SCHEDULED');
+        const events: EventInput[] = scheduled.map(s => ({
+            id: s.id,
+            title: 'Mentorship Session',
+            start: s.scheduledAt,
+            url: s.meetingLink,
+        }));
+
+        this.calendarEvents.set(events);
+        this.calendarOptions.update(opts => ({ ...opts, events }));
     }
 
     getSessionsForRequest(requestId: string): MentorSession[] {
@@ -364,6 +431,7 @@ export class MenteeViewComponent implements OnInit {
                     });
                     return newMap;
                 });
+          this.refreshCalendarEvents();
                 this.showSuccess('Session cancelled.');
             },
             error: () => this.showError('Failed to cancel session.')
