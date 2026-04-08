@@ -54,17 +54,15 @@ public class UserController {
     // ── CURRENT USER ──────────────────────────────────────────────────────────
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(
-            userService.findByKeycloakId(jwt.getSubject()));
+    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
     }
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateCurrentUser(
             @Valid @RequestBody UpdateUserRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        UserResponse current = userService.findByKeycloakId(jwt.getSubject());
+        UserResponse current = userService.findOrProvisionFromJwt(jwt);
         return ResponseEntity.ok(
             userService.update(current.getId(), request));
     }

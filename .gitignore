@@ -40,4 +40,7 @@ dist/
 
 # Coverage / temp
 coverage/
+
+# Postman (environments often include local credentials/tokens)
+*.postman_environment.json
 .mtj.tmp/

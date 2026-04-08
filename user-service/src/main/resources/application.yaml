@@ -77,3 +77,10 @@ logging:
 
 app:
     uploads-dir: ${APP_UPLOADS_DIR:uploads}
+
+googleai:
+    base-url: ${GOOGLE_AI_BASE_URL:https://generativelanguage.googleapis.com}
+    api-key: ${GOOGLE_AI_API_KEY:}
+    model: ${GOOGLE_AI_MODEL:gemini-flash-latest}
+    temperature: ${GOOGLE_AI_TEMPERATURE:0.4}
+    max-output-tokens: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:600}

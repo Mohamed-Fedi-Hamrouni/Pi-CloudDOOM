@@ -6,6 +6,8 @@ import { environment } from "../../../environments/environment";
 export class AuthService {
     private keycloak: Keycloak;
     private initialized = false;
+    private tokenRefreshInFlight: Promise<string> | null = null;
+    private readonly tokenRefreshTimeoutMs = 3000;
 
     constructor() {
         this.keycloak = new Keycloak({
@@ -62,9 +64,56 @@ export class AuthService {
     }
 
     getToken(): Promise<string> {
-        return this.keycloak.updateToken(30).then(() => {
-            return this.keycloak.token || "";
+        const existingToken = this.keycloak.token || "";
+
+        if (!this.initialized) {
+            return Promise.resolve(existingToken);
+        }
+        if (!this.isAuthenticated()) {
+            return Promise.resolve("");
+        }
+
+        // If we already have a token, don't block the request waiting for refresh.
+        // Kick off refresh in background and return the current token immediately.
+        if (existingToken) {
+            if (!this.tokenRefreshInFlight) {
+                this.tokenRefreshInFlight = this.keycloak
+                    .updateToken(30)
+                    .then(() => this.keycloak.token || existingToken)
+                    .catch((err) => {
+                        console.warn("Keycloak updateToken failed; using existing token", err);
+                        return this.keycloak.token || existingToken;
+                    })
+                    .finally(() => {
+                        this.tokenRefreshInFlight = null;
+                    });
+            }
+            return Promise.resolve(existingToken);
+        }
+
+        // No token yet: attempt a refresh, but never hang forever.
+        if (this.tokenRefreshInFlight) {
+            return this.tokenRefreshInFlight;
+        }
+
+        const refreshPromise = this.keycloak
+            .updateToken(30)
+            .then(() => this.keycloak.token || "")
+            .catch((err) => {
+                console.warn("Keycloak updateToken failed; no token available", err);
+                return this.keycloak.token || "";
+            });
+
+        this.tokenRefreshInFlight = Promise.race([
+            refreshPromise,
+            new Promise<string>((resolve) => {
+                window.setTimeout(() => resolve(""), this.tokenRefreshTimeoutMs);
+            }),
+        ]).finally(() => {
+            this.tokenRefreshInFlight = null;
         });
+
+        return this.tokenRefreshInFlight;
     }
 
     getTokenParsed(): any {
@@ -97,5 +146,25 @@ export class AuthService {
 
     getLastName(): string {
         return this.keycloak.tokenParsed?.["family_name"] || "";
+    }
+    loginWithGoogle(): void {
+        this.keycloak.login({
+            idpHint: "google",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithLinkedIn(): void {
+        this.keycloak.login({
+            idpHint: "linkedin-openid-connect",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithGitHub(): void {
+        this.keycloak.login({
+            idpHint: "github",
+            redirectUri: window.location.origin + "/dashboard",
+        });
     }
 }

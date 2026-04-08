@@ -112,7 +112,7 @@ export class ShellComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((user) => {
                 this.currentUser = user;
-                this.cdr.detectChanges();
+                this.cdr.markForCheck();
             });
 
         this.currentUserStore

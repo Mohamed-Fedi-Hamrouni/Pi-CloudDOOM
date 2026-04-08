@@ -30,6 +30,9 @@ import com.microservice.userservice.messaging.producer.UserEventProducer;
 import com.microservice.userservice.model.User;
 import com.microservice.userservice.repository.UserRepository;
 
+import org.springframework.security.oauth2.jwt.Jwt;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -364,5 +367,54 @@ private List<String> deserializeSkills(String skillsJson) {
         log.warn("Failed to deserialize skills for payload", exception);
         return List.of();
     }
+}
+
+@Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users-by-keycloak", key = "#jwt.subject"),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+public UserResponse findOrProvisionFromJwt(Jwt jwt) {
+    String keycloakId = jwt.getSubject();
+    String email      = jwt.getClaimAsString("email");
+
+    // 1. Already exists → update lastLogin and return
+    Optional<User> existing = userRepository.findByKeycloakId(keycloakId)
+            .filter(u -> u.getDeletedAt() == null);
+    if (existing.isPresent()) {
+        User u = existing.get();
+        u.setLastLoginAt(LocalDateTime.now());
+        return toResponseWithSkills(userRepository.save(u));
+    }
+
+    // 2. Same email but different keycloakId (edge: account linking race)
+    //    → re-key to the new sub so we don't create a duplicate
+    if (email != null) {
+        Optional<User> byEmail = userRepository.findByEmail(email)
+                .filter(u -> u.getDeletedAt() == null);
+        if (byEmail.isPresent()) {
+            User u = byEmail.get();
+            u.setKeycloakId(keycloakId);   // re-link
+            u.setLastLoginAt(LocalDateTime.now());
+            log.info("Re-linked existing user {} to new keycloakId {}", u.getId(), keycloakId);
+            return toResponseWithSkills(userRepository.save(u));
+        }
+    }
+
+    // 3. Brand-new social user → auto-create
+    User user = User.builder()
+            .keycloakId(keycloakId)
+            .email(email != null ? email : keycloakId + "@social.local")
+            .firstName(jwt.getClaimAsString("given_name"))
+            .lastName(jwt.getClaimAsString("family_name"))
+            .role(RoleEnum.USER)
+            .status(UserStatus.PENDING_VERIFICATION)
+            .lastLoginAt(LocalDateTime.now())
+            .build();
+
+    User saved = userRepository.save(user);
+    eventProducer.publishUserCreated(saved);
+    log.info("Auto-provisioned social user {} from keycloakId {}", saved.getId(), keycloakId);
+    return toResponseWithSkills(saved);
 }
 }
