@@ -13,23 +13,38 @@ services:
             - ./db/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init.sh
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 20s
 
+    pgadmin:
+        image: dpage/pgadmin4:latest
+        container_name: userservice-pgadmin
+        restart: unless-stopped
         ports:
             - "5050:80"
         environment:
             PGADMIN_DEFAULT_EMAIL: admin@example.com
             PGADMIN_DEFAULT_PASSWORD: admin123
+        depends_on:
             postgres:
                 condition: service_healthy
     redis:
         image: redis:7-alpine
-                [
-                    "CMD",
-                    "redis-cli",
-                    "-a",
-                    "${REDIS_PASSWORD:-devpassword}",
-                    "ping",
-                ]
+        container_name: userservice-redis
+        restart: unless-stopped
+        ports:
+            - "${REDIS_PORT:-6379}:6379"
+        command: >
+            redis-server
+            --requirepass ${REDIS_PASSWORD:-devpassword}
+            --maxmemory 256mb
+            --maxmemory-policy allkeys-lru
+        volumes:
+            - redisdata:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-devpassword}", "ping"]
             interval: 10s
             timeout: 5s
             retries: 5
@@ -42,27 +57,7 @@ services:
 
     zookeeper:
         image: confluentinc/cp-zookeeper:7.5.0
-
-        mentorship-service:
-            build:
-                context: ../mentorship-service
-                dockerfile: Dockerfile
-            container_name: userservice-mentorship
-            restart: unless-stopped
-            depends_on:
-                postgres:
-                    condition: service_healthy
-                keycloak:
-                    condition: service_started
-            ports:
-                - "${MENTORSHIP_SERVICE_PORT:-8084}:8084"
-            environment:
-                SERVER_PORT: 8084
-                SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mentorship_db
-                SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-                SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
-                SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
-                SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+        container_name: userservice-zookeeper
         restart: unless-stopped
         environment:
             ZOOKEEPER_CLIENT_PORT: 2181
