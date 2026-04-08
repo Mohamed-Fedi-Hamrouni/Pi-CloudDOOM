@@ -53,8 +53,15 @@ public class UserEventProducer {
         UserEvent event = UserEvent.from(eventType, user);
         String key = user.getId().toString();
 
-        CompletableFuture<SendResult<String, UserEvent>> future =
-            kafkaTemplate.send(topic, key, event);
+        final CompletableFuture<SendResult<String, UserEvent>> future;
+        try {
+            future = kafkaTemplate.send(topic, key, event);
+        } catch (Exception exception) {
+            // Publishing should not break the user-service API (especially in local/dev Docker stacks).
+            log.error("Failed to publish {} event for user {} (send threw): {}",
+                eventType, user.getId(), exception.getMessage());
+            return;
+        }
 
         future.whenComplete((result, ex) -> {
             if (ex != null) {

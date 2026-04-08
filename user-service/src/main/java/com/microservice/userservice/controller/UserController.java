@@ -150,7 +150,7 @@ public class UserController {
     }
 
     @GetMapping("/by-role")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<UserResponse>> getUsersByRole(
             @RequestParam RoleEnum role,
             Pageable pageable) {
@@ -172,5 +172,13 @@ public ResponseEntity<Page<UserResponse>> getDeletedUsers(Pageable pageable) {
 @PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public ResponseEntity<UserResponse> restoreUser(@PathVariable UUID id) {
     return ResponseEntity.ok(userService.restoreUser(id));
+}
+
+@PatchMapping("/{id}/availability")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<UserResponse> toggleAvailability(
+        @PathVariable UUID id,
+        @RequestParam UserStatus status) {
+    return ResponseEntity.ok(userService.updateStatus(id, status));
 }
 }

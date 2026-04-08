@@ -60,4 +60,11 @@ export class UserApiService {
             formData,
         );
     }
+
+    toggleAvailability(userId: string, status: string): Observable<UserProfile> {
+        return this.http.patch<UserProfile>(
+            `${this.apiUrl}/api/users/${userId}/availability?status=${status}`,
+            {}
+        );
+    }
 }

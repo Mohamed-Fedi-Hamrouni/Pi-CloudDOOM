@@ -14,6 +14,11 @@ export class MentorshipApiService {
     private http = inject(HttpClient);
     private api = environment.mentorshipApiUrl;
 
+    getMentors(): Observable<any> {
+        // This returns a paginated response from user-service
+        return this.http.get<any>(`${environment.apiUrl}/api/users/by-role?role=MENTOR`);
+    }
+
     sendRequest(dto: CreateMentorRequestDTO): Observable<MentorRequest> {
         return this.http.post<MentorRequest>(`${this.api}/api/mentor-requests`, dto);
     }
