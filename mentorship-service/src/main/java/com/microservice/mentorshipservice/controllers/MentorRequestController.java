@@ -2,7 +2,7 @@ package com.microservice.mentorshipservice.controllers;
 
 import com.microservice.mentorshipservice.DTOs.MentorRequestDTO;
 import com.microservice.mentorshipservice.DTOs.MentorRequestResponseDTO;
-import com.microservice.mentorshipservice.entities.MentorRequest;
+import com.microservice.mentorshipservice.clients.UserServiceClient;
 import com.microservice.mentorshipservice.services.MentorRequestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +21,18 @@ public class MentorRequestController {
     @Autowired
     private MentorRequestService service;
 
+    @Autowired
+    private UserServiceClient userServiceClient;
+
     // CREATE
     @PreAuthorize("hasRole('ROLE_USER')")
     @PostMapping
     public ResponseEntity<MentorRequestResponseDTO> create(
             @RequestBody MentorRequestDTO dto,
-            @AuthenticationPrincipal Jwt jwt) {           // ADD JWT parameter
-        UUID menteeId = UUID.fromString(jwt.getSubject()); // extract from token — don't trust client
+            @AuthenticationPrincipal Jwt jwt) {
+        // Use user-service UUIDs for both mentorId and menteeId.
+        // Authorization header is propagated to Feign via FeignClientInterceptor.
+        UUID menteeId = userServiceClient.getCurrentUser().getId();
         return ResponseEntity.ok(service.createRequest(dto, menteeId));
     }
 

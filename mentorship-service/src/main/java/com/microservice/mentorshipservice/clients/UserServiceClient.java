@@ -10,6 +10,9 @@ import java.util.UUID;
 @FeignClient(name = "user-service", url = "http://user-service:8081")
 public interface UserServiceClient {
 
+    @GetMapping("/api/users/me")
+    UserResponse getCurrentUser();
+
     @GetMapping("/api/users/{id}")
     UserResponse getUserById(@PathVariable UUID id);
 }

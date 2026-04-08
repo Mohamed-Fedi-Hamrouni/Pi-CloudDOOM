@@ -2,7 +2,6 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
-import { AuthService } from '../../../core/auth/auth.service';
 import { UserApiService } from '../../../core/services/user-api.service';
 import { MentorRequest, MentorSession } from '../../../core/models/models';
 
@@ -218,7 +217,6 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
 })
 export class MentorViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
-    private authService = inject(AuthService);
     private userApi = inject(UserApiService);
 
     incomingRequests = signal<MentorRequest[]>([]);
@@ -257,11 +255,21 @@ export class MentorViewComponent implements OnInit {
     }
 
     loadIncomingRequests() {
-        const keycloakId = this.authService.getKeycloakId();
-        if (!keycloakId) return;
-        this.loadingRequests.set(true);
+      const userId = this.currentUserId();
+      if (!userId) {
+        this.userApi.getCurrentUser().subscribe({
+          next: (me) => {
+            this.currentUserId.set(me.id);
+            this.loadIncomingRequests();
+          },
+          error: () => this.showError('Failed to load profile.')
+        });
+        return;
+      }
 
-        this.mentorshipApi.getRequestsByMentor(keycloakId).subscribe({
+      this.loadingRequests.set(true);
+
+      this.mentorshipApi.getRequestsByMentor(userId).subscribe({
             next: (requests) => {
                 this.incomingRequests.set(requests);
                 this.loadingRequests.set(false);

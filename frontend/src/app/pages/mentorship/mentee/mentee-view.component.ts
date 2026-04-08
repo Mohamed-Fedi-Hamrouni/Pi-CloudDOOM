@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { MentorCardComponent } from '../../../shared/components/mentor-card/mentor-card.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
-import { AuthService } from '../../../core/auth/auth.service';
+import { UserApiService } from '../../../core/services/user-api.service';
 import { MentorRequest, MentorSession, Mentor } from '../../../core/models/models';
 
 @Component({
@@ -202,7 +202,7 @@ import { MentorRequest, MentorSession, Mentor } from '../../../core/models/model
 })
 export class MenteeViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
-    private authService = inject(AuthService);
+  private userApi = inject(UserApiService);
 
     mentors: Mentor[] = [];
     myRequests = signal<MentorRequest[]>([]);
@@ -284,10 +284,9 @@ export class MenteeViewComponent implements OnInit {
     }
 
     loadMyRequests() {
-        const keycloakId = this.authService.getKeycloakId();
-        if (!keycloakId) return;
-
-        this.mentorshipApi.getRequestsByMentee(keycloakId).subscribe({
+      this.userApi.getCurrentUser().subscribe({
+        next: (me) => {
+          this.mentorshipApi.getRequestsByMentee(me.id).subscribe({
             next: (requests) => {
                 this.myRequests.set(requests);
                 // load sessions for each accepted request
@@ -309,7 +308,10 @@ export class MenteeViewComponent implements OnInit {
                     });
             },
             error: () => {}
-        });
+          });
+        },
+        error: () => {}
+      });
     }
 
     getSessionsForRequest(requestId: string): MentorSession[] {
