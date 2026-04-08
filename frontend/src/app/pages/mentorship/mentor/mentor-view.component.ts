@@ -6,6 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
+import { JitsiMeetComponent } from '../../../shared/components/jitsi-meet/jitsi-meet.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
 import { UserApiService } from '../../../core/services/user-api.service';
 import { MentorRequest, MentorSession } from '../../../core/models/models';
@@ -13,7 +14,7 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
 @Component({
     selector: 'app-mentor-view',
     standalone: true,
-    imports: [CommonModule, SectionHeaderComponent, FullCalendarModule],
+    imports: [CommonModule, SectionHeaderComponent, FullCalendarModule, JitsiMeetComponent],
     template: `
     <div class="mentorship-page animate-fade">
 
@@ -40,6 +41,15 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
       <!-- Messages -->
       <div class="card error-card" *ngIf="errorMessage()">⚠️ {{ errorMessage() }}</div>
       <div class="card success-card" *ngIf="successMessage()">✅ {{ successMessage() }}</div>
+
+      <!-- Embedded meeting -->
+      <div class="card" *ngIf="activeRoomName()">
+        <app-section-header title="Live Session" icon="🎥"></app-section-header>
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem;">
+          <button class="btn btn-ghost btn-sm" (click)="closeJitsi()">Close</button>
+        </div>
+        <app-jitsi-meet [roomName]="activeRoomName()!" [displayName]="displayName()"></app-jitsi-meet>
+      </div>
 
       <!-- Calendar -->
       <div class="card">
@@ -143,11 +153,8 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
                     </span>
                   </div>
                   <div class="session-row">
-                    <span class="session-label">🔗 Meeting Link</span>
-                    <a [href]="getSession(req.id)!.meetingLink"
-                      target="_blank" class="session-link">
-                      {{ getSession(req.id)!.meetingLink }}
-                    </a>
+                    <span class="session-label">🎥 Room Name</span>
+                    <span class="session-value">{{ getSession(req.id)!.meetingLink }}</span>
                   </div>
                   <div class="session-row">
                     <span class="session-label">📊 Status</span>
@@ -159,13 +166,22 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
                     ✏️ Edit
                   </button>
                   <button class="btn btn-ghost btn-sm"
+                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
                     (click)="cancelActiveSession(getSession(req.id)!.id, req.id)">
                     🗑 Cancel Session
                   </button>
-                  <a [href]="getSession(req.id)!.meetingLink"
-                    target="_blank" class="btn btn-teal btn-sm">
-                    🚀 Join Call
-                  </a>
+                  <button class="btn btn-teal btn-sm"
+                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
+                    [disabled]="!canJoin(getSession(req.id)!) || completingRequestId() === req.id"
+                    (click)="completeActiveSession(getSession(req.id)!.id, req.id)">
+                    {{ completingRequestId() === req.id ? '...' : '✅ Complete' }}
+                  </button>
+                  <button class="btn btn-primary btn-sm"
+                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
+                    [disabled]="!canJoin(getSession(req.id)!)"
+                    (click)="openJitsi(getSession(req.id)!)">
+                    Join
+                  </button>
                 </div>
               </ng-container>
 
@@ -178,9 +194,9 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
                       (change)="scheduledAt = $any($event.target).value">
                   </div>
                   <div class="form-group">
-                    <label class="form-label">New Meeting Link</label>
-                    <input type="url" class="input"
-                      placeholder="https://meet.google.com/..."
+                    <label class="form-label">Room Name</label>
+                    <input type="text" class="input"
+                      placeholder="mentorship-..."
                       [value]="meetingLink"
                       (input)="meetingLink = $any($event.target).value">
                   </div>
@@ -212,9 +228,9 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
               (change)="scheduledAt = $any($event.target).value">
           </div>
           <div class="form-group">
-            <label class="form-label">Meeting Link</label>
-            <input type="url" class="input"
-              placeholder="https://meet.google.com/..."
+            <label class="form-label">Room Name</label>
+            <input type="text" class="input"
+              placeholder="mentorship-..."
               [value]="meetingLink"
               (input)="meetingLink = $any($event.target).value">
           </div>
@@ -253,11 +269,8 @@ export class MentorViewComponent implements OnInit {
       hour12: false,
     },
     eventClick: (arg: EventClickArg) => {
-      const url = arg.event.url;
-      if (url) {
-        arg.jsEvent.preventDefault();
-        window.open(url, '_blank');
-      }
+      // No external navigation: sessions are joined in-app via Jitsi embed.
+      arg.jsEvent.preventDefault();
     },
     events: [],
   });
@@ -268,6 +281,7 @@ export class MentorViewComponent implements OnInit {
     processingId = signal<string | null>(null);
     schedulingRequestId = signal<string | null>(null);
     schedulingSession = signal(false);
+    completingRequestId = signal<string | null>(null);
     viewingId = signal<string | null>(null);
     editMode = signal(false);
     errorMessage = signal<string | null>(null);
@@ -275,8 +289,28 @@ export class MentorViewComponent implements OnInit {
     isAvailable = signal(true);
     togglingAvailability = signal(false);
     currentUserId = signal<string | null>(null);
+    displayName = signal<string>('');
+    activeRoomName = signal<string | null>(null);
     scheduledAt = '';
     meetingLink = '';
+
+    private generateRoomName(): string {
+      try {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        const base64 = btoa(String.fromCharCode(...Array.from(bytes)));
+        const base64url = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        return `mentorship-${base64url}`;
+      } catch {
+        return `mentorship-${Date.now()}`;
+      }
+    }
+
+    private ensureMeetingLinkPrefilled() {
+      if (!this.meetingLink || !this.meetingLink.trim()) {
+        this.meetingLink = this.generateRoomName();
+      }
+    }
 
     get pendingCount() {
         return () => this.incomingRequests().filter(r => r.status === 'PENDING').length;
@@ -292,9 +326,29 @@ export class MentorViewComponent implements OnInit {
             next: (user) => {
                 this.currentUserId.set(user.id);
                 this.isAvailable.set(user.status === 'ACTIVE');
+          this.displayName.set(`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User');
             },
         error: () => this.showError('Failed to load profile.')
         });
+    }
+
+    canJoin(session: MentorSession): boolean {
+      const start = new Date(session.scheduledAt).getTime();
+      const now = Date.now();
+        return now >= start;
+    }
+
+    openJitsi(session: MentorSession) {
+      const room = (session.meetingLink || '').trim();
+      if (!room) {
+        this.showError('Room name not set.');
+        return;
+      }
+      this.activeRoomName.set(room);
+    }
+
+    closeJitsi() {
+      this.activeRoomName.set(null);
     }
 
     loadIncomingRequests() {
@@ -350,7 +404,6 @@ export class MentorViewComponent implements OnInit {
             id: s.id,
             title: 'Mentorship Session',
             start: s.scheduledAt,
-            url: s.meetingLink,
           }));
 
         this.calendarEvents.set(events);
@@ -415,6 +468,7 @@ export class MentorViewComponent implements OnInit {
         this.viewingId.set(null);
         this.scheduledAt = '';
         this.meetingLink = '';
+      this.ensureMeetingLinkPrefilled();
     }
 
     closeScheduleModal() {
@@ -452,6 +506,7 @@ export class MentorViewComponent implements OnInit {
         if (!session) return;
         this.scheduledAt = session.scheduledAt.slice(0, 16);
         this.meetingLink = session.meetingLink;
+      this.ensureMeetingLinkPrefilled();
         this.editMode.set(true);
     }
 
@@ -502,6 +557,31 @@ export class MentorViewComponent implements OnInit {
             },
             error: () => this.showError('Failed to cancel session.')
         });
+    }
+
+    completeActiveSession(sessionId: string, requestId: string) {
+      this.completingRequestId.set(requestId);
+      this.mentorshipApi.completeSession(sessionId).subscribe({
+        next: (updated) => {
+          this.sessionMap.update(map => {
+            const m = new Map(map);
+            m.set(requestId, updated);
+            return m;
+          });
+          this.refreshCalendarEvents();
+
+          if (this.activeRoomName() && (updated.meetingLink || '').trim() === this.activeRoomName()) {
+            this.closeJitsi();
+          }
+
+          this.completingRequestId.set(null);
+          this.showSuccess('Session completed.');
+        },
+        error: () => {
+          this.completingRequestId.set(null);
+          this.showError('Failed to complete session.');
+        }
+      });
     }
 
     toggleAvailability() {

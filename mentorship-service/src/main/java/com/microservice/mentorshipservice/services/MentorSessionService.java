@@ -9,12 +9,16 @@ import com.microservice.mentorshipservice.repository.MentorSessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class MentorSessionService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
     private MentorSessionRepository sessionRepository;
@@ -42,10 +46,24 @@ public class MentorSessionService {
         MentorSession session = new MentorSession();
         session.setRequestId(requestId);
         session.setScheduledAt(scheduledAt);
-        session.setMeetingLink(meetingLink);
+        session.setMeetingLink(normalizeOrGenerateRoomName(meetingLink));
         session.setStatus(SessionStatus.SCHEDULED);
 
         return sessionRepository.save(session);
+    }
+
+    private String normalizeOrGenerateRoomName(String meetingLink) {
+        if (meetingLink != null) {
+            String trimmed = meetingLink.trim();
+            if (!trimmed.isEmpty()) {
+                return trimmed;
+            }
+        }
+
+        byte[] bytes = new byte[16];
+        SECURE_RANDOM.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return "mentorship-" + token;
     }
 
     // GET SESSIONS BY REQUEST
