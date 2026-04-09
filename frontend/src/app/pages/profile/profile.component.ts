@@ -891,12 +891,27 @@ export class ProfileComponent implements OnInit {
                 updated.skills = updated.skills || [];
                 this.user = updated;
                 this.currentUserStore.setCurrentUser(updated);
+
+                this.selectedSkills = [...updated.skills];
+                this.editForm.skills = [...updated.skills];
+
+                this.experiences = this.parseExperiences(
+                    updated.experiencesJson,
+                );
+                this.educations = this.parseEducations(updated.educationsJson);
+
+                if (this.editing) {
+                    this.editForm.bio = updated.bio || "";
+                }
+
                 this.selectedCvFileName = this.extractFileNameFromUrl(
                     updated.cvUrl || null,
                 );
+
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
                 this.refreshCompletion();
+                this.syncPreferences();
                 this.cdr.markForCheck();
             },
             error: (err) => {
@@ -919,15 +934,17 @@ export class ProfileComponent implements OnInit {
 
     getCvLink(): string {
         const cvUrl = this.user?.cvUrl;
-        if (!cvUrl) {
-            return "";
-        }
+        if (!cvUrl) return "";
 
         if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
             return cvUrl;
         }
 
-        return `${environment.apiUrl}${cvUrl}`;
+        if (cvUrl.startsWith("/uploads/")) {
+            return `${environment.apiUrl}${cvUrl}`;
+        }
+
+        return `${environment.apiUrl}/uploads/${cvUrl}`;
     }
 
     private extractFileNameFromUrl(cvUrl: string | null): string {
