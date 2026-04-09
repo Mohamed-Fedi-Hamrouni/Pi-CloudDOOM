@@ -8,8 +8,9 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { JitsiMeetComponent } from '../../../shared/components/jitsi-meet/jitsi-meet.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
-import { UserApiService } from '../../../core/services/user-api.service';
+import { UserApiService, UserProfile } from '../../../core/services/user-api.service';
 import { MentorRequest, MentorSession } from '../../../core/models/models';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
 
 @Component({
     selector: 'app-mentor-view',
@@ -87,7 +88,7 @@ import { MentorRequest, MentorSession } from '../../../core/models/models';
                   style="width:40px;height:40px;font-size:0.85rem;">U</div>
               </div>
               <div class="request-info">
-                <span class="request-mentor">Mentee ID: {{ req.menteeId }}</span>
+                <span class="request-mentor" [title]="req.menteeId">Mentee: {{ userLabel(req.menteeId) }}</span>
                 <span class="request-date">{{ req.createdAt | date:'mediumDate' }}</span>
               </div>
               <span class="chip"
@@ -253,6 +254,8 @@ export class MentorViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
     private userApi = inject(UserApiService);
 
+    private userNameById = signal<Record<string, string>>({});
+
   calendarEvents = signal<EventInput[]>([]);
   calendarOptions = signal<CalendarOptions>({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -371,6 +374,7 @@ export class MentorViewComponent implements OnInit {
       this.mentorshipApi.getRequestsByMentor(userId).subscribe({
             next: (requests) => {
                 this.incomingRequests.set(requests);
+            this.prefetchUserNames(requests.map(r => r.menteeId));
                 this.loadingRequests.set(false);
                 requests
                     .filter(r => r.status === 'ACCEPTED')
@@ -395,6 +399,35 @@ export class MentorViewComponent implements OnInit {
             error: () => this.loadingRequests.set(false)
         });
     }
+
+        userLabel(userId: string): string {
+          if (!userId) return '';
+          return this.userNameById()[userId] || userId;
+        }
+
+        private prefetchUserNames(userIds: string[]): void {
+          const existing = this.userNameById();
+          const unique = Array.from(new Set((userIds || []).filter(Boolean)));
+          const missing = unique.filter(id => !existing[id]);
+          if (missing.length === 0) return;
+
+          const calls: Record<string, Observable<UserProfile | null>> = {};
+          for (const id of missing) {
+            calls[id] = this.userApi.getUserById(id).pipe(catchError(() => of(null)));
+          }
+
+          forkJoin(calls).subscribe((result) => {
+            const additions: Record<string, string> = {};
+            for (const [id, profile] of Object.entries(result)) {
+              if (!profile) continue;
+              const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+              additions[id] = fullName || profile.email || id;
+            }
+
+            if (Object.keys(additions).length === 0) return;
+            this.userNameById.update((curr) => ({ ...curr, ...additions }));
+          });
+        }
 
       private refreshCalendarEvents() {
         const sessions = Array.from(this.sessionMap().values());

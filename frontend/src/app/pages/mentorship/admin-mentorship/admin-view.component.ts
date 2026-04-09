@@ -1,10 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { forkJoin } from 'rxjs';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { SectionHeaderComponent } from '../../../shared/components/section-header/section-header.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
 import { MentorRequest, MentorSession } from '../../../core/models/models';
+import { UserApiService, UserProfile } from '../../../core/services/user-api.service';
 
 type RequestStatus = MentorRequest['status'];
 type SessionStatus = MentorSession['status'];
@@ -88,16 +89,16 @@ type SessionStatus = MentorSession['status'];
 					<table class="admin-table">
 						<thead>
 							<tr>
-								<th>Mentee ID</th>
-								<th>Mentor ID</th>
+								<th>Mentee</th>
+								<th>Mentor</th>
 								<th>Status</th>
 								<th>Date</th>
 							</tr>
 						</thead>
 						<tbody>
 							<tr *ngFor="let r of filteredRequests(); trackBy: trackById">
-								<td class="mono">{{ r.menteeId }}</td>
-								<td class="mono">{{ r.mentorId }}</td>
+								<td [title]="r.menteeId">{{ userLabel(r.menteeId) }}</td>
+								<td [title]="r.mentorId">{{ userLabel(r.mentorId) }}</td>
 								<td>
 									<span class="chip"
 										[class.chip-neutral]="r.status === 'PENDING'"
@@ -172,6 +173,9 @@ type SessionStatus = MentorSession['status'];
 })
 export class AdminViewComponent implements OnInit {
 	private mentorshipApi = inject(MentorshipApiService);
+	private userApi = inject(UserApiService);
+
+	private userNameById = signal<Record<string, string>>({});
 
 	loading = signal(false);
 	errorMessage = signal<string | null>(null);
@@ -199,12 +203,45 @@ export class AdminViewComponent implements OnInit {
 				next: ({ requests, sessions }) => {
 					this.requests.set(this.sortByDateDesc(requests, r => r.createdAt));
 					this.sessions.set(this.sortByDateDesc(sessions, s => s.scheduledAt));
+					this.prefetchUserNames([
+						...requests.map(r => r.menteeId),
+						...requests.map(r => r.mentorId)
+					]);
 				},
 				error: (err) => {
 					const message = err?.error?.message || err?.message || 'Failed to load mentorship admin data.';
 					this.errorMessage.set(message);
 				}
 			});
+	}
+
+	userLabel(userId: string): string {
+		if (!userId) return '';
+		return this.userNameById()[userId] || userId;
+	}
+
+	private prefetchUserNames(userIds: string[]): void {
+		const existing = this.userNameById();
+		const unique = Array.from(new Set((userIds || []).filter(Boolean)));
+		const missing = unique.filter(id => !existing[id]);
+		if (missing.length === 0) return;
+
+		const calls: Record<string, Observable<UserProfile | null>> = {};
+		for (const id of missing) {
+			calls[id] = this.userApi.getUserById(id).pipe(catchError(() => of(null)));
+		}
+
+		forkJoin(calls).subscribe((result) => {
+			const additions: Record<string, string> = {};
+			for (const [id, profile] of Object.entries(result)) {
+				if (!profile) continue;
+				const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+				additions[id] = fullName || profile.email || id;
+			}
+
+			if (Object.keys(additions).length === 0) return;
+			this.userNameById.update((curr) => ({ ...curr, ...additions }));
+		});
 	}
 
 	totalRequests(): number {

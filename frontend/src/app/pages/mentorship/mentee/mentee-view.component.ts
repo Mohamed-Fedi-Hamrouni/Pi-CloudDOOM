@@ -9,8 +9,9 @@ import { SectionHeaderComponent } from '../../../shared/components/section-heade
 import { MentorCardComponent } from '../../../shared/components/mentor-card/mentor-card.component';
 import { JitsiMeetComponent } from '../../../shared/components/jitsi-meet/jitsi-meet.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
-import { UserApiService } from '../../../core/services/user-api.service';
+import { UserApiService, UserProfile } from '../../../core/services/user-api.service';
 import { MentorRequest, MentorSession, Mentor } from '../../../core/models/models';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
 
 @Component({
     selector: 'app-mentee-view',
@@ -96,7 +97,7 @@ import { MentorRequest, MentorSession, Mentor } from '../../../core/models/model
             <!-- Request row -->
             <div class="request-item">
               <div class="request-info">
-                <span class="request-mentor">Mentor ID: {{ req.mentorId }}</span>
+                <span class="request-mentor" [title]="req.mentorId">Mentor: {{ userLabel(req.mentorId) }}</span>
                 <span class="chip"
                   [class.chip-teal]="req.status === 'ACCEPTED'"
                   [class.chip-neutral]="req.status === 'PENDING'"
@@ -224,6 +225,8 @@ export class MenteeViewComponent implements OnInit {
     private mentorshipApi = inject(MentorshipApiService);
   private userApi = inject(UserApiService);
 
+  private userNameById = signal<Record<string, string>>({});
+
   displayName = signal<string>('');
   activeRoomName = signal<string | null>(null);
 
@@ -335,6 +338,7 @@ export class MenteeViewComponent implements OnInit {
           this.mentorshipApi.getRequestsByMentee(me.id).subscribe({
             next: (requests) => {
                 this.myRequests.set(requests);
+                this.prefetchUserNames(requests.map(r => r.mentorId));
                 // load sessions for each accepted request
                 requests
                     .filter(r => r.status === 'ACCEPTED')
@@ -363,6 +367,35 @@ export class MenteeViewComponent implements OnInit {
         error: () => {}
       });
     }
+
+        userLabel(userId: string): string {
+          if (!userId) return '';
+          return this.userNameById()[userId] || userId;
+        }
+
+        private prefetchUserNames(userIds: string[]): void {
+          const existing = this.userNameById();
+          const unique = Array.from(new Set((userIds || []).filter(Boolean)));
+          const missing = unique.filter(id => !existing[id]);
+          if (missing.length === 0) return;
+
+          const calls: Record<string, Observable<UserProfile | null>> = {};
+          for (const id of missing) {
+            calls[id] = this.userApi.getUserById(id).pipe(catchError(() => of(null)));
+          }
+
+          forkJoin(calls).subscribe((result) => {
+            const additions: Record<string, string> = {};
+            for (const [id, profile] of Object.entries(result)) {
+              if (!profile) continue;
+              const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+              additions[id] = fullName || profile.email || id;
+            }
+
+            if (Object.keys(additions).length === 0) return;
+            this.userNameById.update((curr) => ({ ...curr, ...additions }));
+          });
+        }
 
     private refreshCalendarEvents() {
         const sessions: MentorSession[] = [];
