@@ -71,6 +71,10 @@ public class MentorSessionService {
         return sessionRepository.findByRequestId(requestId);
     }
 
+    public List<MentorSession> getAllSessions() {
+        return sessionRepository.findAll();
+    }
+
     // UPDATE SESSION STATUS
     public MentorSession completeSession(UUID sessionId) {
         MentorSession session = sessionRepository.findById(sessionId)

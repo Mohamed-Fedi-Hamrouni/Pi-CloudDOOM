@@ -37,6 +37,12 @@ public class MentorRequestController {
     }
 
     // READ
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping
+    public List<MentorRequestResponseDTO> getAll() {
+        return service.getAllRequests();
+    }
+
     @PreAuthorize("hasAnyRole('ROLE_USER','ROLE_MENTOR')")
     @GetMapping("/mentee/{id}")
     public List<MentorRequestResponseDTO> getByMentee(@PathVariable UUID id) {  // return DTO not entity

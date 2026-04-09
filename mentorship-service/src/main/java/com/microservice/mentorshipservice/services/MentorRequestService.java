@@ -60,6 +60,11 @@ public class MentorRequestService {
                 .stream().map(this::toDTO).collect(Collectors.toList());
     }
 
+    public List<MentorRequestResponseDTO> getAllRequests() {
+        return repository.findAll()
+                .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
     // UPDATE (ACCEPT)
     public MentorRequestResponseDTO acceptRequest(UUID id) {
         MentorRequest request = repository.findById(id)

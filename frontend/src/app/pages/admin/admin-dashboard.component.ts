@@ -25,6 +25,7 @@ import {
     UserBadgeResponse,
     UserXPTrackerResponse,
 } from "../../core/models/training.models";
+import { AdminViewComponent } from "../mentorship/admin-mentorship/admin-view.component";
 
 interface UserItem {
     id: string;
@@ -48,13 +49,13 @@ interface UserItem {
     lastLoginAt: string;
 }
 
-type AdminTab = "users" | "interviews" | "training";
+type AdminTab = "users" | "interviews" | "training" | "mentorship";
 
 @Component({
     selector: "app-admin-dashboard",
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [CommonModule, FormsModule],
+    imports: [CommonModule, FormsModule, AdminViewComponent],
     template: `
         <div class="admin-panel">
             <!-- Tab switcher -->
@@ -79,6 +80,13 @@ type AdminTab = "users" | "interviews" | "training";
                     (click)="setTab('training')"
                 >
                     🎯 Training
+                </button>
+                <button
+                    class="adm-tab"
+                    [class.active]="activeTab === 'mentorship'"
+                    (click)="setTab('mentorship')"
+                >
+                    🤝 Mentorship
                 </button>
             </div>
 
@@ -750,6 +758,11 @@ type AdminTab = "users" | "interviews" | "training";
                         </ng-container>
                     </div>
                 </ng-container>
+            </ng-container>
+
+            <!-- ════════════════════ MENTORSHIP TAB ════════════════════ -->
+            <ng-container *ngIf="activeTab === 'mentorship'">
+                <app-admin-mentorship-view></app-admin-mentorship-view>
             </ng-container>
 
             <!-- ════════════════════ TRAINING TAB ════════════════════ -->

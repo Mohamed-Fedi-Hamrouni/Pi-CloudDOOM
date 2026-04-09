@@ -28,6 +28,12 @@ public class MentorSessionController {
     }
 
     // READ
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping
+    public List<MentorSession> getAll() {
+        return service.getAllSessions();
+    }
+
     @PreAuthorize("hasAnyRole('USER','MENTOR')") // ADD
     @GetMapping("/request/{requestId}")
     public List<MentorSession> getByRequest(@PathVariable UUID requestId) {

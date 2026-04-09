@@ -56,3 +56,95 @@
 
 @media (max-width: 1200px) { .mentors-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 768px) { .mentors-grid { grid-template-columns: 1fr; } .hmw-steps { grid-template-columns: repeat(2,1fr); } .us-body { flex-direction: column; } }
+
+/* ── Admin Mentorship Dashboard ─────────────────────────────────────────── */
+.admin-mentorship-stats {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: var(--space-4);
+}
+
+.admin-stat-card {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	padding: var(--space-5);
+	box-shadow: var(--shadow-sm);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.admin-stat-label {
+	font-size: var(--text-sm);
+	color: var(--color-text-muted);
+	font-weight: 600;
+}
+
+.admin-stat-value {
+	font-size: var(--text-3xl);
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+.admin-stat-sub {
+	display: flex;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+}
+
+.admin-table-toolbar {
+	margin-top: var(--space-4);
+	display: flex;
+	justify-content: flex-end;
+}
+
+.admin-filter {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 220px;
+}
+
+.table-wrap {
+	margin-top: var(--space-4);
+	overflow: auto;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+}
+
+.admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--color-surface);
+}
+
+.admin-table th,
+.admin-table td {
+	text-align: left;
+	padding: var(--space-3) var(--space-4);
+	border-bottom: 1px solid var(--color-border);
+	font-size: var(--text-sm);
+}
+
+.admin-table th {
+	font-weight: 700;
+	color: var(--color-text-muted);
+	background: var(--neutral-50);
+}
+
+.admin-table tr:hover td {
+	background: var(--neutral-50);
+}
+
+.mono {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-size: var(--text-xs);
+	color: var(--neutral-700);
+	word-break: break-all;
+}
+
+@media (max-width: 1200px) {
+	.admin-mentorship-stats { grid-template-columns: repeat(2, 1fr); }
+}
+

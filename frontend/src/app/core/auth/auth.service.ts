@@ -121,11 +121,31 @@ export class AuthService {
     }
 
     getUserRoles(): string[] {
-        return this.keycloak.tokenParsed?.["realm_access"]?.["roles"] || [];
+        const token: any = this.keycloak.tokenParsed || {};
+
+        const realmRoles: string[] = token?.["realm_access"]?.["roles"] || [];
+
+        const resourceAccess: Record<string, any> = token?.["resource_access"] || {};
+        const resourceRoles: string[] = Object.values(resourceAccess)
+            .flatMap((client: any) => client?.roles || []);
+
+        // De-dupe, keep as-is (callers can normalize case)
+        return Array.from(new Set([...(realmRoles || []), ...(resourceRoles || [])]));
     }
 
     hasRole(role: string): boolean {
-        return this.getUserRoles().includes(role);
+        const roles = this.getUserRoles().map((r) => String(r).toUpperCase());
+        const target = String(role || "").toUpperCase();
+
+        if (!target) return false;
+        if (roles.includes(target)) return true;
+
+        // Normalize ROLE_ prefix differences (Keycloak often returns roles without ROLE_)
+        if (target.startsWith("ROLE_")) {
+            return roles.includes(target.substring("ROLE_".length));
+        }
+
+        return roles.includes(`ROLE_${target}`);
     }
 
     getKeycloakId(): string {

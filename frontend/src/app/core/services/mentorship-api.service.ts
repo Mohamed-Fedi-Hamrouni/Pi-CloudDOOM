@@ -31,6 +31,10 @@ export class MentorshipApiService {
         return this.http.get<MentorRequest[]>(`${this.api}/api/mentor-requests/mentor/${mentorKeycloakId}`);
     }
 
+    getAllRequests(): Observable<MentorRequest[]> {
+        return this.http.get<MentorRequest[]>(`${this.api}/api/mentor-requests`);
+    }
+
     acceptRequest(requestId: string): Observable<MentorRequest> {
         return this.http.put<MentorRequest>(`${this.api}/api/mentor-requests/${requestId}/accept`, {});
     }
@@ -49,6 +53,10 @@ export class MentorshipApiService {
 
     getSessionsByRequest(requestId: string): Observable<MentorSession[]> {
         return this.http.get<MentorSession[]>(`${this.api}/api/mentor-sessions/request/${requestId}`);
+    }
+
+    getAllSessions(): Observable<MentorSession[]> {
+        return this.http.get<MentorSession[]>(`${this.api}/api/mentor-sessions`);
     }
 
     completeSession(sessionId: string): Observable<MentorSession> {
