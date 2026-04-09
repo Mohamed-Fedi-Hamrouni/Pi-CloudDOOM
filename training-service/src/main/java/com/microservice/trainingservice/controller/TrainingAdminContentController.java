@@ -4,6 +4,8 @@ import com.microservice.trainingservice.dto.BadgeResponse;
 import com.microservice.trainingservice.dto.BadgeUpsertRequest;
 import com.microservice.trainingservice.dto.DailyActivityResponse;
 import com.microservice.trainingservice.dto.DailyActivityUpsertRequest;
+import com.microservice.trainingservice.dto.GenerateMissingLessonsRequest;
+import com.microservice.trainingservice.dto.GenerateMissingLessonsResponse;
 import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingModuleUpsertRequest;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
@@ -86,6 +88,12 @@ public class TrainingAdminContentController {
     @ResponseStatus(HttpStatus.CREATED)
     public TrainingLessonResponse createLesson(@RequestBody TrainingLessonUpsertRequest request) {
         return trainingAdminContentService.createLesson(request);
+    }
+
+    @PostMapping("/lessons/generate-missing")
+    @ResponseStatus(HttpStatus.CREATED)
+    public GenerateMissingLessonsResponse generateMissingLessons(@Valid @RequestBody GenerateMissingLessonsRequest request) {
+        return trainingAdminContentService.generateMissingDraftLessons(request);
     }
 
     @PutMapping("/lessons/{id}")

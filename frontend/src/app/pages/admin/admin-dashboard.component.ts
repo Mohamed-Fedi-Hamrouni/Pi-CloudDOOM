@@ -26,6 +26,16 @@ import {
     UserXPTrackerResponse,
 } from "../../core/models/training.models";
 
+interface GenerateMissingLessonsResponse {
+    category: string;
+    language: string;
+    existingActiveCount: number;
+    targetActiveCount: number;
+    missingCount: number;
+    generatedCount: number;
+    generatedLessonIds: number[];
+}
+
 interface UserItem {
     id: string;
     email: string;
@@ -86,6 +96,20 @@ type AdminTab = "users" | "interviews" | "training";
                     (click)="setTab('training')"
                 >
                     🎯 Training
+                </button>
+            </div>
+
+            <!-- In-app notices (replaces browser alert) -->
+            <div
+                *ngIf="adminNotice"
+                class="admin-notice"
+                [class.notice-success]="adminNotice.type === 'success'"
+                [class.notice-error]="adminNotice.type === 'error'"
+                [class.notice-info]="adminNotice.type === 'info'"
+            >
+                <div class="notice-message">{{ adminNotice.message }}</div>
+                <button class="notice-close" (click)="clearNotice()">
+                    ✕
                 </button>
             </div>
 
@@ -1049,6 +1073,44 @@ type AdminTab = "users" | "interviews" | "training";
 
                 <!-- Lessons CRUD -->
                 <ng-container *ngIf="trainingView === 'lessons'">
+                    <div class="crud-card">
+                        <div class="crud-head">
+                            <strong>AI: Generate missing draft lessons</strong>
+                        </div>
+                        <div class="crud-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <select class="input" [(ngModel)]="aiLessonGenForm.category" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let c of trainingCategories" [value]="c">{{ c }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Language</span>
+                                <select class="input" [(ngModel)]="aiLessonGenForm.language" [ngModelOptions]="{standalone:true}">
+                                    <option *ngFor="let l of lessonLanguages" [value]="l">{{ l }}</option>
+                                </select>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Target ACTIVE</span>
+                                <input class="input" type="number" [(ngModel)]="aiLessonGenForm.targetActiveCount" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Max generate</span>
+                                <input class="input" type="number" [(ngModel)]="aiLessonGenForm.maxGenerate" [ngModelOptions]="{standalone:true}" />
+                            </div>
+                            <div class="detail-item detail-full">
+                                <span class="detail-label">Difficulty (optional)</span>
+                                <select class="input" [(ngModel)]="aiLessonGenForm.difficulty" [ngModelOptions]="{standalone:true}">
+                                    <option [value]="''">AUTO</option>
+                                    <option *ngFor="let d of lessonDifficulties" [value]="d">{{ d }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="action-btn action-btn-teal" (click)="generateMissingLessonDrafts()">✨ Generate drafts</button>
+                        </div>
+                    </div>
+
                     <div class="admin-table-wrap">
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
@@ -1131,12 +1193,12 @@ type AdminTab = "users" | "interviews" | "training";
                                 <input class="input" [(ngModel)]="lessonForm.summary" [ngModelOptions]="{standalone:true}" placeholder="Short summary" />
                             </div>
 
-                            <div class="detail-item" *ngIf="lessonForm.format === 'VIDEO'">
+                            <div class="detail-item detail-full" *ngIf="lessonForm.format === 'VIDEO'">
                                 <span class="detail-label">Video URL</span>
                                 <input class="input" [(ngModel)]="lessonForm.videoUrl" [ngModelOptions]="{standalone:true}" placeholder="https://..." />
                             </div>
 
-                            <div class="detail-item" *ngIf="lessonForm.format === 'TEXT'">
+                            <div class="detail-item detail-full" *ngIf="lessonForm.format === 'TEXT'">
                                 <span class="detail-label">Content (Markdown)</span>
                                 <textarea class="input" rows="6" [(ngModel)]="lessonForm.contentMarkdown" [ngModelOptions]="{standalone:true}" placeholder="# Lesson\n...\n"></textarea>
                             </div>
@@ -1729,6 +1791,43 @@ type AdminTab = "users" | "interviews" | "training";
                 </div>
             </div>
         </div>
+
+        <!-- Confirm Modal (replaces browser confirm) -->
+        <div
+            class="modal-overlay confirm-overlay"
+            *ngIf="confirmDialog"
+            (click)="closeConfirm()"
+        >
+            <div
+                class="modal-card confirm-card"
+                (click)="$event.stopPropagation()"
+            >
+                <div class="modal-header">
+                    <div class="confirm-copy">
+                        <h2>{{ confirmDialog.title }}</h2>
+                        <p>{{ confirmDialog.message }}</p>
+                    </div>
+                    <button class="modal-close" (click)="closeConfirm()">
+                        ✕
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        class="btn-action"
+                        [ngClass]="confirmDialog.danger ? 'btn-red' : 'btn-teal'"
+                        (click)="confirmDialogConfirm()"
+                    >
+                        {{ confirmDialog.confirmText }}
+                    </button>
+                    <button
+                        class="btn-action btn-neutral"
+                        (click)="closeConfirm()"
+                    >
+                        {{ confirmDialog.cancelText }}
+                    </button>
+                </div>
+            </div>
+        </div>
     `,
     styles: [
         `
@@ -1757,6 +1856,52 @@ type AdminTab = "users" | "interviews" | "training";
             .adm-tab.active {
                 color: var(--teal-600);
                 border-bottom-color: var(--teal-500);
+            }
+
+            /* In-app notices */
+            .admin-notice {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: var(--space-3);
+                padding: var(--space-3) var(--space-4);
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--color-border);
+                background: var(--neutral-50);
+                color: var(--color-text);
+            }
+            .notice-message {
+                font-size: var(--text-sm);
+                line-height: var(--leading-relaxed);
+                white-space: pre-line;
+            }
+            .notice-close {
+                flex-shrink: 0;
+                width: 32px;
+                height: 32px;
+                border-radius: var(--radius-full);
+                border: 1px solid var(--color-border);
+                background: var(--color-surface);
+                color: var(--color-text-muted);
+                cursor: pointer;
+            }
+            .notice-close:hover {
+                opacity: 0.85;
+            }
+            .admin-notice.notice-success {
+                background: var(--success-50);
+                border-color: var(--success-500);
+                color: var(--success-600);
+            }
+            .admin-notice.notice-error {
+                background: var(--error-50);
+                border-color: var(--error-500);
+                color: var(--error-500);
+            }
+            .admin-notice.notice-info {
+                background: var(--teal-50);
+                border-color: var(--teal-300);
+                color: var(--teal-700);
             }
 
             /* Training tab */
@@ -1935,6 +2080,10 @@ type AdminTab = "users" | "interviews" | "training";
                 font-size: 0.75rem;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
+                user-select: none;
+            }
+            .admin-table thead th:hover {
+                background: var(--neutral-100);
             }
             .admin-table td {
                 padding: var(--space-3) var(--space-4);
@@ -2515,6 +2664,17 @@ type AdminTab = "users" | "interviews" | "training";
                 padding: var(--space-4);
                 backdrop-filter: blur(4px);
             }
+
+            .confirm-overlay {
+                z-index: 110;
+            }
+            .confirm-card .modal-header p {
+                margin-top: var(--space-1);
+                white-space: pre-line;
+            }
+            .confirm-card .btn-neutral {
+                margin-left: 0;
+            }
             .modal-card {
                 background: var(--color-surface);
                 border-radius: var(--radius-xl);
@@ -2677,6 +2837,64 @@ export class AdminDashboardComponent implements OnInit {
     private interviewApi = inject(InterviewApiService);
     private cdr = inject(ChangeDetectorRef);
 
+    adminNotice: {
+        type: "success" | "error" | "info";
+        message: string;
+    } | null = null;
+
+    confirmDialog: {
+        title: string;
+        message: string;
+        confirmText: string;
+        cancelText: string;
+        danger?: boolean;
+        onConfirm: () => void;
+    } | null = null;
+
+    showNotice(
+        type: "success" | "error" | "info",
+        message: string,
+    ): void {
+        this.adminNotice = { type, message };
+        this.cdr.markForCheck();
+    }
+
+    clearNotice(): void {
+        this.adminNotice = null;
+        this.cdr.markForCheck();
+    }
+
+    openConfirm(opts: {
+        title: string;
+        message: string;
+        confirmText?: string;
+        cancelText?: string;
+        danger?: boolean;
+        onConfirm: () => void;
+    }): void {
+        this.confirmDialog = {
+            title: opts.title,
+            message: opts.message,
+            confirmText: opts.confirmText ?? "Confirm",
+            cancelText: opts.cancelText ?? "Cancel",
+            danger: Boolean(opts.danger),
+            onConfirm: opts.onConfirm,
+        };
+        this.cdr.markForCheck();
+    }
+
+    closeConfirm(): void {
+        this.confirmDialog = null;
+        this.cdr.markForCheck();
+    }
+
+    confirmDialogConfirm(): void {
+        const cb = this.confirmDialog?.onConfirm;
+        this.confirmDialog = null;
+        this.cdr.markForCheck();
+        if (cb) cb();
+    }
+
     // ── Users tab ─────────────────────────────────────────────────────────────
     activeTab: AdminTab = "users";
     users: UserItem[] = [];
@@ -2799,6 +3017,21 @@ export class AdminDashboardComponent implements OnInit {
 
     lessonFormats = ["TEXT", "VIDEO"];
     lessonDifficulties = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
+    lessonLanguages = ["en", "fr", "ar"];
+
+    aiLessonGenForm: {
+        category: string;
+        language: string;
+        targetActiveCount: number;
+        maxGenerate: number;
+        difficulty: string; // '' means AUTO
+    } = {
+        category: "COMMUNICATION",
+        language: "en",
+        targetActiveCount: 30,
+        maxGenerate: 10,
+        difficulty: "",
+    };
 
     editingLessonId: number | null = null;
     lessonForm: {
@@ -3401,21 +3634,26 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteUser(user: UserItem): void {
-        if (
-            !confirm(
-                `Delete ${user.firstName} ${user.lastName}? This cannot be undone.`,
-            )
-        )
-            return;
-        this.http
-            .delete(`${environment.apiUrl}/api/users/${user.id}`)
-            .subscribe({
-                next: () => {
-                    this.users = this.users.filter((u) => u.id !== user.id);
-                    this.loadStats();
-                    this.cdr.markForCheck();
-                },
-            });
+        this.openConfirm({
+            title: "Delete user",
+            message: `Delete ${user.firstName} ${user.lastName}? This cannot be undone.`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.http
+                    .delete(`${environment.apiUrl}/api/users/${user.id}`)
+                    .subscribe({
+                        next: () => {
+                            this.users = this.users.filter(
+                                (u) => u.id !== user.id,
+                            );
+                            this.loadStats();
+                            this.cdr.markForCheck();
+                        },
+                    });
+            },
+        });
     }
 
     restoreUser(user: UserItem): void {
@@ -3510,6 +3748,74 @@ export class AdminDashboardComponent implements OnInit {
         });
     }
 
+    generateMissingLessonDrafts(): void {
+        this.trainingError = null;
+
+        const cat = this.aiLessonGenForm.category;
+        const lang = this.aiLessonGenForm.language;
+        const target = Number(this.aiLessonGenForm.targetActiveCount ?? 0);
+        const maxGenerate = Number(this.aiLessonGenForm.maxGenerate ?? 0);
+        const difficulty = (this.aiLessonGenForm.difficulty || "").trim();
+
+        if (!cat || !lang || !target || target < 0) {
+            this.trainingError = "Please set category, language and a valid target active count.";
+            this.cdr.markForCheck();
+            return;
+        }
+
+        if (!Number.isFinite(maxGenerate) || maxGenerate <= 0) {
+            this.trainingError = "Please set a positive 'Max generate' (e.g. 3, 5, 10).";
+            this.cdr.markForCheck();
+            return;
+        }
+
+        const payload: any = {
+            category: cat,
+            language: lang,
+            targetActiveCount: target,
+            maxGenerate: Math.max(1, Math.floor(maxGenerate)),
+            difficulty: difficulty ? difficulty : null,
+        };
+
+        this.openConfirm({
+            title: "Generate draft lessons",
+            message: `Generate missing draft lessons (INACTIVE) for ${cat} / ${lang} up to ${target} active lessons?\n\nNew lessons will be created as INACTIVE and must be reviewed + activated by an admin.`,
+            confirmText: "Generate",
+            cancelText: "Cancel",
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .post<GenerateMissingLessonsResponse>(
+                        `${this.trainingAdminBase()}/lessons/generate-missing`,
+                        payload,
+                    )
+                    .subscribe({
+                        next: (res) => {
+                            this.setTrainingBusy(false, null);
+                            // Refresh list to show new INACTIVE lessons
+                            this.loadLessons();
+                            const generated = res?.generatedCount ?? 0;
+                            const existingActive = res?.existingActiveCount ?? 0;
+                            const missing = res?.missingCount ?? 0;
+                            const targetCount =
+                                res?.targetActiveCount ?? target;
+
+                            this.showNotice(
+                                "success",
+                                `Generated ${generated} draft lessons (INACTIVE).\n\nExisting ACTIVE: ${existingActive}\nTarget ACTIVE: ${targetCount}\nMissing: ${missing}\n\nReview them in the Lessons list (INACTIVE).`,
+                            );
+                        },
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
+    }
+
     editLesson(l: TrainingLessonResponse): void {
         this.editingLessonId = l.id;
         this.lessonForm = {
@@ -3592,15 +3898,25 @@ export class AdminDashboardComponent implements OnInit {
 
     deleteLesson(l: TrainingLessonResponse): void {
         if (!l?.id) return;
-        if (!confirm(`Disable lesson "${l.title}"?`)) return;
-        this.trainingError = null;
-        this.http.delete(`${this.trainingAdminBase()}/lessons/${l.id}`).subscribe({
-            next: () => {
-                this.loadLessons();
-            },
-            error: (err) => {
-                this.trainingError = this.formatTrainingError(err);
-                this.cdr.markForCheck();
+        this.openConfirm({
+            title: "Disable lesson",
+            message: `Disable lesson "${l.title}"?`,
+            confirmText: "Disable",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.trainingError = null;
+                this.http
+                    .delete(`${this.trainingAdminBase()}/lessons/${l.id}`)
+                    .subscribe({
+                        next: () => {
+                            this.loadLessons();
+                        },
+                        error: (err) => {
+                            this.trainingError = this.formatTrainingError(err);
+                            this.cdr.markForCheck();
+                        },
+                    });
             },
         });
     }
@@ -3627,26 +3943,29 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     adminDeleteSession(s: InterviewSessionResponse): void {
-        if (
-            !confirm(
-                `Delete session #${s.id}? This will remove the session, all responses, and the report permanently.`,
-            )
-        )
-            return;
-        this.interviewApi.adminDeleteSession(s.id).subscribe({
-            next: () => {
-                this.intSessions = this.intSessions.filter(
-                    (x) => x.id !== s.id,
-                );
-                if (this.selectedIntSession?.id === s.id)
-                    this.selectedIntSession = null;
-                if ((this.intReport as any)?.sessionId === s.id)
-                    this.intReport = null;
-                this.cdr.markForCheck();
-            },
-            error: () => {
-                this.intReportError = "Failed to delete session.";
-                this.cdr.markForCheck();
+        this.openConfirm({
+            title: "Delete interview session",
+            message: `Delete session #${s.id}? This will remove the session, all responses, and the report permanently.`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.interviewApi.adminDeleteSession(s.id).subscribe({
+                    next: () => {
+                        this.intSessions = this.intSessions.filter(
+                            (x) => x.id !== s.id,
+                        );
+                        if (this.selectedIntSession?.id === s.id)
+                            this.selectedIntSession = null;
+                        if ((this.intReport as any)?.sessionId === s.id)
+                            this.intReport = null;
+                        this.cdr.markForCheck();
+                    },
+                    error: () => {
+                        this.intReportError = "Failed to delete session.";
+                        this.cdr.markForCheck();
+                    },
+                });
             },
         });
     }
@@ -3779,16 +4098,27 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteBadge(b: BadgeResponse): void {
-        if (!confirm(`Delete badge "${b.name}"?`)) return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/badges/${b.id}`)
-            .subscribe({
-                next: () => this.loadBadges(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete badge",
+            message: `Delete badge "${b.name}"?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/badges/${b.id}`)
+                    .subscribe({
+                        next: () => this.loadBadges(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     loadPaths(): void {
@@ -3857,17 +4187,27 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deletePath(p: TrainingPathResponse): void {
-        if (!confirm(`Delete path for ${this.userLabelByKeycloakId(p.userId)}?`))
-            return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/paths/${p.id}`)
-            .subscribe({
-                next: () => this.loadPaths(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete path",
+            message: `Delete path for ${this.userLabelByKeycloakId(p.userId)}?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/paths/${p.id}`)
+                    .subscribe({
+                        next: () => this.loadPaths(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     loadModules(): void {
@@ -3973,16 +4313,27 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteModule(m: TrainingModuleResponse): void {
-        if (!confirm(`Delete module "${m.title}"?`)) return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/modules/${m.id}`)
-            .subscribe({
-                next: () => this.loadModules(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete module",
+            message: `Delete module "${m.title}"?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/modules/${m.id}`)
+                    .subscribe({
+                        next: () => this.loadModules(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     loadTrackers(): void {
@@ -4066,17 +4417,27 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteTracker(t: UserXPTrackerResponse): void {
-        if (!confirm(`Delete tracker for ${this.userLabelByKeycloakId(t.userId)}?`))
-            return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/xp-trackers/${t.id}`)
-            .subscribe({
-                next: () => this.loadTrackers(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete XP tracker",
+            message: `Delete tracker for ${this.userLabelByKeycloakId(t.userId)}?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/xp-trackers/${t.id}`)
+                    .subscribe({
+                        next: () => this.loadTrackers(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     loadActivities(): void {
@@ -4169,21 +4530,27 @@ export class AdminDashboardComponent implements OnInit {
             this.cdr.markForCheck();
             return;
         }
-        if (
-            !confirm(
-                `Delete activity for ${this.userLabelByKeycloakId(a.userId)} (${a.activityDate})?`,
-            )
-        )
-            return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/activities/${id}`)
-            .subscribe({
-                next: () => this.loadActivities(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete activity",
+            message: `Delete activity for ${this.userLabelByKeycloakId(a.userId)} (${a.activityDate})?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/activities/${id}`)
+                    .subscribe({
+                        next: () => this.loadActivities(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     loadUserBadges(): void {
@@ -4266,21 +4633,27 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteUserBadge(ub: UserBadgeResponse): void {
-        if (
-            !confirm(
-                `Delete user badge for ${this.userLabelByKeycloakId(ub.userId)} (${this.badgeLabelById(ub.badgeId)})?`,
-            )
-        )
-            return;
-        this.setTrainingBusy(true, null);
-        this.http
-            .delete(`${this.trainingAdminBase()}/user-badges/${ub.id}`)
-            .subscribe({
-                next: () => this.loadUserBadges(),
-                error: (err) => {
-                    this.setTrainingBusy(false, this.formatTrainingError(err));
-                },
-            });
+        this.openConfirm({
+            title: "Delete user badge",
+            message: `Delete user badge for ${this.userLabelByKeycloakId(ub.userId)} (${this.badgeLabelById(ub.badgeId)})?`,
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            danger: true,
+            onConfirm: () => {
+                this.setTrainingBusy(true, null);
+                this.http
+                    .delete(`${this.trainingAdminBase()}/user-badges/${ub.id}`)
+                    .subscribe({
+                        next: () => this.loadUserBadges(),
+                        error: (err) => {
+                            this.setTrainingBusy(
+                                false,
+                                this.formatTrainingError(err),
+                            );
+                        },
+                    });
+            },
+        });
     }
 
     private formatTrainingError(err: any): string {

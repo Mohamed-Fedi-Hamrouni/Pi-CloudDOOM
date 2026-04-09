@@ -1,9 +1,6 @@
-package com.microservice.userservice.ai;
+package com.microservice.trainingservice.ai;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -13,7 +10,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Component
 public class GeminiGenerateContentClient {
@@ -26,15 +25,46 @@ public class GeminiGenerateContentClient {
         this.props = props;
     }
 
+    public boolean isConfigured() {
+        return StringUtils.hasText(props.getApiKey());
+    }
+
     public String generate(String systemInstruction, List<Content> contents) {
+        return generateInternal(systemInstruction, contents, null);
+    }
+
+    /** Prefer this when you need strict JSON output (e.g. lesson generation). */
+    public String generateJson(String systemInstruction, List<Content> contents) {
+        return generateInternal(systemInstruction, contents, "application/json");
+    }
+
+    /** Like {@link #generateJson(String, List)} but lets callers override temperature for diversity. */
+    public String generateJson(String systemInstruction, List<Content> contents, Double temperatureOverride) {
+        return generateInternal(systemInstruction, contents, "application/json", temperatureOverride);
+    }
+
+    private String generateInternal(String systemInstruction, List<Content> contents, String responseMimeType) {
+        return generateInternal(systemInstruction, contents, responseMimeType, null);
+    }
+
+    private String generateInternal(
+        String systemInstruction,
+        List<Content> contents,
+        String responseMimeType,
+        Double temperatureOverride
+    ) {
         if (!StringUtils.hasText(props.getApiKey())) {
             throw new IllegalStateException("GOOGLE_AI_API_KEY is not configured");
         }
 
+        double temperature = temperatureOverride == null ? props.getTemperature() : temperatureOverride;
+
         GenerateContentRequest request = new GenerateContentRequest(
-                systemInstruction == null || systemInstruction.isBlank() ? null : new SystemInstruction(List.of(new Part(systemInstruction))),
-                contents,
-                new GenerationConfig(props.getTemperature(), props.getMaxOutputTokens()));
+            systemInstruction == null || systemInstruction.isBlank()
+                ? null
+                : new SystemInstruction(List.of(new Part(systemInstruction))),
+            contents,
+            new GenerationConfig(temperature, props.getMaxOutputTokens(), responseMimeType));
 
         List<String> modelsToTry = new ArrayList<>();
         modelsToTry.add(props.getModel());
@@ -65,14 +95,14 @@ public class GeminiGenerateContentClient {
                 break;
             } catch (RestClientResponseException ex) {
                 lastException = ex;
+
                 int status = ex.getStatusCode().value();
                 String body = ex.getResponseBodyAsString();
 
                 if (status == 400 && body != null && body.contains("API_KEY_INVALID")) {
                     throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "Gemini rejected the API key (API_KEY_INVALID). Verify GOOGLE_AI_API_KEY in infra/.env is the full key (usually starts with 'AIza' and is much longer than 10 chars). " +
-                            "If it is full, check key restrictions / enabled APIs in Google AI Studio / Google Cloud.");
+                        "Gemini rejected the API key (API_KEY_INVALID). Verify GOOGLE_AI_API_KEY in infra/.env is the full key.");
                 }
 
                 if (status == 429) {
@@ -131,13 +161,12 @@ public class GeminiGenerateContentClient {
             throw new IllegalStateException("Gemini response missing content");
         }
 
-        // Gemini may return multiple text parts; concatenate them.
         String text = first.content.parts.stream()
-                .filter(Objects::nonNull)
-                .map(Part::text)
-                .filter(StringUtils::hasText)
-                .reduce("", String::concat)
-                .trim();
+            .filter(Objects::nonNull)
+            .map(Part::text)
+            .filter(StringUtils::hasText)
+            .reduce("", String::concat)
+            .trim();
 
         if (text.isBlank()) {
             throw new IllegalStateException("Gemini response missing text");
@@ -154,13 +183,12 @@ public class GeminiGenerateContentClient {
     public record SystemInstruction(List<Part> parts) {}
 
     public record GenerationConfig(
-            double temperature,
-            @JsonProperty("maxOutputTokens") int maxOutputTokens) {}
+        double temperature,
+        @JsonProperty("maxOutputTokens") int maxOutputTokens,
+        @JsonProperty("responseMimeType") String responseMimeType
+    ) {}
 
-    public record GenerateContentRequest(
-            SystemInstruction systemInstruction,
-            List<Content> contents,
-            GenerationConfig generationConfig) {}
+    public record GenerateContentRequest(SystemInstruction systemInstruction, List<Content> contents, GenerationConfig generationConfig) {}
 
     public record GenerateContentResponse(List<Candidate> candidates) {}
 

@@ -1,8 +1,7 @@
-package com.microservice.userservice.ai;
-
-import org.springframework.boot.context.properties.ConfigurationProperties;
+package com.microservice.trainingservice.ai;
 
 import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,11 +19,14 @@ public class GoogleAiProperties {
     /** Model id, e.g. "gemini-flash-latest". */
     private String model = "gemini-flash-latest";
 
-    /** Optional fallback model ids (comma-separated in env var), tried when primary is overloaded/unavailable. */
+    /**
+     * Optional list of fallback model ids, tried in order when the primary model is overloaded/unavailable.
+     * Example: ["gemini-flash-lite-latest", "gemini-2.5-flash"].
+     */
     private List<String> fallbackModels = new ArrayList<>();
 
     private double temperature = 0.4;
 
     /** Google uses maxOutputTokens. */
-    private int maxOutputTokens = 600;
+    private int maxOutputTokens = 900;
 }

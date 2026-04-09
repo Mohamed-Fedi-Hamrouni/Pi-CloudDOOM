@@ -207,6 +207,7 @@ services:
             # AI (Google AI Studio / Gemini) — set these in your shell or an uncommitted infra/.env file
             GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
             GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_FALLBACK_MODELS: ${GOOGLE_AI_FALLBACK_MODELS:-gemini-flash-lite-latest}
             GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
             GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
             GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
@@ -281,6 +282,14 @@ services:
             KEYCLOAK_CLIENT_ID: training-service
             KEYCLOAK_CLIENT_SECRET: training-service-secret-change-in-prod
             TRAINING_DEBUG_BADGE_SIMULATION_ENABLED: "true"
+
+            # AI (Google AI Studio / Gemini) — drafts + reranking in training-service
+            GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+            GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_FALLBACK_MODELS: ${GOOGLE_AI_FALLBACK_MODELS:-gemini-flash-lite-latest}
+            GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
+            GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
+            GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-900}
 
 volumes:
     pgdata:
