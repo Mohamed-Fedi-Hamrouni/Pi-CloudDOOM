@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
@@ -111,6 +112,11 @@ public class UserService {
     public Page<UserResponse> findAll(Pageable pageable) {
         return userRepository.findByDeletedAtIsNull(pageable)
             .map(this::toResponseWithSkills);
+    }
+
+    public Page<UserIdentityResponse> findAllIdentities(Pageable pageable) {
+        return userRepository.findByDeletedAtIsNull(pageable)
+            .map(userMapper::toIdentityResponse);
     }
 
     public Page<UserResponse> search(String query, Pageable pageable) {

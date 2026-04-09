@@ -2,6 +2,7 @@ package com.microservice.userservice.mapper;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.model.User;
 import org.mapstruct.*;
@@ -12,6 +13,8 @@ public interface UserMapper {
 
     @Mapping(target = "skills", ignore = true)
     UserResponse toResponse(User user);
+
+    UserIdentityResponse toIdentityResponse(User user);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "keycloakId", ignore = true)

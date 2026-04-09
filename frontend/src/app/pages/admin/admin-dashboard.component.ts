@@ -48,6 +48,13 @@ interface UserItem {
     lastLoginAt: string;
 }
 
+interface UserIdentityItem {
+    keycloakId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+}
+
 type AdminTab = "users" | "interviews" | "training";
 
 @Component({
@@ -878,7 +885,6 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
                                     <th (click)="setTrainingSort('name')">Name {{ sortIndicator('name') }}</th>
                                     <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
                                     <th (click)="setTrainingSort('xpReward')">XP {{ sortIndicator('xpReward') }}</th>
@@ -888,7 +894,6 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let b of visibleBadges" class="user-row" (click)="editBadge(b)">
-                                    <td>{{ b.id }}</td>
                                     <td>
                                         <div class="user-name">{{ b.name }}</div>
                                         <div class="user-email" *ngIf="b.description">{{ b.description }}</div>
@@ -977,8 +982,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
-                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('user')">User {{ sortIndicator('user') }}</th>
                                     <th (click)="setTrainingSort('status')">Status {{ sortIndicator('status') }}</th>
                                     <th (click)="setTrainingSort('xpThreshold')">XP Threshold {{ sortIndicator('xpThreshold') }}</th>
                                     <th (click)="setTrainingSort('modulesCount')">Modules {{ sortIndicator('modulesCount') }}</th>
@@ -987,8 +991,12 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let p of visiblePaths" class="user-row" (click)="editPath(p)">
-                                    <td>{{ p.id }}</td>
-                                    <td>{{ p.userId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ userLabelByKeycloakId(p.userId) }}</div>
+                                        <div class="user-email" *ngIf="userEmailByKeycloakId(p.userId)">
+                                            {{ userEmailByKeycloakId(p.userId) }}
+                                        </div>
+                                    </td>
                                     <td><span class="badge badge-plan">{{ p.status }}</span></td>
                                     <td>{{ p.xpThreshold }}</td>
                                     <td>{{ p.modules.length }}</td>
@@ -1013,8 +1021,13 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
-                                <span class="detail-label">User ID (Keycloak sub)</span>
-                                <input class="input" [(ngModel)]="pathForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                                <span class="detail-label">User</span>
+                                <select class="input" [(ngModel)]="pathForm.userId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="''" disabled>Select a user...</option>
+                                    <option *ngFor="let u of trainingUserIdentities" [value]="u.keycloakId">
+                                        {{ userOptionLabel(u) }}
+                                    </option>
+                                </select>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Status</span>
@@ -1040,7 +1053,6 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
                                     <th (click)="setTrainingSort('title')">Title {{ sortIndicator('title') }}</th>
                                     <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
                                     <th (click)="setTrainingSort('format')">Format {{ sortIndicator('format') }}</th>
@@ -1053,7 +1065,6 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let l of visibleLessons" class="user-row" (click)="editLesson(l)">
-                                    <td>{{ l.id }}</td>
                                     <td>
                                         <div class="user-name">{{ l.title }}</div>
                                         <div class="user-email" *ngIf="l.summary">{{ l.summary }}</div>
@@ -1178,8 +1189,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
-                                    <th (click)="setTrainingSort('pathId')">Path {{ sortIndicator('pathId') }}</th>
+                                    <th (click)="setTrainingSort('user')">User {{ sortIndicator('user') }}</th>
                                     <th (click)="setTrainingSort('title')">Title {{ sortIndicator('title') }}</th>
                                     <th (click)="setTrainingSort('category')">Category {{ sortIndicator('category') }}</th>
                                     <th (click)="setTrainingSort('status')">Status {{ sortIndicator('status') }}</th>
@@ -1190,8 +1200,12 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let m of visibleModules" class="user-row" (click)="editModule(m)">
-                                    <td>{{ m.id }}</td>
-                                    <td>{{ m.pathId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ pathOwnerLabel(m.pathId) }}</div>
+                                        <div class="user-email" *ngIf="pathOwnerEmail(m.pathId)">
+                                            {{ pathOwnerEmail(m.pathId) }}
+                                        </div>
+                                    </td>
                                     <td>
                                         <div class="user-name">{{ m.title }}</div>
                                         <div class="user-email" *ngIf="m.lessons">{{ m.completedLessons }}/{{ m.lessons }} lessons</div>
@@ -1221,8 +1235,11 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item">
-                                <span class="detail-label">Path ID</span>
-                                <input class="input" type="number" [(ngModel)]="moduleForm.pathId" [ngModelOptions]="{standalone:true}" />
+                                <span class="detail-label">Path</span>
+                                <select class="input" [(ngModel)]="moduleForm.pathId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="null" disabled>Select a path...</option>
+                                    <option *ngFor="let p of adminPaths" [ngValue]="p.id">{{ pathOptionLabel(p) }}</option>
+                                </select>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Category</span>
@@ -1278,8 +1295,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
-                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('user')">User {{ sortIndicator('user') }}</th>
                                     <th (click)="setTrainingSort('totalXp')">Total XP {{ sortIndicator('totalXp') }}</th>
                                     <th (click)="setTrainingSort('currentLevel')">Level {{ sortIndicator('currentLevel') }}</th>
                                     <th (click)="setTrainingSort('xpToNextLevel')">To Next {{ sortIndicator('xpToNextLevel') }}</th>
@@ -1291,8 +1307,12 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let t of visibleTrackers" class="user-row" (click)="editTracker(t)">
-                                    <td>{{ t.id }}</td>
-                                    <td>{{ t.userId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ userLabelByKeycloakId(t.userId) }}</div>
+                                        <div class="user-email" *ngIf="userEmailByKeycloakId(t.userId)">
+                                            {{ userEmailByKeycloakId(t.userId) }}
+                                        </div>
+                                    </td>
                                     <td>{{ t.totalXp }}</td>
                                     <td>{{ t.currentLevel }}</td>
                                     <td>{{ t.xpToNextLevel }}</td>
@@ -1320,8 +1340,13 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
-                                <span class="detail-label">User ID (Keycloak sub)</span>
-                                <input class="input" [(ngModel)]="trackerForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                                <span class="detail-label">User</span>
+                                <select class="input" [(ngModel)]="trackerForm.userId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="''" disabled>Select a user...</option>
+                                    <option *ngFor="let u of trainingUserIdentities" [value]="u.keycloakId">
+                                        {{ userOptionLabel(u) }}
+                                    </option>
+                                </select>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Total XP</span>
@@ -1361,8 +1386,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
-                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
+                                    <th (click)="setTrainingSort('user')">User {{ sortIndicator('user') }}</th>
                                     <th (click)="setTrainingSort('activityDate')">Date {{ sortIndicator('activityDate') }}</th>
                                     <th (click)="setTrainingSort('xpEarned')">XP {{ sortIndicator('xpEarned') }}</th>
                                     <th (click)="setTrainingSort('sessionCompleted')">Session {{ sortIndicator('sessionCompleted') }}</th>
@@ -1375,8 +1399,12 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let a of visibleActivities" class="user-row" (click)="editActivity(a)">
-                                    <td>{{ a.id }}</td>
-                                    <td>{{ a.userId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ userLabelByKeycloakId(a.userId) }}</div>
+                                        <div class="user-email" *ngIf="userEmailByKeycloakId(a.userId)">
+                                            {{ userEmailByKeycloakId(a.userId) }}
+                                        </div>
+                                    </td>
                                     <td>{{ a.activityDate }}</td>
                                     <td>{{ a.xpEarned }}</td>
                                     <td>{{ a.sessionCompleted ? 'YES' : 'NO' }}</td>
@@ -1405,8 +1433,13 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
-                                <span class="detail-label">User ID (Keycloak sub)</span>
-                                <input class="input" [(ngModel)]="activityForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                                <span class="detail-label">User</span>
+                                <select class="input" [(ngModel)]="activityForm.userId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="''" disabled>Select a user...</option>
+                                    <option *ngFor="let u of trainingUserIdentities" [value]="u.keycloakId">
+                                        {{ userOptionLabel(u) }}
+                                    </option>
+                                </select>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Activity Date</span>
@@ -1453,9 +1486,8 @@ type AdminTab = "users" | "interviews" | "training";
                         <table class="admin-table" *ngIf="!trainingLoading">
                             <thead>
                                 <tr>
-                                    <th (click)="setTrainingSort('id')">ID {{ sortIndicator('id') }}</th>
-                                    <th (click)="setTrainingSort('userId')">User ID {{ sortIndicator('userId') }}</th>
-                                    <th (click)="setTrainingSort('badgeId')">Badge ID {{ sortIndicator('badgeId') }}</th>
+                                    <th (click)="setTrainingSort('user')">User {{ sortIndicator('user') }}</th>
+                                    <th (click)="setTrainingSort('badge')">Badge {{ sortIndicator('badge') }}</th>
                                     <th (click)="setTrainingSort('progress')">Progress {{ sortIndicator('progress') }}</th>
                                     <th (click)="setTrainingSort('earnedDate')">Earned Date {{ sortIndicator('earnedDate') }}</th>
                                     <th>Actions</th>
@@ -1463,9 +1495,13 @@ type AdminTab = "users" | "interviews" | "training";
                             </thead>
                             <tbody>
                                 <tr *ngFor="let ub of visibleUserBadges" class="user-row" (click)="editUserBadge(ub)">
-                                    <td>{{ ub.id }}</td>
-                                    <td>{{ ub.userId }}</td>
-                                    <td>{{ ub.badgeId }}</td>
+                                    <td>
+                                        <div class="user-name">{{ userLabelByKeycloakId(ub.userId) }}</div>
+                                        <div class="user-email" *ngIf="userEmailByKeycloakId(ub.userId)">
+                                            {{ userEmailByKeycloakId(ub.userId) }}
+                                        </div>
+                                    </td>
+                                    <td>{{ badgeLabelById(ub.badgeId) }}</td>
                                     <td>{{ ub.progress ?? '-' }}</td>
                                     <td>{{ ub.earnedDate || '-' }}</td>
                                     <td (click)="$event.stopPropagation()">
@@ -1489,12 +1525,20 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
-                                <span class="detail-label">User ID (Keycloak sub)</span>
-                                <input class="input" [(ngModel)]="userBadgeForm.userId" [ngModelOptions]="{standalone:true}" placeholder="UUID from Keycloak token (sub)" />
+                                <span class="detail-label">User</span>
+                                <select class="input" [(ngModel)]="userBadgeForm.userId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="''" disabled>Select a user...</option>
+                                    <option *ngFor="let u of trainingUserIdentities" [value]="u.keycloakId">
+                                        {{ userOptionLabel(u) }}
+                                    </option>
+                                </select>
                             </div>
                             <div class="detail-item">
-                                <span class="detail-label">Badge ID</span>
-                                <input class="input" type="number" [(ngModel)]="userBadgeForm.badgeId" [ngModelOptions]="{standalone:true}" />
+                                <span class="detail-label">Badge</span>
+                                <select class="input" [(ngModel)]="userBadgeForm.badgeId" [ngModelOptions]="{standalone:true}">
+                                    <option [ngValue]="null" disabled>Select a badge...</option>
+                                    <option *ngFor="let b of adminBadges" [ngValue]="b.id">{{ b.name }}</option>
+                                </select>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Progress (optional)</span>
@@ -2685,12 +2729,19 @@ export class AdminDashboardComponent implements OnInit {
     adminActivities: DailyActivityResponse[] = [];
     adminUserBadges: UserBadgeResponse[] = [];
 
+    trainingUserIdentities: UserIdentityItem[] = [];
+    private trainingUserIdentityByKeycloakId = new Map<string, UserIdentityItem>();
+    private trainingIdentitiesLoading = false;
+    private trainingIdentitiesLoaded = false;
+    private trainingPathById = new Map<number, TrainingPathResponse>();
+    private trainingBadgeById = new Map<number, BadgeResponse>();
+
     // Training table UI (search/sort/pagination) — client-side over loaded lists
     trainingSearchQuery = "";
     trainingSearchTimeout: any;
     trainingPage = 0;
     trainingPageSize = 10;
-    trainingSortKey = "id";
+    trainingSortKey = "name";
     trainingSortDir: "asc" | "desc" = "asc";
     trainingTotalItems = 0;
     trainingTotalPages = 1;
@@ -2856,6 +2907,8 @@ export class AdminDashboardComponent implements OnInit {
     setTab(tab: AdminTab): void {
         this.activeTab = tab;
         if (tab === "training") {
+            this.ensureTrainingIdentitiesLoaded();
+            this.trainingSortKey = this.defaultTrainingSortKey(this.trainingView);
             this.setTrainingView(this.trainingView);
         }
     }
@@ -2873,8 +2926,9 @@ export class AdminDashboardComponent implements OnInit {
         const changed = this.trainingView !== view;
         this.trainingView = view;
         if (changed) {
-            this.resetTrainingTableState();
+            this.resetTrainingTableState(view);
         }
+        this.ensureTrainingIdentitiesLoaded();
         if (view === "badges") {
             this.loadBadges();
         } else if (view === "paths") {
@@ -2948,10 +3002,19 @@ export class AdminDashboardComponent implements OnInit {
         return `Search ${label}...`;
     }
 
-    private resetTrainingTableState(): void {
+    private resetTrainingTableState(
+        view:
+            | "badges"
+            | "paths"
+            | "modules"
+            | "lessons"
+            | "xp-trackers"
+            | "activities"
+            | "user-badges",
+    ): void {
         this.trainingSearchQuery = "";
         this.trainingPage = 0;
-        this.trainingSortKey = "id";
+        this.trainingSortKey = this.defaultTrainingSortKey(view);
         this.trainingSortDir = "asc";
         this.trainingTotalItems = 0;
         this.trainingTotalPages = 1;
@@ -2962,6 +3025,97 @@ export class AdminDashboardComponent implements OnInit {
         this.visibleTrackers = [];
         this.visibleActivities = [];
         this.visibleUserBadges = [];
+    }
+
+    private defaultTrainingSortKey(
+        view:
+            | "badges"
+            | "paths"
+            | "modules"
+            | "lessons"
+            | "xp-trackers"
+            | "activities"
+            | "user-badges",
+    ): string {
+        if (view === "badges") return "name";
+        if (view === "paths") return "user";
+        if (view === "modules") return "title";
+        if (view === "lessons") return "title";
+        if (view === "xp-trackers") return "user";
+        if (view === "activities") return "activityDate";
+        return "user";
+    }
+
+    private ensureTrainingIdentitiesLoaded(): void {
+        if (this.trainingIdentitiesLoaded || this.trainingIdentitiesLoading)
+            return;
+
+        this.trainingIdentitiesLoading = true;
+        const url = `${environment.apiUrl}/api/users/identities?page=0&size=5000`;
+        this.http.get<any>(url).subscribe({
+            next: (res: any) => {
+                const items: UserIdentityItem[] = (res?.content || []) as UserIdentityItem[];
+                this.trainingUserIdentities = items;
+                this.trainingUserIdentityByKeycloakId = new Map(
+                    items
+                        .filter((u) => !!u?.keycloakId)
+                        .map((u) => [u.keycloakId, u] as const),
+                );
+                this.trainingIdentitiesLoaded = true;
+                this.trainingIdentitiesLoading = false;
+                this.cdr.markForCheck();
+            },
+            error: () => {
+                this.trainingIdentitiesLoaded = true;
+                this.trainingIdentitiesLoading = false;
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
+    private userDisplayName(u: UserIdentityItem | undefined | null): string {
+        if (!u) return "Unknown user";
+        const full = `${String(u.firstName || "")} ${String(u.lastName || "")}`.trim();
+        return full || String(u.email || "") || "Unknown user";
+    }
+
+    userLabelByKeycloakId(keycloakId: string | null | undefined): string {
+        if (!keycloakId) return "Unknown user";
+        return this.userDisplayName(this.trainingUserIdentityByKeycloakId.get(String(keycloakId)));
+    }
+
+    userEmailByKeycloakId(keycloakId: string | null | undefined): string {
+        if (!keycloakId) return "";
+        return String(this.trainingUserIdentityByKeycloakId.get(String(keycloakId))?.email || "");
+    }
+
+    userOptionLabel(u: UserIdentityItem): string {
+        const name = this.userDisplayName(u);
+        const email = String(u.email || "");
+        return email && email !== name ? `${name} — ${email}` : name;
+    }
+
+    private pathOwnerKeycloakId(pathId: number | null | undefined): string | null {
+        if (!pathId) return null;
+        const p = this.trainingPathById.get(Number(pathId));
+        return p?.userId || null;
+    }
+
+    pathOwnerLabel(pathId: number | null | undefined): string {
+        return this.userLabelByKeycloakId(this.pathOwnerKeycloakId(pathId));
+    }
+
+    pathOwnerEmail(pathId: number | null | undefined): string {
+        return this.userEmailByKeycloakId(this.pathOwnerKeycloakId(pathId));
+    }
+
+    pathOptionLabel(p: TrainingPathResponse): string {
+        return `${this.userLabelByKeycloakId(p.userId)} — ${p.status}`;
+    }
+
+    badgeLabelById(badgeId: number | null | undefined): string {
+        if (!badgeId) return "Unknown badge";
+        return String(this.trainingBadgeById.get(Number(badgeId))?.name || "Unknown badge");
     }
 
     private normalizeText(v: any): string {
@@ -3023,7 +3177,6 @@ export class AdminDashboardComponent implements OnInit {
             this.visibleBadges = this.applyTrainingTable<BadgeResponse>(
                 this.adminBadges,
                 (b, q) =>
-                    this.normalizeText(b.id).includes(q) ||
                     this.normalizeText(b.name).includes(q) ||
                     this.normalizeText(b.category).includes(q) ||
                     this.normalizeText(b.description).includes(q) ||
@@ -3035,13 +3188,14 @@ export class AdminDashboardComponent implements OnInit {
             this.visiblePaths = this.applyTrainingTable<TrainingPathResponse>(
                 this.adminPaths,
                 (p, q) =>
-                    this.normalizeText(p.id).includes(q) ||
-                    this.normalizeText(p.userId).includes(q) ||
+                    this.normalizeText(this.userLabelByKeycloakId(p.userId)).includes(q) ||
+                    this.normalizeText(this.userEmailByKeycloakId(p.userId)).includes(q) ||
                     this.normalizeText(p.status).includes(q) ||
                     this.normalizeText(p.xpThreshold).includes(q) ||
                     this.normalizeText(p.modules?.length ?? 0).includes(q),
                 (p, key) => {
                     if (key === "modulesCount") return p.modules?.length ?? 0;
+                    if (key === "user") return this.userLabelByKeycloakId(p.userId);
                     return (p as any)[key];
                 },
             );
@@ -3049,8 +3203,7 @@ export class AdminDashboardComponent implements OnInit {
             this.visibleModules = this.applyTrainingTable<TrainingModuleResponse>(
                 this.adminModules,
                 (m, q) =>
-                    this.normalizeText(m.id).includes(q) ||
-                    this.normalizeText(m.pathId).includes(q) ||
+                    this.normalizeText(this.pathOwnerLabel(m.pathId)).includes(q) ||
                     this.normalizeText(m.title).includes(q) ||
                     this.normalizeText(m.category).includes(q) ||
                     this.normalizeText(m.status).includes(q) ||
@@ -3058,13 +3211,15 @@ export class AdminDashboardComponent implements OnInit {
                     this.normalizeText(m.xpReward).includes(q) ||
                     this.normalizeText(m.lessons).includes(q) ||
                     this.normalizeText(m.completedLessons).includes(q),
-                (m, key) => (m as any)[key],
+                (m, key) => {
+                    if (key === "user") return this.pathOwnerLabel(m.pathId);
+                    return (m as any)[key];
+                },
             );
         } else if (this.trainingView === "lessons") {
             this.visibleLessons = this.applyTrainingTable<TrainingLessonResponse>(
                 this.adminLessons,
                 (l, q) =>
-                    this.normalizeText(l.id).includes(q) ||
                     this.normalizeText(l.title).includes(q) ||
                     this.normalizeText(l.category).includes(q) ||
                     this.normalizeText(l.format).includes(q) ||
@@ -3080,22 +3235,25 @@ export class AdminDashboardComponent implements OnInit {
             this.visibleTrackers = this.applyTrainingTable<UserXPTrackerResponse>(
                 this.adminTrackers,
                 (t, q) =>
-                    this.normalizeText(t.id).includes(q) ||
-                    this.normalizeText(t.userId).includes(q) ||
+                    this.normalizeText(this.userLabelByKeycloakId(t.userId)).includes(q) ||
+                    this.normalizeText(this.userEmailByKeycloakId(t.userId)).includes(q) ||
                     this.normalizeText(t.totalXp).includes(q) ||
                     this.normalizeText(t.currentLevel).includes(q) ||
                     this.normalizeText(t.xpToNextLevel).includes(q) ||
                     this.normalizeText(t.currentStreak).includes(q) ||
                     this.normalizeText(t.longestStreak).includes(q) ||
                     this.normalizeText(t.lastActivityDate).includes(q),
-                (t, key) => (t as any)[key],
+                (t, key) => {
+                    if (key === "user") return this.userLabelByKeycloakId(t.userId);
+                    return (t as any)[key];
+                },
             );
         } else if (this.trainingView === "activities") {
             this.visibleActivities = this.applyTrainingTable<DailyActivityResponse>(
                 this.adminActivities,
                 (a, q) =>
-                    this.normalizeText(a.id).includes(q) ||
-                    this.normalizeText(a.userId).includes(q) ||
+                    this.normalizeText(this.userLabelByKeycloakId(a.userId)).includes(q) ||
+                    this.normalizeText(this.userEmailByKeycloakId(a.userId)).includes(q) ||
                     this.normalizeText(a.activityDate).includes(q) ||
                     this.normalizeText(a.xpEarned).includes(q) ||
                     this.normalizeText(a.sessionCompleted ? "true" : "false").includes(q) ||
@@ -3103,18 +3261,25 @@ export class AdminDashboardComponent implements OnInit {
                     this.normalizeText(a.behavioralCount).includes(q) ||
                     this.normalizeText(a.libraryCount).includes(q) ||
                     this.normalizeText(a.quizCount).includes(q),
-                (a, key) => (a as any)[key],
+                (a, key) => {
+                    if (key === "user") return this.userLabelByKeycloakId(a.userId);
+                    return (a as any)[key];
+                },
             );
         } else {
             this.visibleUserBadges = this.applyTrainingTable<UserBadgeResponse>(
                 this.adminUserBadges,
                 (ub, q) =>
-                    this.normalizeText(ub.id).includes(q) ||
-                    this.normalizeText(ub.userId).includes(q) ||
-                    this.normalizeText(ub.badgeId).includes(q) ||
+                    this.normalizeText(this.userLabelByKeycloakId(ub.userId)).includes(q) ||
+                    this.normalizeText(this.userEmailByKeycloakId(ub.userId)).includes(q) ||
+                    this.normalizeText(this.badgeLabelById(ub.badgeId)).includes(q) ||
                     this.normalizeText(ub.progress).includes(q) ||
                     this.normalizeText(ub.earnedDate).includes(q),
-                (ub, key) => (ub as any)[key],
+                (ub, key) => {
+                    if (key === "user") return this.userLabelByKeycloakId(ub.userId);
+                    if (key === "badge") return this.badgeLabelById(ub.badgeId);
+                    return (ub as any)[key];
+                },
             );
         }
 
@@ -3427,7 +3592,7 @@ export class AdminDashboardComponent implements OnInit {
 
     deleteLesson(l: TrainingLessonResponse): void {
         if (!l?.id) return;
-        if (!confirm(`Disable lesson #${l.id} (${l.title})?`)) return;
+        if (!confirm(`Disable lesson "${l.title}"?`)) return;
         this.trainingError = null;
         this.http.delete(`${this.trainingAdminBase()}/lessons/${l.id}`).subscribe({
             next: () => {
@@ -3497,11 +3662,51 @@ export class AdminDashboardComponent implements OnInit {
         this.cdr.markForCheck();
     }
 
+    private fetchPathsForLookup(): void {
+        if (this.adminPaths.length) return;
+        this.http
+            .get<TrainingPathResponse[]>(`${this.trainingAdminBase()}/paths`)
+            .subscribe({
+                next: (res) => {
+                    this.adminPaths = res || [];
+                    this.trainingPathById = new Map(
+                        (this.adminPaths || []).map((p) => [Number(p.id), p] as const),
+                    );
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    // best-effort: module/user-badge views can still load without path labels
+                },
+            });
+    }
+
+    private fetchBadgesForLookup(): void {
+        if (this.adminBadges.length) return;
+        this.http
+            .get<BadgeResponse[]>(`${this.trainingAdminBase()}/badges`)
+            .subscribe({
+                next: (res) => {
+                    this.adminBadges = res || [];
+                    this.trainingBadgeById = new Map(
+                        (this.adminBadges || []).map((b) => [Number(b.id), b] as const),
+                    );
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    // best-effort
+                },
+            });
+    }
+
     loadBadges(): void {
+        this.ensureTrainingIdentitiesLoaded();
         this.setTrainingBusy(true, null);
         this.http.get<BadgeResponse[]>(`${this.trainingAdminBase()}/badges`).subscribe({
             next: (res) => {
                 this.adminBadges = res || [];
+                this.trainingBadgeById = new Map(
+                    (this.adminBadges || []).map((b) => [Number(b.id), b] as const),
+                );
                 this.refreshTrainingTable();
                 this.setTrainingBusy(false, null);
             },
@@ -3574,7 +3779,7 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteBadge(b: BadgeResponse): void {
-        if (!confirm(`Delete badge #${b.id} (${b.name})?`)) return;
+        if (!confirm(`Delete badge "${b.name}"?`)) return;
         this.setTrainingBusy(true, null);
         this.http
             .delete(`${this.trainingAdminBase()}/badges/${b.id}`)
@@ -3587,12 +3792,16 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     loadPaths(): void {
+        this.ensureTrainingIdentitiesLoaded();
         this.setTrainingBusy(true, null);
         this.http
             .get<TrainingPathResponse[]>(`${this.trainingAdminBase()}/paths`)
             .subscribe({
                 next: (res) => {
                     this.adminPaths = res || [];
+                    this.trainingPathById = new Map(
+                        (this.adminPaths || []).map((p) => [Number(p.id), p] as const),
+                    );
                     this.refreshTrainingTable();
                     this.setTrainingBusy(false, null);
                 },
@@ -3648,7 +3857,8 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deletePath(p: TrainingPathResponse): void {
-        if (!confirm(`Delete path #${p.id} for user ${p.userId}?`)) return;
+        if (!confirm(`Delete path for ${this.userLabelByKeycloakId(p.userId)}?`))
+            return;
         this.setTrainingBusy(true, null);
         this.http
             .delete(`${this.trainingAdminBase()}/paths/${p.id}`)
@@ -3661,6 +3871,8 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     loadModules(): void {
+        this.ensureTrainingIdentitiesLoaded();
+        this.fetchPathsForLookup();
         this.setTrainingBusy(true, null);
         this.http
             .get<TrainingModuleResponse[]>(`${this.trainingAdminBase()}/modules`)
@@ -3715,7 +3927,7 @@ export class AdminDashboardComponent implements OnInit {
     saveModule(): void {
         const pathId = Number(this.moduleForm.pathId);
         if (!Number.isFinite(pathId) || pathId <= 0) {
-            this.trainingError = "Path ID is required for modules.";
+            this.trainingError = "Path is required for modules.";
             this.cdr.markForCheck();
             return;
         }
@@ -3761,7 +3973,7 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteModule(m: TrainingModuleResponse): void {
-        if (!confirm(`Delete module #${m.id} (${m.title})?`)) return;
+        if (!confirm(`Delete module "${m.title}"?`)) return;
         this.setTrainingBusy(true, null);
         this.http
             .delete(`${this.trainingAdminBase()}/modules/${m.id}`)
@@ -3774,6 +3986,7 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     loadTrackers(): void {
+        this.ensureTrainingIdentitiesLoaded();
         this.setTrainingBusy(true, null);
         this.http
             .get<UserXPTrackerResponse[]>(
@@ -3853,7 +4066,8 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteTracker(t: UserXPTrackerResponse): void {
-        if (!confirm(`Delete tracker #${t.id} for user ${t.userId}?`)) return;
+        if (!confirm(`Delete tracker for ${this.userLabelByKeycloakId(t.userId)}?`))
+            return;
         this.setTrainingBusy(true, null);
         this.http
             .delete(`${this.trainingAdminBase()}/xp-trackers/${t.id}`)
@@ -3866,6 +4080,7 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     loadActivities(): void {
+        this.ensureTrainingIdentitiesLoaded();
         this.setTrainingBusy(true, null);
         this.http
             .get<DailyActivityResponse[]>(
@@ -3950,11 +4165,16 @@ export class AdminDashboardComponent implements OnInit {
     deleteActivity(a: DailyActivityResponse): void {
         const id = (a.id as any) ?? null;
         if (!id) {
-            this.trainingError = "Cannot delete an activity without an ID.";
+            this.trainingError = "Cannot delete an activity (missing identifier).";
             this.cdr.markForCheck();
             return;
         }
-        if (!confirm(`Delete activity #${id} for user ${a.userId} (${a.activityDate})?`)) return;
+        if (
+            !confirm(
+                `Delete activity for ${this.userLabelByKeycloakId(a.userId)} (${a.activityDate})?`,
+            )
+        )
+            return;
         this.setTrainingBusy(true, null);
         this.http
             .delete(`${this.trainingAdminBase()}/activities/${id}`)
@@ -3967,6 +4187,8 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     loadUserBadges(): void {
+        this.ensureTrainingIdentitiesLoaded();
+        this.fetchBadgesForLookup();
         this.setTrainingBusy(true, null);
         this.http
             .get<UserBadgeResponse[]>(
@@ -4006,7 +4228,7 @@ export class AdminDashboardComponent implements OnInit {
     saveUserBadge(): void {
         const badgeId = Number(this.userBadgeForm.badgeId);
         if (!Number.isFinite(badgeId) || badgeId <= 0) {
-            this.trainingError = "Badge ID is required for user badges.";
+            this.trainingError = "Badge is required for user badges.";
             this.cdr.markForCheck();
             return;
         }
@@ -4044,7 +4266,11 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     deleteUserBadge(ub: UserBadgeResponse): void {
-        if (!confirm(`Delete user-badge #${ub.id} for user ${ub.userId}?`))
+        if (
+            !confirm(
+                `Delete user badge for ${this.userLabelByKeycloakId(ub.userId)} (${this.badgeLabelById(ub.badgeId)})?`,
+            )
+        )
             return;
         this.setTrainingBusy(true, null);
         this.http
