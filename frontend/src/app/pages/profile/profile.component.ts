@@ -82,6 +82,7 @@ export class ProfileComponent implements OnInit {
     private cdr = inject(ChangeDetectorRef);
     private userApi = inject(UserApiService);
     private currentUserStore = inject(CurrentUserStoreService);
+    private router = inject(Router);
 
     user: UserProfile | null = null;
     initials = "";
@@ -121,6 +122,7 @@ export class ProfileComponent implements OnInit {
         lastName: "",
         bio: "",
         avatarUrl: "",
+        phoneNumber: "",
         city: "",
         preferredIndustry: "",
         preferredLanguage: "fr",
@@ -143,26 +145,31 @@ export class ProfileComponent implements OnInit {
         "Git",
         "REST API",
     ];
-        } else if (cvUrl.startsWith("/uploads/")) {
-            this.cvLink = `${environment.apiUrl}${cvUrl}`;
-        } else if (cvUrl.startsWith("/")) {
-            this.cvLink = `${environment.apiUrl}${cvUrl}`;
 
-            this.cvLink = `${environment.apiUrl}/uploads/${cvUrl}`;
+    preferences = [
         { label: "Interview format", value: "Video call" },
+        { label: "Preferred language", value: "Not set" },
+        { label: "Session length", value: "45 min" },
+        { label: "Availability", value: "Weekday evenings" },
+        { label: "City", value: "Not set" },
     ];
 
     ngOnInit(): void {
         this.loadProfile();
     }
 
-
     loadProfile(): void {
         this.userApi.getCurrentUser().subscribe({
             next: (user) => {
                 user.skills = user.skills || [];
-                    user.cvUrl || null,
-                );
+                this.user = user;
+                this.initials = this.computeInitials(user.firstName, user.lastName);
+                this.currentUserStore.setCurrentUser(user);
+                this.avatarPreviewUrl = user.avatarUrl || "";
+                this.selectedSkills = [...user.skills];
+                this.experiences = this.parseExperiences(user.experiencesJson);
+                this.educations = this.parseEducations(user.educationsJson);
+                this.selectedCvFileName = this.extractFileNameFromUrl(user.cvUrl || null);
                 this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();
