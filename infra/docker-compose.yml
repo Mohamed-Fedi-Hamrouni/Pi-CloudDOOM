@@ -164,6 +164,29 @@ services:
             retries: 10
             start_period: 90s
 
+    ollama:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama
+        restart: unless-stopped
+        volumes:
+            - ollamadata:/root/.ollama
+        healthcheck:
+            test: ["CMD", "ollama", "list"]
+            interval: 30s
+            timeout: 10s
+            retries: 10
+            start_period: 20s
+
+    ollama-init:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama-init
+        depends_on:
+            ollama:
+                condition: service_started
+        entrypoint: ["/bin/sh", "-c"]
+        command: >
+            "sleep 5 && OLLAMA_HOST=http://ollama:11434 ollama pull llama3.2:3b"
+
     user-service:
         build:
             context: ../user-service
@@ -196,6 +219,9 @@ services:
             KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
+            APP_OLLAMA_BASE_URL: http://ollama:11434
+            APP_OLLAMA_MODEL: llama3.2:3b
+            APP_OLLAMA_TIMEOUT_SECONDS: 120
 
     frontend:
         build:
@@ -215,6 +241,7 @@ volumes:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    ollamadata:
 
 networks:
     default:
