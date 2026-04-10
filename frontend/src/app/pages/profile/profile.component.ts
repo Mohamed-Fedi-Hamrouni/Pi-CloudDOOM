@@ -121,7 +121,6 @@ export class ProfileComponent implements OnInit {
         lastName: "",
         bio: "",
         avatarUrl: "",
-        phoneNumber: "",
         city: "",
         preferredIndustry: "",
         preferredLanguage: "fr",
@@ -144,33 +143,24 @@ export class ProfileComponent implements OnInit {
         "Git",
         "REST API",
     ];
+        } else if (cvUrl.startsWith("/uploads/")) {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
+        } else if (cvUrl.startsWith("/")) {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
 
-    preferences = [
+            this.cvLink = `${environment.apiUrl}/uploads/${cvUrl}`;
         { label: "Interview format", value: "Video call" },
-        { label: "Preferred language", value: "English" },
-        { label: "Session length", value: "45 min" },
-        { label: "Availability", value: "Weekday evenings" },
-        { label: "Timezone", value: "GMT+1 (Tunisia)" },
     ];
 
     ngOnInit(): void {
         this.loadProfile();
     }
 
-    private router = inject(Router);
 
     loadProfile(): void {
         this.userApi.getCurrentUser().subscribe({
             next: (user) => {
                 user.skills = user.skills || [];
-                this.user = user;
-                this.initials = this.computeInitials(user.firstName, user.lastName);
-                this.currentUserStore.setCurrentUser(user);
-                this.avatarPreviewUrl = user.avatarUrl || "";
-                this.selectedSkills = [...user.skills];
-                this.experiences = this.parseExperiences(user.experiencesJson);
-                this.educations = this.parseEducations(user.educationsJson);
-                this.selectedCvFileName = this.extractFileNameFromUrl(
                     user.cvUrl || null,
                 );
                 this.refreshDerivedFields();
@@ -912,13 +902,28 @@ export class ProfileComponent implements OnInit {
                 updated.skills = updated.skills || [];
                 this.user = updated;
                 this.currentUserStore.setCurrentUser(updated);
+
+                this.selectedSkills = [...updated.skills];
+                this.editForm.skills = [...updated.skills];
+
+                this.experiences = this.parseExperiences(
+                    updated.experiencesJson,
+                );
+                this.educations = this.parseEducations(updated.educationsJson);
+
+                if (this.editing) {
+                    this.editForm.bio = updated.bio || "";
+                }
+
                 this.selectedCvFileName = this.extractFileNameFromUrl(
                     updated.cvUrl || null,
                 );
+
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
                 this.refreshDerivedFields();
                 this.refreshCompletion();
+                this.syncPreferences();
                 this.cdr.markForCheck();
             },
             error: (err) => {
@@ -958,8 +963,12 @@ export class ProfileComponent implements OnInit {
             this.cvLink = "";
         } else if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
             this.cvLink = cvUrl;
-        } else {
+        } else if (cvUrl.startsWith("/uploads/")) {
             this.cvLink = `${environment.apiUrl}${cvUrl}`;
+        } else if (cvUrl.startsWith("/")) {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
+        } else {
+            this.cvLink = `${environment.apiUrl}/uploads/${cvUrl}`;
         }
 
         this.preferredLanguageLabel = this.getLanguageLabel(

@@ -18,7 +18,7 @@ public class CvStorageService {
 
     private static final long MAX_CV_SIZE_BYTES = 5L * 1024L * 1024L;
     private static final String PDF_CONTENT_TYPE = "application/pdf";
-    private static final String CV_URL_PREFIX = "/uploads/cvs/";
+    private static final String CV_STORAGE_PREFIX = "cvs/";
 
     private final Path cvsDirectory;
 
@@ -34,7 +34,7 @@ public class CvStorageService {
             String fileName = "user-" + userId + "-cv-" + UUID.randomUUID() + ".pdf";
             Path target = cvsDirectory.resolve(fileName);
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-            return CV_URL_PREFIX + fileName;
+            return CV_STORAGE_PREFIX + fileName;
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to store CV file", exception);
         }
@@ -49,11 +49,11 @@ public class CvStorageService {
             return;
         }
 
-        if (!previousCvUrl.startsWith(CV_URL_PREFIX)) {
-            return;
-        }
+        if (!previousCvUrl.startsWith(CV_STORAGE_PREFIX)) {
+    return;
+}
 
-        String fileName = previousCvUrl.substring(CV_URL_PREFIX.length());
+String fileName = previousCvUrl.substring(CV_STORAGE_PREFIX.length());
         if (fileName.contains("/") || fileName.contains("\\")) {
             return;
         }

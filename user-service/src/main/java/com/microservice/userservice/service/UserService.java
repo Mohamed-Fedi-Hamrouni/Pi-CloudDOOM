@@ -48,6 +48,11 @@ public class UserService {
     private final ObjectMapper objectMapper;
     private final CvStorageService cvStorageService;
 
+    private final PdfTextExtractorService pdfTextExtractorService;
+private final CvAiParsingService cvAiParsingService;
+private final CvNormalizationService cvNormalizationService;
+private final CvProfileEnrichmentService cvProfileEnrichmentService;
+
     // ── CREATE ────────────────────────────────────────────────────────────────
 
     @Transactional
@@ -163,30 +168,62 @@ public class UserService {
         return toResponseWithSkills(saved);
     }
 
-    @Transactional
-    @Caching(evict = {
-        @CacheEvict(value = "users", allEntries = true),
-        @CacheEvict(value = "users-by-keycloak", allEntries = true),
-        @CacheEvict(value = "users-by-email", allEntries = true)
-    })
-    public UserResponse uploadCv(String keycloakId, MultipartFile file) {
-        log.info("Uploading CV for user with keycloakId: {}", keycloakId);
+   @Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users", allEntries = true),
+    @CacheEvict(value = "users-by-keycloak", allEntries = true),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+public UserResponse uploadCv(String keycloakId, MultipartFile file) {
+    log.info("Uploading CV for user with keycloakId: {}", keycloakId);
 
-        User user = userRepository.findByKeycloakId(keycloakId)
-            .filter(u -> u.getDeletedAt() == null)
-            .orElseThrow(() -> new UserNotFoundException(
-                "User not found with keycloakId: " + keycloakId));
+    User user = userRepository.findByKeycloakId(keycloakId)
+        .filter(u -> u.getDeletedAt() == null)
+        .orElseThrow(() -> new UserNotFoundException(
+            "User not found with keycloakId: " + keycloakId));
 
-        String previousCvUrl = user.getCvUrl();
-        String currentCvUrl = cvStorageService.storeCv(file, user.getId());
+    String previousCvUrl = user.getCvUrl();
+    String currentCvUrl = cvStorageService.storeCv(file, user.getId());
 
-        user.setCvUrl(currentCvUrl);
-        User saved = userRepository.save(user);
-        cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
-        eventProducer.publishUserUpdated(saved);
+    user.setCvUrl(currentCvUrl);
 
-        return toResponseWithSkills(saved);
+    try {
+        // ── Step 1: Extract text from PDF
+        var extraction = pdfTextExtractorService.extractText(currentCvUrl);
+
+        if (!extraction.isUsable()) {
+            log.warn("CV extraction is low quality, skipping AI parsing for user {}", user.getId());
+        } else {
+            String text = extraction.text();
+
+            // ── Step 2: AI parsing
+            var parsed = cvAiParsingService.parse(text);
+
+            // ── Step 3: Normalize
+            var normalized = cvNormalizationService.normalize(parsed);
+
+            // ── Step 4: Apply to user
+            cvProfileEnrichmentService.applyToUser(user, normalized);
+
+            log.info("CV successfully parsed and applied for user {}", user.getId());
+        }
+
+    } catch (Exception ex) {
+        // IMPORTANT: CV upload must NOT fail if AI fails
+        log.error("CV parsing failed for user {}: {}", user.getId(), ex.getMessage());
     }
+
+    // ── Step 5: Save user
+    User saved = userRepository.save(user);
+
+    // ── Step 6: Cleanup old file
+    cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
+
+    // ── Step 7: Emit event
+    eventProducer.publishUserUpdated(saved);
+
+    return toResponseWithSkills(saved);
+}
 
     @Transactional
     @Caching(evict = {
