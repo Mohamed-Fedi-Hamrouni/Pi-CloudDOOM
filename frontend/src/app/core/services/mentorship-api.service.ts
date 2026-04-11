@@ -9,6 +9,13 @@ import {
     CreateMentorSessionDTO
 } from '../models/models';
 
+export interface MyMentorRating {
+    mentorId: string;
+    stars: number;
+    comment: string | null;
+    sessionId: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MentorshipApiService {
     private http = inject(HttpClient);
@@ -83,9 +90,17 @@ export class MentorshipApiService {
         return this.http.get<any>(`${this.api}/api/mentor-ratings/mentor/${mentorId}/stats`);
     }
 
-    rateMentor(mentorId: string, stars: number, comment: string, sessionId: string): Observable<any> {
-        return this.http.post(`${this.api}/api/mentor-ratings/mentor/${mentorId}`, {
-        stars, comment, sessionId
-    });
+    getMyRatings(): Observable<MyMentorRating[]> {
+        return this.http.get<MyMentorRating[]>(`${this.api}/api/mentor-ratings/me`);
+    }
+
+    rateMentor(mentorId: string, stars: number, comment: string, sessionId?: string | null): Observable<any> {
+        const body: any = { stars, comment };
+        if (sessionId) body.sessionId = sessionId;
+        return this.http.post(`${this.api}/api/mentor-ratings/mentor/${mentorId}`, body);
+    }
+
+    unrateMentor(mentorId: string): Observable<void> {
+        return this.http.delete<void>(`${this.api}/api/mentor-ratings/mentor/${mentorId}`);
     }
 }

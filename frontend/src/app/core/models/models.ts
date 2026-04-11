@@ -55,7 +55,11 @@ export interface Mentor {
   completedSessions?: number;
   averageRating?: number;
   totalRatings?: number;
-  canRate?: boolean; // true if mentee has a completed session with this mentor
+  canRate?: boolean; // legacy flag; UI now allows rating even without sessions
+
+  // Current user's rating for this mentor (optional)
+  myRatingStars?: number | null;
+  myRatingComment?: string | null;
 }
 
 // Resource model

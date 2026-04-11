@@ -13,6 +13,8 @@ public interface MentorRatingRepository extends JpaRepository<MentorRating, UUID
 
     List<MentorRating> findByMentorId(UUID mentorId);
 
+    List<MentorRating> findByMenteeId(UUID menteeId);
+
     Optional<MentorRating> findByMenteeIdAndMentorId(UUID menteeId, UUID mentorId);
 
     @Query("SELECT COUNT(r) FROM MentorRating r WHERE r.mentorId = :mentorId")
@@ -24,4 +26,6 @@ public interface MentorRatingRepository extends JpaRepository<MentorRating, UUID
     void deleteBySessionId(UUID sessionId);
 
     void deleteBySessionIdIn(List<UUID> sessionIds);
+
+    void deleteByMenteeIdAndMentorId(UUID menteeId, UUID mentorId);
 }

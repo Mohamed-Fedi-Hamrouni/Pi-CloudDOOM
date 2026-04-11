@@ -196,7 +196,8 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
           [requested]="hasRequestFor(mentor.id)"
           [requesting]="requestingId() === mentor.id"
           (requestClicked)="sendRequest($event)"
-          (rateSubmitted)="onRateSubmitted($event)">
+          (rateSubmitted)="onRateSubmitted($event)"
+          (unrateClicked)="onUnrate($event)">
         </app-mentor-card>
       </div>
 
@@ -326,6 +327,7 @@ export class MenteeViewComponent implements OnInit {
 
           this.realMentors.set(this.mentors);
           this.loadMentorStats(this.mentors);
+          this.loadMyRatings();
         },
         error: () => {
           this.mentors = [];
@@ -361,9 +363,9 @@ export class MenteeViewComponent implements OnInit {
                                 const scheduled = sessions.find(s => s.status === 'SCHEDULED');
                                 if (scheduled) this.upcomingSession.set(scheduled);
 
-                          // update canRate flag for this mentor (rating widget visibility)
+                          // rating is allowed even without sessions
                           this.realMentors.update(list => list.map(m =>
-                            m.id === r.mentorId ? { ...m, canRate: this.hasCompletedSessionWith(r.mentorId) } : m
+                            m.id === r.mentorId ? { ...m, canRate: true } : m
                           ));
 
                                 this.refreshCalendarEvents();
@@ -518,17 +520,37 @@ export class MenteeViewComponent implements OnInit {
     }
 
     onRateSubmitted(event: { mentorId: string; stars: number; comment: string }) {
-      // find a completed session for this mentor to pass as sessionId
-      const completedSessionId = this.findCompletedSessionId(event.mentorId);
-
       this.mentorshipApi.rateMentor(
         event.mentorId,
         event.stars,
         event.comment,
-        completedSessionId ?? ''
+        this.findCompletedSessionId(event.mentorId)
       ).subscribe({
-        next: () => this.showSuccess('Rating submitted!'),
+        next: () => {
+          this.realMentors.update(list => list.map(m =>
+            m.id === event.mentorId
+              ? { ...m, myRatingStars: event.stars, myRatingComment: event.comment }
+              : m
+          ));
+          this.refreshOneMentorStats(event.mentorId);
+          this.showSuccess('Rating saved!');
+        },
         error: (err) => this.showError(err.error?.error ?? 'Failed to submit rating.')
+      });
+    }
+
+    onUnrate(mentorId: string) {
+      this.mentorshipApi.unrateMentor(mentorId).subscribe({
+        next: () => {
+          this.realMentors.update(list => list.map(m =>
+            m.id === mentorId
+              ? { ...m, myRatingStars: null, myRatingComment: null }
+              : m
+          ));
+          this.refreshOneMentorStats(mentorId);
+          this.showSuccess('Rating removed.');
+        },
+        error: () => this.showError('Failed to remove rating.')
       });
     }
 
@@ -554,7 +576,7 @@ export class MenteeViewComponent implements OnInit {
                 completedSessions: stats.completedSessions,
                 averageRating: stats.averageRating,
                 totalRatings: stats.totalRatings,
-                canRate: this.hasCompletedSessionWith(m.id)
+                canRate: true
               } : mentor
             ));
           },
@@ -563,12 +585,36 @@ export class MenteeViewComponent implements OnInit {
       });
     }
 
-    private hasCompletedSessionWith(mentorId: string): boolean {
-      for (const [requestId, sessions] of this.sessionsByRequest()) {
-        const req = this.myRequests().find(r => r.id === requestId && r.mentorId === mentorId);
-        if (req && sessions.some(s => s.status === 'COMPLETED')) return true;
-      }
-      return false;
+    private refreshOneMentorStats(mentorId: string) {
+      this.mentorshipApi.getMentorStats(mentorId).subscribe({
+        next: (stats) => {
+          this.realMentors.update(list => list.map(m =>
+            m.id === mentorId
+              ? { ...m, completedSessions: stats.completedSessions, averageRating: stats.averageRating, totalRatings: stats.totalRatings }
+              : m
+          ));
+        },
+        error: () => {}
+      });
+    }
+
+    private loadMyRatings() {
+      this.mentorshipApi.getMyRatings().subscribe({
+        next: (ratings) => {
+          const byMentorId: Record<string, { stars: number; comment: string | null }> = {};
+          for (const r of ratings || []) {
+            if (!r?.mentorId) continue;
+            byMentorId[r.mentorId] = { stars: r.stars, comment: r.comment };
+          }
+
+          this.realMentors.update(list => list.map(m => {
+            const mine = byMentorId[m.id];
+            if (!mine) return m;
+            return { ...m, myRatingStars: mine.stars, myRatingComment: mine.comment };
+          }));
+        },
+        error: () => {}
+      });
     }
 
     setFilter(f: 'all' | 'available') { this.activeFilter.set(f); }

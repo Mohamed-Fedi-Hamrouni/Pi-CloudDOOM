@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Mentor } from '../../../core/models/models';
 
@@ -45,9 +45,9 @@ import { Mentor } from '../../../core/models/models';
 
       <p class="mentor-bio">{{ mentor.bio }}</p>
 
-      <!-- Rating widget — only shown when canRate is true -->
-      <div class="rating-widget" *ngIf="mentor.canRate && !rated()">
-        <div class="rating-label">Rate your session:</div>
+      <!-- Rating widget -->
+      <div class="rating-widget">
+        <div class="rating-label">Rate this mentor:</div>
         <div class="star-picker">
           <span *ngFor="let s of [1,2,3,4,5]"
             class="star-pick"
@@ -63,15 +63,19 @@ import { Mentor } from '../../../core/models/models';
           [value]="ratingComment()"
           (input)="ratingComment.set($any($event.target).value)">
         </textarea>
-        <button class="btn btn-primary btn-sm"
-          [disabled]="selectedStar() === 0 || submittingRating()"
-          (click)="submitRating()">
-          {{ submittingRating() ? 'Submitting...' : 'Submit Rating' }}
-        </button>
-      </div>
-
-      <div class="rating-done" *ngIf="rated()">
-        ✅ Thank you for rating!
+        <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm"
+            *ngIf="hasExistingRating()"
+            [disabled]="submittingRating()"
+            (click)="unrate()">
+            Remove
+          </button>
+          <button class="btn btn-primary btn-sm"
+            [disabled]="selectedStar() === 0 || submittingRating()"
+            (click)="submitRating()">
+            {{ submittingRating() ? 'Saving...' : (hasExistingRating() ? 'Update Rating' : 'Submit Rating') }}
+          </button>
+        </div>
       </div>
 
       <div class="mentor-footer">
@@ -130,18 +134,19 @@ import { Mentor } from '../../../core/models/models';
     .rating-done { font-size: var(--text-sm); color: var(--teal-700); font-weight: 600; text-align: center; padding: var(--space-2); }
   `]
 })
-export class MentorCardComponent {
+export class MentorCardComponent implements OnChanges {
   @Input() mentor!: Mentor;
   @Input() requested = false;
   @Input() requesting = false;
   @Output() requestClicked = new EventEmitter<string>();
   @Output() rateSubmitted = new EventEmitter<{ mentorId: string; stars: number; comment: string }>();
+  @Output() unrateClicked = new EventEmitter<string>();
 
   hoveredStar = signal(0);
   selectedStar = signal(0);
   ratingComment = signal('');
   submittingRating = signal(false);
-  rated = signal(false);
+  hasExistingRating = signal(false);
 
   displayRating(): number {
     return this.mentor.averageRating ?? this.mentor.rating ?? 0;
@@ -161,6 +166,16 @@ export class MentorCardComponent {
     }
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['mentor']) {
+      const stars = this.mentor?.myRatingStars ?? 0;
+      const comment = this.mentor?.myRatingComment ?? '';
+      this.selectedStar.set(typeof stars === 'number' ? stars : 0);
+      this.ratingComment.set(comment || '');
+      this.hasExistingRating.set(!!this.mentor?.myRatingStars);
+    }
+  }
+
   submitRating() {
     if (this.selectedStar() === 0) return;
     this.submittingRating.set(true);
@@ -169,10 +184,10 @@ export class MentorCardComponent {
       stars: this.selectedStar(),
       comment: this.ratingComment()
     });
-    // parent handles the API call and calls back
-    setTimeout(() => {
-      this.submittingRating.set(false);
-      this.rated.set(true);
-    }, 1000);
+    setTimeout(() => this.submittingRating.set(false), 800);
+  }
+
+  unrate() {
+    this.unrateClicked.emit(this.mentor.id);
   }
 }

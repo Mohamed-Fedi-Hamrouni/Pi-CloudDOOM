@@ -3,7 +3,6 @@ package com.microservice.mentorshipservice.services;
 import com.microservice.mentorshipservice.DTOs.MentorStatsDTO;
 import com.microservice.mentorshipservice.DTOs.RatingRequestDTO;
 import com.microservice.mentorshipservice.entities.MentorRating;
-import com.microservice.mentorshipservice.entities.MentorSession;
 import com.microservice.mentorshipservice.enums.MentorStatus;
 import com.microservice.mentorshipservice.enums.SessionStatus;
 import com.microservice.mentorshipservice.repository.MentorRatingRepository;
@@ -13,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -28,30 +28,27 @@ public class MentorRatingService {
             throw new RuntimeException("Stars must be between 1 and 5");
         }
 
-        // verify mentee has a COMPLETED session with this mentor
-        boolean hasCompleted = requestRepository.findByMenteeId(menteeId)
-            .stream()
-            .filter(r -> r.getMentorId().equals(mentorId) && r.getStatus() == MentorStatus.ACCEPTED)
-            .flatMap(r -> sessionRepository.findByRequestId(r.getId()).stream())
-            .anyMatch(s -> s.getStatus() == SessionStatus.COMPLETED);
-
-        if (!hasCompleted) {
-            throw new RuntimeException("You can only rate a mentor after a completed session");
-        }
-
-        // check if already rated
-        if (ratingRepository.findByMenteeIdAndMentorId(menteeId, mentorId).isPresent()) {
-            throw new RuntimeException("You have already rated this mentor");
-        }
-
-        MentorRating rating = new MentorRating();
+        // One rating per mentee+mentor, but allow editing by upserting.
+        Optional<MentorRating> existing = ratingRepository.findByMenteeIdAndMentorId(menteeId, mentorId);
+        MentorRating rating = existing.orElseGet(MentorRating::new);
         rating.setMenteeId(menteeId);
         rating.setMentorId(mentorId);
-        rating.setSessionId(dto.getSessionId());
         rating.setStars(dto.getStars());
         rating.setComment(dto.getComment());
+        // sessionId is optional (can be null). If provided, store/overwrite it.
+        if (dto.getSessionId() != null) {
+            rating.setSessionId(dto.getSessionId());
+        }
 
         return ratingRepository.save(rating);
+    }
+
+    public void unrateMentor(UUID menteeId, UUID mentorId) {
+        ratingRepository.deleteByMenteeIdAndMentorId(menteeId, mentorId);
+    }
+
+    public List<MentorRating> getMyRatings(UUID menteeId) {
+        return ratingRepository.findByMenteeId(menteeId);
     }
 
     public MentorStatsDTO getMentorStats(UUID mentorId) {
