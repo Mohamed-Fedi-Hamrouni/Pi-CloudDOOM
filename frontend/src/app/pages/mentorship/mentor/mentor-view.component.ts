@@ -27,6 +27,7 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
         </div>
         <div class="mentor-page-stats">
           <span class="chip chip-teal">📨 {{ pendingCount() }} Pending</span>
+          <span class="chip chip-mint">⭐ {{ mentorAverageRating() }} ({{ mentorTotalRatings() }} ratings)</span>
           <span class="chip chip-purple">🎓 Mentor Dashboard</span>
           <button 
             class="btn btn-sm"
@@ -115,12 +116,12 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
               <!-- ACCEPTED actions -->
               <div class="request-actions" *ngIf="req.status === 'ACCEPTED'">
                 <button class="btn btn-primary btn-sm"
-                  *ngIf="!getSession(req.id)"
+                  *ngIf="!hasScheduledSession(req.id)"
                   (click)="openScheduleModal(req.id)">
                   📅 Schedule
                 </button>
                 <button class="btn btn-teal btn-sm"
-                  *ngIf="getSession(req.id)"
+                  *ngIf="getSessionsForRequest(req.id).length > 0"
                   (click)="toggleSession(req.id)">
                   {{ viewingId() === req.id ? '▲ Hide' : '👁 Session' }}
                 </button>
@@ -143,46 +144,54 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
             <!-- Session detail panel -->
             <div class="session-panel"
-              *ngIf="viewingId() === req.id && getSession(req.id)">
+              *ngIf="viewingId() === req.id && getSessionsForRequest(req.id).length > 0">
 
               <ng-container *ngIf="!editMode()">
-                <div class="session-details">
-                  <div class="session-row">
-                    <span class="session-label">📅 Date & Time</span>
-                    <span class="session-value">
-                      {{ getSession(req.id)!.scheduledAt | date:'full' }}
-                    </span>
+                <div class="sessions-list">
+                  <div class="session-card" *ngFor="let session of getSessionsForRequest(req.id)">
+                    <div class="session-row">
+                      <span class="session-label">📅 Date</span>
+                      <span class="session-value">{{ session.scheduledAt | date:'full' }}</span>
+                    </div>
+                    <div class="session-row">
+                      <span class="session-label">🎥 Room Name</span>
+                      <span class="session-value">{{ session.meetingLink }}</span>
+                    </div>
+                    <div class="session-row">
+                      <span class="session-label">📊 Status</span>
+                      <span class="chip"
+                        [class.chip-teal]="session.status === 'SCHEDULED'"
+                        [class.chip-neutral]="session.status === 'COMPLETED'"
+                        [class.chip-error]="session.status === 'CANCELLED'">
+                        {{ session.status }}
+                      </span>
+                    </div>
+
+                    <div class="session-actions">
+                      <button class="btn btn-primary btn-sm"
+                        *ngIf="session.status === 'SCHEDULED'"
+                        (click)="enterEditMode(req.id, session)">
+                        ✏️ Edit
+                      </button>
+                      <button class="btn btn-ghost btn-sm"
+                        *ngIf="session.status === 'SCHEDULED'"
+                        (click)="cancelActiveSession(session.id, req.id)">
+                        🗑 Cancel Session
+                      </button>
+                      <button class="btn btn-teal btn-sm"
+                        *ngIf="session.status === 'SCHEDULED'"
+                        [disabled]="!canJoin(session) || completingRequestId() === req.id"
+                        (click)="completeActiveSession(session.id, req.id)">
+                        {{ completingRequestId() === req.id ? '...' : '✅ Complete' }}
+                      </button>
+                      <button class="btn btn-primary btn-sm"
+                        *ngIf="session.status === 'SCHEDULED'"
+                        [disabled]="!canJoin(session)"
+                        (click)="openJitsi(session)">
+                        Join
+                      </button>
+                    </div>
                   </div>
-                  <div class="session-row">
-                    <span class="session-label">🎥 Room Name</span>
-                    <span class="session-value">{{ getSession(req.id)!.meetingLink }}</span>
-                  </div>
-                  <div class="session-row">
-                    <span class="session-label">📊 Status</span>
-                    <span class="chip chip-teal">{{ getSession(req.id)!.status }}</span>
-                  </div>
-                </div>
-                <div class="session-actions">
-                  <button class="btn btn-primary btn-sm" (click)="enterEditMode(req.id)">
-                    ✏️ Edit
-                  </button>
-                  <button class="btn btn-ghost btn-sm"
-                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
-                    (click)="cancelActiveSession(getSession(req.id)!.id, req.id)">
-                    🗑 Cancel Session
-                  </button>
-                  <button class="btn btn-teal btn-sm"
-                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
-                    [disabled]="!canJoin(getSession(req.id)!) || completingRequestId() === req.id"
-                    (click)="completeActiveSession(getSession(req.id)!.id, req.id)">
-                    {{ completingRequestId() === req.id ? '...' : '✅ Complete' }}
-                  </button>
-                  <button class="btn btn-primary btn-sm"
-                    *ngIf="getSession(req.id)!.status === 'SCHEDULED'"
-                    [disabled]="!canJoin(getSession(req.id)!)"
-                    (click)="openJitsi(getSession(req.id)!)">
-                    Join
-                  </button>
                 </div>
               </ng-container>
 
@@ -204,7 +213,7 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
                   <div class="schedule-actions">
                     <button class="btn btn-primary"
                       [disabled]="!scheduledAt || !meetingLink || schedulingSession()"
-                      (click)="rescheduleSession(req.id)">
+                      (click)="updateSession(req.id)">
                       {{ schedulingSession() ? 'Saving...' : '💾 Save Changes' }}
                     </button>
                     <button class="btn btn-ghost" (click)="exitEditMode()">Cancel</button>
@@ -279,7 +288,7 @@ export class MentorViewComponent implements OnInit {
   });
 
     incomingRequests = signal<MentorRequest[]>([]);
-    sessionMap = signal<Map<string, MentorSession>>(new Map());
+    sessionsByRequest = signal<Map<string, MentorSession[]>>(new Map());
     loadingRequests = signal(false);
     processingId = signal<string | null>(null);
     schedulingRequestId = signal<string | null>(null);
@@ -294,8 +303,11 @@ export class MentorViewComponent implements OnInit {
     currentUserId = signal<string | null>(null);
     displayName = signal<string>('');
     activeRoomName = signal<string | null>(null);
+    mentorAverageRating = signal<number>(0);
+    mentorTotalRatings = signal<number>(0);
     scheduledAt = '';
     meetingLink = '';
+    editingSessionId: string | null = null;
 
     private generateRoomName(): string {
       try {
@@ -330,9 +342,20 @@ export class MentorViewComponent implements OnInit {
                 this.currentUserId.set(user.id);
                 this.isAvailable.set(user.status === 'ACTIVE');
           this.displayName.set(`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User');
+                this.loadMyRatingStats(user.id);
             },
         error: () => this.showError('Failed to load profile.')
         });
+    }
+
+    private loadMyRatingStats(mentorId: string) {
+      this.mentorshipApi.getMentorStats(mentorId).subscribe({
+        next: (stats) => {
+          this.mentorAverageRating.set(stats.averageRating ?? 0);
+          this.mentorTotalRatings.set(stats.totalRatings ?? 0);
+        },
+        error: () => {}
+      });
     }
 
     canJoin(session: MentorSession): boolean {
@@ -368,7 +391,7 @@ export class MentorViewComponent implements OnInit {
       }
 
       this.loadingRequests.set(true);
-      this.sessionMap.set(new Map());
+      this.sessionsByRequest.set(new Map());
       this.refreshCalendarEvents();
 
       this.mentorshipApi.getRequestsByMentor(userId).subscribe({
@@ -381,15 +404,12 @@ export class MentorViewComponent implements OnInit {
                     .forEach(r => {
                         this.mentorshipApi.getSessionsByRequest(r.id).subscribe({
                             next: (sessions) => {
-                                const active = sessions.find(s => s.status === 'SCHEDULED');
-                                if (active) {
-                                    this.sessionMap.update(map => {
-                                        const newMap = new Map(map);
-                                        newMap.set(r.id, active);
-                                        return newMap;
-                                    });
-                      this.refreshCalendarEvents();
-                                }
+                        this.sessionsByRequest.update(map => {
+                          const newMap = new Map(map);
+                          newMap.set(r.id, sessions);
+                          return newMap;
+                        });
+                        this.refreshCalendarEvents();
                             }
                         });
                     });
@@ -430,22 +450,25 @@ export class MentorViewComponent implements OnInit {
         }
 
       private refreshCalendarEvents() {
-        const sessions = Array.from(this.sessionMap().values());
+        const sessions: MentorSession[] = [];
+        for (const list of this.sessionsByRequest().values()) {
+          sessions.push(...list);
+        }
         const events: EventInput[] = sessions
           .filter(s => s.status === 'SCHEDULED')
-          .map(s => ({
-            id: s.id,
-            title: 'Mentorship Session',
-            start: s.scheduledAt,
-          }));
+          .map(s => ({ id: s.id, title: 'Mentorship Session', start: s.scheduledAt }));
 
         this.calendarEvents.set(events);
         this.calendarOptions.update(opts => ({ ...opts, events }));
       }
 
-    getSession(requestId: string): MentorSession | undefined {
-        return this.sessionMap().get(requestId);
-    }
+      getSessionsForRequest(requestId: string): MentorSession[] {
+        return this.sessionsByRequest().get(requestId) ?? [];
+      }
+
+      hasScheduledSession(requestId: string): boolean {
+        return this.getSessionsForRequest(requestId).some(s => s.status === 'SCHEDULED');
+      }
 
     acceptRequest(requestId: string) {
         this.processingId.set(requestId);
@@ -472,11 +495,13 @@ export class MentorViewComponent implements OnInit {
     }
 
     deleteRequest(requestId: string) {
+      const ok = window.confirm('Are you sure? This will delete the request and all its sessions.');
+      if (!ok) return;
         this.processingId.set(requestId);
         this.mentorshipApi.deleteRequest(requestId).subscribe({
             next: () => {
                 this.incomingRequests.update(reqs => reqs.filter(r => r.id !== requestId));
-                this.sessionMap.update(map => { const m = new Map(map); m.delete(requestId); return m; });
+          this.sessionsByRequest.update(map => { const m = new Map(map); m.delete(requestId); return m; });
                 if (this.viewingId() === requestId) this.viewingId.set(null);
                 this.processingId.set(null);
                 this.showSuccess('Request deleted.');
@@ -521,7 +546,12 @@ export class MentorViewComponent implements OnInit {
             meetingLink: this.meetingLink
         }).subscribe({
             next: (session) => {
-                this.sessionMap.update(map => { const m = new Map(map); m.set(requestId, session); return m; });
+            this.sessionsByRequest.update(map => {
+              const m = new Map(map);
+              const existing = m.get(requestId) ?? [];
+              m.set(requestId, [...existing, session]);
+              return m;
+            });
             this.refreshCalendarEvents();
                 this.schedulingSession.set(false);
                 this.closeScheduleModal();
@@ -534,56 +564,57 @@ export class MentorViewComponent implements OnInit {
         });
     }
 
-    enterEditMode(requestId: string) {
-        const session = this.getSession(requestId);
-        if (!session) return;
-        this.scheduledAt = session.scheduledAt.slice(0, 16);
+      enterEditMode(requestId: string, session: MentorSession) {
+        if (!session || session.status !== 'SCHEDULED') return;
+        this.editingSessionId = session.id;
+        this.scheduledAt = (session.scheduledAt || '').slice(0, 16);
         this.meetingLink = session.meetingLink;
-      this.ensureMeetingLinkPrefilled();
+        this.ensureMeetingLinkPrefilled();
         this.editMode.set(true);
-    }
+      }
 
     exitEditMode() {
         this.editMode.set(false);
         this.scheduledAt = '';
         this.meetingLink = '';
+        this.editingSessionId = null;
     }
 
-    rescheduleSession(requestId: string) {
-        const session = this.getSession(requestId);
-        if (!session || !this.scheduledAt || !this.meetingLink) return;
+    updateSession(requestId: string) {
+        const sessionId = this.editingSessionId;
+        if (!sessionId || !this.scheduledAt || !this.meetingLink) return;
         this.schedulingSession.set(true);
 
-        this.mentorshipApi.cancelSession(session.id).subscribe({
-            next: () => {
-                this.mentorshipApi.createSession({
-                    requestId: session.requestId,
-                    scheduledAt: this.scheduledAt,
-                    meetingLink: this.meetingLink
-                }).subscribe({
-                    next: (newSession) => {
-                        this.sessionMap.update(map => { const m = new Map(map); m.set(requestId, newSession); return m; });
-                      this.refreshCalendarEvents();
-                        this.schedulingSession.set(false);
-                        this.editMode.set(false);
-                        this.scheduledAt = '';
-                        this.meetingLink = '';
-                        this.showSuccess('Session updated!');
-                    },
-                    error: (err) => {
-                        this.schedulingSession.set(false);
-                        this.showError(err.error?.error ?? 'Failed to reschedule.');
-                    }
-                });
-            },
-            error: () => { this.schedulingSession.set(false); this.showError('Failed to cancel old session.'); }
+        this.mentorshipApi.updateSession(sessionId, this.scheduledAt, this.meetingLink).subscribe({
+          next: (updated) => {
+            this.sessionsByRequest.update(map => {
+              const m = new Map(map);
+              const list = m.get(requestId) ?? [];
+              m.set(requestId, list.map(s => (s.id === sessionId ? updated : s)));
+              return m;
+            });
+            this.refreshCalendarEvents();
+
+            this.schedulingSession.set(false);
+            this.exitEditMode();
+            this.showSuccess('Session updated!');
+          },
+          error: (err) => {
+            this.schedulingSession.set(false);
+            this.showError(err.error?.error ?? 'Failed to update session.');
+          }
         });
     }
 
     cancelActiveSession(sessionId: string, requestId: string) {
         this.mentorshipApi.cancelSession(sessionId).subscribe({
             next: () => {
-                this.sessionMap.update(map => { const m = new Map(map); m.delete(requestId); return m; });
+          this.sessionsByRequest.update(map => {
+            const m = new Map(map);
+            const list = m.get(requestId) ?? [];
+            m.set(requestId, list.map(s => (s.id === sessionId ? { ...s, status: 'CANCELLED' as const } : s)));
+            return m;
+          });
           this.refreshCalendarEvents();
                 this.viewingId.set(null);
                 this.showSuccess('Session cancelled.');
@@ -596,9 +627,10 @@ export class MentorViewComponent implements OnInit {
       this.completingRequestId.set(requestId);
       this.mentorshipApi.completeSession(sessionId).subscribe({
         next: (updated) => {
-          this.sessionMap.update(map => {
+          this.sessionsByRequest.update(map => {
             const m = new Map(map);
-            m.set(requestId, updated);
+            const list = m.get(requestId) ?? [];
+            m.set(requestId, list.map(s => (s.id === sessionId ? updated : s)));
             return m;
           });
           this.refreshCalendarEvents();
