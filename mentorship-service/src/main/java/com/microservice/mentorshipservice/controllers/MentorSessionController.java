@@ -34,23 +34,38 @@ public class MentorSessionController {
         return service.getAllSessions();
     }
 
-    @PreAuthorize("hasAnyRole('USER','MENTOR')") // ADD
+    @PreAuthorize("hasAnyRole('USER','MENTOR','ADMIN')") // ADD
     @GetMapping("/request/{requestId}")
     public List<MentorSession> getByRequest(@PathVariable UUID requestId) {
         return service.getSessionsByRequest(requestId);
     }
 
     // UPDATE (COMPLETE)
-    @PreAuthorize("hasRole('MENTOR')")           // ADD
+    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")           // ADD
     @PutMapping("/{id}/complete")
     public MentorSession complete(@PathVariable UUID id) {
         return service.completeSession(id);
     }
 
     // UPDATE (CANCEL)
-    @PreAuthorize("hasAnyRole('USER','MENTOR')") // ADD — either party can cancel
+    @PreAuthorize("hasAnyRole('USER','MENTOR','ADMIN')") // ADD — either party can cancel
     @PutMapping("/{id}/cancel")
     public MentorSession cancel(@PathVariable UUID id) {
         return service.cancelSession(id);
+    }
+
+    // UPDATE (EDIT)
+    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")
+    @PutMapping("/{id}")
+    public MentorSession update(@PathVariable UUID id, @RequestBody MentorSessionDTO dto) {
+        return service.updateSession(id, dto.getScheduledAt(), dto.getMeetingLink());
+    }
+
+    // DELETE
+    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        service.deleteSession(id);
+        return ResponseEntity.noContent().build();
     }
 }

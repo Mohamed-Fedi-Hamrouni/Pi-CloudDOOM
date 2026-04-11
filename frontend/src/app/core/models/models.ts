@@ -20,6 +20,22 @@ export interface User {
 }
 
 // Mentor model
+// export interface Mentor {
+//   id: string;
+//   name: string;
+//   initials: string;
+//   avatar: string;
+//   title: string;
+//   company: string;
+//   expertise: string[];
+//   rating: number;
+//   reviews: number;
+//   sessions: number;
+//   available: boolean;
+//   price: number;
+//   bio: string;
+//   nextAvailable: string;
+// }
 export interface Mentor {
   id: string;
   name: string;
@@ -35,6 +51,11 @@ export interface Mentor {
   price: number;
   bio: string;
   nextAvailable: string;
+  // NEW — real data from backend
+  completedSessions?: number;
+  averageRating?: number;
+  totalRatings?: number;
+  canRate?: boolean; // true if mentee has a completed session with this mentor
 }
 
 // Resource model

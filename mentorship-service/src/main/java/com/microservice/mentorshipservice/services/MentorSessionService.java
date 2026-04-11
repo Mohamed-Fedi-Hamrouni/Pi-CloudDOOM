@@ -5,9 +5,11 @@ import com.microservice.mentorshipservice.entities.MentorSession;
 import com.microservice.mentorshipservice.enums.MentorStatus;
 import com.microservice.mentorshipservice.enums.SessionStatus;
 import com.microservice.mentorshipservice.repository.MentorRequestRepository;
+import com.microservice.mentorshipservice.repository.MentorRatingRepository;
 import com.microservice.mentorshipservice.repository.MentorSessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -25,6 +27,9 @@ public class MentorSessionService {
 
     @Autowired
     private MentorRequestRepository requestRepository;
+
+    @Autowired
+    private MentorRatingRepository ratingRepository;
 
     // CREATE SESSION (when request is accepted)
     public MentorSession createSession(UUID requestId, LocalDateTime scheduledAt, String meetingLink) {
@@ -89,6 +94,32 @@ public class MentorSessionService {
                 .orElseThrow(() -> new RuntimeException("Session not found"));
 
         session.setStatus(com.microservice.mentorshipservice.enums.SessionStatus.CANCELLED);
+        return sessionRepository.save(session);
+    }
+
+    @Transactional
+    public void deleteSession(UUID sessionId) {
+        if (!sessionRepository.existsById(sessionId)) {
+            throw new RuntimeException("Session not found");
+        }
+        ratingRepository.deleteBySessionId(sessionId);
+        sessionRepository.deleteById(sessionId);
+    }
+
+    public MentorSession updateSession(UUID sessionId, LocalDateTime scheduledAt, String meetingLink) {
+        MentorSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session not found"));
+
+        if (session.getStatus() != SessionStatus.SCHEDULED) {
+            throw new RuntimeException("Only SCHEDULED sessions can be edited");
+        }
+
+        if (scheduledAt != null) {
+            session.setScheduledAt(scheduledAt);
+        }
+        if (meetingLink != null) {
+            session.setMeetingLink(normalizeOrGenerateRoomName(meetingLink));
+        }
         return sessionRepository.save(session);
     }
 }

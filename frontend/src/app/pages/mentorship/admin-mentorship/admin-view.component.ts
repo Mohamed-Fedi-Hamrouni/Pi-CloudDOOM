@@ -93,6 +93,7 @@ type SessionStatus = MentorSession['status'];
 								<th>Mentor</th>
 								<th>Status</th>
 								<th>Date</th>
+									<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -108,6 +109,35 @@ type SessionStatus = MentorSession['status'];
 									</span>
 								</td>
 								<td>{{ r.createdAt | date:'medium' }}</td>
+									<td>
+										<div class="request-actions">
+											<ng-container *ngIf="r.status === 'PENDING'">
+												<button class="btn btn-primary btn-sm"
+													[disabled]="processingRequestId() === r.id"
+													(click)="acceptRequest(r.id)">
+													{{ processingRequestId() === r.id ? '...' : '✓ Accept' }}
+												</button>
+												<button class="btn btn-ghost btn-sm"
+													[disabled]="processingRequestId() === r.id"
+													(click)="declineRequest(r.id)">
+													✕ Reject
+												</button>
+												<button class="btn btn-ghost btn-sm"
+													[disabled]="processingRequestId() === r.id"
+													(click)="cancelRequest(r.id)">
+													🗑 Cancel
+												</button>
+											</ng-container>
+
+											<ng-container *ngIf="r.status !== 'PENDING'">
+												<button class="btn btn-ghost btn-sm"
+													[disabled]="processingRequestId() === r.id"
+													(click)="deleteRequest(r.id)">
+													🗑 Delete
+												</button>
+											</ng-container>
+										</div>
+									</td>
 							</tr>
 						</tbody>
 					</table>
@@ -142,26 +172,73 @@ type SessionStatus = MentorSession['status'];
 							<tr>
 								<th>Session ID</th>
 								<th>Request ID</th>
+								<th>Mentee</th>
+								<th>Mentor</th>
 								<th>Date</th>
 								<th>Link</th>
 								<th>Status</th>
+								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
-							<tr *ngFor="let s of filteredSessions(); trackBy: trackById">
-								<td class="mono">{{ s.id }}</td>
-								<td class="mono">{{ s.requestId }}</td>
-								<td>{{ s.scheduledAt | date:'medium' }}</td>
-								<td class="mono">{{ s.meetingLink }}</td>
-								<td>
-									<span class="chip"
-										[class.chip-neutral]="s.status === 'SCHEDULED'"
-										[class.chip-teal]="s.status === 'COMPLETED'"
-										[class.chip-error]="s.status === 'CANCELLED'">
-										{{ s.status }}
-									</span>
-								</td>
-							</tr>
+							<ng-container *ngFor="let s of filteredSessions(); trackBy: trackById">
+								<tr *ngIf="editingSessionId() !== s.id">
+									<td class="mono">{{ s.id }}</td>
+									<td class="mono">{{ s.requestId }}</td>
+									<td [title]="sessionMenteeId(s)">{{ sessionMenteeLabel(s) }}</td>
+									<td [title]="sessionMentorId(s)">{{ sessionMentorLabel(s) }}</td>
+									<td>{{ s.scheduledAt | date:'medium' }}</td>
+									<td class="mono">{{ s.meetingLink }}</td>
+									<td>
+										<span class="chip"
+											[class.chip-neutral]="s.status === 'SCHEDULED'"
+											[class.chip-teal]="s.status === 'COMPLETED'"
+											[class.chip-error]="s.status === 'CANCELLED'">
+											{{ s.status }}
+										</span>
+									</td>
+									<td>
+										<div class="request-actions">
+											<button class="btn btn-ghost btn-sm" (click)="openMeetingLink(s)">🔗 Open</button>
+											<button class="btn btn-primary btn-sm"
+												*ngIf="s.status === 'SCHEDULED'"
+												(click)="startEditSession(s)">✏️ Edit</button>
+											<button class="btn btn-ghost btn-sm"
+												*ngIf="s.status === 'SCHEDULED'"
+												[disabled]="processingSessionId() === s.id"
+												(click)="cancelSession(s.id)">🗑 Cancel</button>
+											<button class="btn btn-teal btn-sm"
+												*ngIf="s.status === 'SCHEDULED'"
+												[disabled]="processingSessionId() === s.id"
+												(click)="completeSession(s.id)">✅ Complete</button>
+											<button class="btn btn-ghost btn-sm"
+												[disabled]="processingSessionId() === s.id"
+												(click)="deleteSession(s.id)">🗑 Delete</button>
+										</div>
+									</td>
+								</tr>
+								<tr *ngIf="editingSessionId() === s.id">
+									<td class="mono">{{ s.id }}</td>
+									<td class="mono">{{ s.requestId }}</td>
+									<td [title]="sessionMenteeId(s)">{{ sessionMenteeLabel(s) }}</td>
+									<td [title]="sessionMentorId(s)">{{ sessionMentorLabel(s) }}</td>
+									<td>
+										<input class="input" type="datetime-local" [value]="editScheduledAt()" (change)="editScheduledAt.set($any($event.target).value)" />
+									</td>
+									<td>
+										<input class="input" type="text" [value]="editMeetingLink()" (input)="editMeetingLink.set($any($event.target).value)" />
+									</td>
+									<td>
+										<span class="chip chip-neutral">SCHEDULED</span>
+									</td>
+									<td>
+										<div class="request-actions">
+											<button class="btn btn-primary btn-sm" [disabled]="processingSessionId() === s.id" (click)="saveEditSession(s.id)">💾 Save</button>
+											<button class="btn btn-ghost btn-sm" (click)="cancelEditSession()">Cancel</button>
+										</div>
+									</td>
+								</tr>
+							</ng-container>
 						</tbody>
 					</table>
 				</div>
@@ -176,12 +253,18 @@ export class AdminViewComponent implements OnInit {
 	private userApi = inject(UserApiService);
 
 	private userNameById = signal<Record<string, string>>({});
+	private requestById = signal<Map<string, MentorRequest>>(new Map());
 
 	loading = signal(false);
 	errorMessage = signal<string | null>(null);
 
 	requests = signal<MentorRequest[]>([]);
 	sessions = signal<MentorSession[]>([]);
+	processingRequestId = signal<string | null>(null);
+	processingSessionId = signal<string | null>(null);
+	editingSessionId = signal<string | null>(null);
+	editScheduledAt = signal<string>('');
+	editMeetingLink = signal<string>('');
 
 	requestStatusFilter = signal<'' | RequestStatus>('');
 	sessionStatusFilter = signal<'' | SessionStatus>('');
@@ -201,7 +284,9 @@ export class AdminViewComponent implements OnInit {
 			.pipe(finalize(() => this.loading.set(false)))
 			.subscribe({
 				next: ({ requests, sessions }) => {
-					this.requests.set(this.sortByDateDesc(requests, r => r.createdAt));
+					const sortedRequests = this.sortByDateDesc(requests, r => r.createdAt);
+					this.requests.set(sortedRequests);
+					this.requestById.set(new Map(sortedRequests.map(r => [r.id, r])));
 					this.sessions.set(this.sortByDateDesc(sessions, s => s.scheduledAt));
 					this.prefetchUserNames([
 						...requests.map(r => r.menteeId),
@@ -213,6 +298,156 @@ export class AdminViewComponent implements OnInit {
 					this.errorMessage.set(message);
 				}
 			});
+	}
+
+	private requestForSession(session: MentorSession): MentorRequest | undefined {
+		return this.requestById().get(session.requestId);
+	}
+
+	acceptRequest(requestId: string): void {
+		this.processingRequestId.set(requestId);
+		this.mentorshipApi.acceptRequest(requestId).subscribe({
+			next: (updated) => {
+				this.requests.update(list => list.map(r => (r.id === requestId ? updated : r)));
+				this.requestById.update(map => {
+					const next = new Map(map);
+					next.set(requestId, updated);
+					return next;
+				});
+				this.processingRequestId.set(null);
+			},
+			error: () => this.processingRequestId.set(null)
+		});
+	}
+
+	declineRequest(requestId: string): void {
+		this.processingRequestId.set(requestId);
+		this.mentorshipApi.declineRequest(requestId).subscribe({
+			next: (updated) => {
+				this.requests.update(list => list.map(r => (r.id === requestId ? updated : r)));
+				this.requestById.update(map => {
+					const next = new Map(map);
+					next.set(requestId, updated);
+					return next;
+				});
+				this.processingRequestId.set(null);
+			},
+			error: () => this.processingRequestId.set(null)
+		});
+	}
+
+	deleteRequest(requestId: string): void {
+		const ok = window.confirm('Are you sure? This will delete the request and all its sessions.');
+		if (!ok) return;
+		this.processingRequestId.set(requestId);
+		this.mentorshipApi.deleteRequest(requestId).subscribe({
+			next: () => {
+				this.requests.update(list => list.filter(r => r.id !== requestId));
+				this.requestById.update(map => {
+					const next = new Map(map);
+					next.delete(requestId);
+					return next;
+				});
+				// also remove sessions that belonged to that request (keeps UI consistent)
+				this.sessions.update(list => list.filter(s => s.requestId !== requestId));
+				this.processingRequestId.set(null);
+			},
+			error: () => this.processingRequestId.set(null)
+		});
+	}
+
+	cancelRequest(requestId: string): void {
+		// "Cancel" is implemented as delete (requests have no CANCELLED status)
+		this.deleteRequest(requestId);
+	}
+
+	openMeetingLink(session: MentorSession): void {
+		const raw = (session.meetingLink || '').trim();
+		if (!raw) return;
+		const url = /^https?:\/\//i.test(raw) ? raw : `https://meet.jit.si/${encodeURIComponent(raw)}`;
+		window.open(url, '_blank', 'noopener');
+	}
+
+	deleteSession(sessionId: string): void {
+		const ok = window.confirm('Are you sure you want to delete this session?');
+		if (!ok) return;
+		this.processingSessionId.set(sessionId);
+		this.mentorshipApi.deleteSession(sessionId).subscribe({
+			next: () => {
+				this.sessions.update(list => list.filter(s => s.id !== sessionId));
+				if (this.editingSessionId() === sessionId) {
+					this.cancelEditSession();
+				}
+				this.processingSessionId.set(null);
+			},
+			error: () => this.processingSessionId.set(null)
+		});
+	}
+
+	startEditSession(session: MentorSession): void {
+		this.editingSessionId.set(session.id);
+		// datetime-local expects YYYY-MM-DDTHH:mm
+		const iso = (session.scheduledAt || '').slice(0, 16);
+		this.editScheduledAt.set(iso);
+		this.editMeetingLink.set(session.meetingLink || '');
+	}
+
+	cancelEditSession(): void {
+		this.editingSessionId.set(null);
+		this.editScheduledAt.set('');
+		this.editMeetingLink.set('');
+	}
+
+	saveEditSession(sessionId: string): void {
+		this.processingSessionId.set(sessionId);
+		this.mentorshipApi.updateSession(sessionId, this.editScheduledAt(), this.editMeetingLink()).subscribe({
+			next: (updated) => {
+				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.processingSessionId.set(null);
+				this.cancelEditSession();
+			},
+			error: () => this.processingSessionId.set(null)
+		});
+	}
+
+	cancelSession(sessionId: string): void {
+		this.processingSessionId.set(sessionId);
+		this.mentorshipApi.cancelSession(sessionId).subscribe({
+			next: (updated) => {
+				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.processingSessionId.set(null);
+			},
+			error: () => this.processingSessionId.set(null)
+		});
+	}
+
+	completeSession(sessionId: string): void {
+		this.processingSessionId.set(sessionId);
+		this.mentorshipApi.completeSession(sessionId).subscribe({
+			next: (updated) => {
+				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.processingSessionId.set(null);
+			},
+			error: () => this.processingSessionId.set(null)
+		});
+	}
+
+	sessionMenteeId(session: MentorSession): string {
+		return this.requestForSession(session)?.menteeId ?? '';
+	}
+
+	sessionMentorId(session: MentorSession): string {
+		return this.requestForSession(session)?.mentorId ?? '';
+	}
+
+	sessionMenteeLabel(session: MentorSession): string {
+		const id = this.sessionMenteeId(session);
+		return id ? this.userLabel(id) : '—';
+	}
+
+	sessionMentorLabel(session: MentorSession): string {
+		const id = this.sessionMentorId(session);
+		return id ? this.userLabel(id) : '—';
 	}
 
 	userLabel(userId: string): string {

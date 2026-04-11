@@ -66,4 +66,26 @@ export class MentorshipApiService {
     cancelSession(sessionId: string): Observable<MentorSession> {
         return this.http.put<MentorSession>(`${this.api}/api/mentor-sessions/${sessionId}/cancel`, {});
     }
+
+    deleteSession(sessionId: string): Observable<void> {
+        return this.http.delete<void>(`${this.api}/api/mentor-sessions/${sessionId}`);
+    }
+
+    updateSession(sessionId: string, scheduledAt: string, meetingLink: string): Observable<MentorSession> {
+        return this.http.put<MentorSession>(`${this.api}/api/mentor-sessions/${sessionId}`, {
+            scheduledAt,
+            meetingLink
+        });
+    }
+
+
+    getMentorStats(mentorId: string): Observable<{ completedSessions: number; averageRating: number; totalRatings: number }> {
+        return this.http.get<any>(`${this.api}/api/mentor-ratings/mentor/${mentorId}/stats`);
+    }
+
+    rateMentor(mentorId: string, stars: number, comment: string, sessionId: string): Observable<any> {
+        return this.http.post(`${this.api}/api/mentor-ratings/mentor/${mentorId}`, {
+        stars, comment, sessionId
+    });
+    }
 }

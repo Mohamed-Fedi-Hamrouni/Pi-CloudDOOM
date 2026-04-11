@@ -44,8 +44,9 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
         <div class="us-body">
           <div class="avatar-placeholder" style="width:52px;height:52px;font-size:1rem;">M</div>
           <div class="us-info">
-            <div class="us-mentor-name">Scheduled Session</div>
-            <div class="us-mentor-role">{{ upcomingSession()!.meetingLink }}</div>
+            <div class="us-mentor-name">{{ upcomingMentorName() }}</div>
+            <div class="us-mentor-role">Mentee: {{ displayName() }}</div>
+            <div class="us-mentor-role">Room: {{ upcomingSession()!.meetingLink }}</div>
             <div class="us-meta">
               <span>📅 {{ upcomingSession()!.scheduledAt | date:'medium' }}</span>
               <span class="chip chip-cyan">Video Call</span>
@@ -194,7 +195,8 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
           [mentor]="mentor"
           [requested]="hasRequestFor(mentor.id)"
           [requesting]="requestingId() === mentor.id"
-          (requestClicked)="sendRequest($event)">
+          (requestClicked)="sendRequest($event)"
+          (rateSubmitted)="onRateSubmitted($event)">
         </app-mentor-card>
       </div>
 
@@ -253,6 +255,7 @@ export class MenteeViewComponent implements OnInit {
   });
 
     mentors: Mentor[] = [];
+  realMentors = signal<Mentor[]>([]);
     myRequests = signal<MentorRequest[]>([]);
     sessionsByRequest = signal<Map<string, MentorSession[]>>(new Map());
     upcomingSession = signal<MentorSession | null>(null);
@@ -265,7 +268,7 @@ export class MenteeViewComponent implements OnInit {
     sortBy = signal('rating');
 
     displayedMentors = () => {
-        let list = [...this.mentors];
+    let list = [...this.realMentors()];
 
         // search
         const q = this.searchQuery().toLowerCase().trim();
@@ -282,8 +285,8 @@ export class MenteeViewComponent implements OnInit {
         if (this.activeFilter() === 'available') list = list.filter(m => m.available);
 
         // sort
-        if (this.sortBy() === 'rating') list.sort((a, b) => b.rating - a.rating);
-        if (this.sortBy() === 'sessions') list.sort((a, b) => b.sessions - a.sessions);
+  if (this.sortBy() === 'rating') list.sort((a, b) => (b.averageRating ?? b.rating) - (a.averageRating ?? a.rating));
+  if (this.sortBy() === 'sessions') list.sort((a, b) => (b.completedSessions ?? b.sessions) - (a.completedSessions ?? a.sessions));
         if (this.sortBy() === 'price_asc') list.sort((a, b) => a.price - b.price);
         if (this.sortBy() === 'price_desc') list.sort((a, b) => b.price - a.price);
 
@@ -320,9 +323,13 @@ export class MenteeViewComponent implements OnInit {
               isVerified: user.isVerified
             };
           });
+
+          this.realMentors.set(this.mentors);
+          this.loadMentorStats(this.mentors);
         },
         error: () => {
           this.mentors = [];
+          this.realMentors.set([]);
           this.showError('Failed to load mentors.');
         }
       });
@@ -353,6 +360,11 @@ export class MenteeViewComponent implements OnInit {
                                 // set upcoming session banner
                                 const scheduled = sessions.find(s => s.status === 'SCHEDULED');
                                 if (scheduled) this.upcomingSession.set(scheduled);
+
+                          // update canRate flag for this mentor (rating widget visibility)
+                          this.realMentors.update(list => list.map(m =>
+                            m.id === r.mentorId ? { ...m, canRate: this.hasCompletedSessionWith(r.mentorId) } : m
+                          ));
 
                                 this.refreshCalendarEvents();
                             }
@@ -442,6 +454,8 @@ export class MenteeViewComponent implements OnInit {
     }
 
     cancelRequest(requestId: string) {
+      const ok = window.confirm('Are you sure? This will delete the request and all its sessions.');
+      if (!ok) return;
         this.mentorshipApi.deleteRequest(requestId).subscribe({
             next: () => {
                 this.myRequests.update(reqs => reqs.filter(r => r.id !== requestId));
@@ -491,8 +505,70 @@ export class MenteeViewComponent implements OnInit {
       this.activeRoomName.set(null);
     }
 
+    upcomingMentorName(): string {
+      const session = this.upcomingSession();
+      if (!session) return '';
+      const req = this.myRequests().find(r => r.id === session.requestId);
+      if (!req) return 'Mentor';
+      return this.userLabel(req.mentorId);
+    }
+
     hasRequestFor(mentorId: string): boolean {
         return this.myRequests().some(r => r.mentorId === mentorId && r.status === 'PENDING');
+    }
+
+    onRateSubmitted(event: { mentorId: string; stars: number; comment: string }) {
+      // find a completed session for this mentor to pass as sessionId
+      const completedSessionId = this.findCompletedSessionId(event.mentorId);
+
+      this.mentorshipApi.rateMentor(
+        event.mentorId,
+        event.stars,
+        event.comment,
+        completedSessionId ?? ''
+      ).subscribe({
+        next: () => this.showSuccess('Rating submitted!'),
+        error: (err) => this.showError(err.error?.error ?? 'Failed to submit rating.')
+      });
+    }
+
+    findCompletedSessionId(mentorId: string): string | null {
+      for (const [requestId, sessions] of this.sessionsByRequest()) {
+        const req = this.myRequests().find(r => r.id === requestId && r.mentorId === mentorId);
+        if (req) {
+          const completed = sessions.find(s => s.status === 'COMPLETED');
+          if (completed) return completed.id;
+        }
+      }
+      return null;
+    }
+
+    private loadMentorStats(mentors: Mentor[]) {
+      mentors.forEach(m => {
+        this.mentorshipApi.getMentorStats(m.id).subscribe({
+          next: (stats) => {
+            // update the mentor in the list with real stats
+            this.realMentors.update(list => list.map(mentor =>
+              mentor.id === m.id ? {
+                ...mentor,
+                completedSessions: stats.completedSessions,
+                averageRating: stats.averageRating,
+                totalRatings: stats.totalRatings,
+                canRate: this.hasCompletedSessionWith(m.id)
+              } : mentor
+            ));
+          },
+          error: () => {} // silent if stats not available
+        });
+      });
+    }
+
+    private hasCompletedSessionWith(mentorId: string): boolean {
+      for (const [requestId, sessions] of this.sessionsByRequest()) {
+        const req = this.myRequests().find(r => r.id === requestId && r.mentorId === mentorId);
+        if (req && sessions.some(s => s.status === 'COMPLETED')) return true;
+      }
+      return false;
     }
 
     setFilter(f: 'all' | 'available') { this.activeFilter.set(f); }

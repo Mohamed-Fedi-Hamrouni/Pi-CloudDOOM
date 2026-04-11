@@ -7,8 +7,11 @@ import com.microservice.mentorshipservice.clients.UserServiceClient;
 import com.microservice.mentorshipservice.entities.MentorRequest;
 import com.microservice.mentorshipservice.enums.MentorStatus;
 import com.microservice.mentorshipservice.repository.MentorRequestRepository;
+import com.microservice.mentorshipservice.repository.MentorRatingRepository;
+import com.microservice.mentorshipservice.repository.MentorSessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,6 +23,12 @@ public class MentorRequestService {
 
     @Autowired
     private MentorRequestRepository repository;
+
+    @Autowired
+    private MentorSessionRepository sessionRepository;
+
+    @Autowired
+    private MentorRatingRepository ratingRepository;
 
     @Autowired
     private UserServiceClient userServiceClient;
@@ -88,7 +97,19 @@ public class MentorRequestService {
     }
 
     // DELETE
+    @Transactional
     public void deleteRequest(UUID id) {
+        // delete mentor_ratings -> sessions -> request (order matters if DB has FKs)
+        List<UUID> sessionIds = sessionRepository.findByRequestId(id)
+                .stream()
+                .map(s -> s.getId())
+                .collect(Collectors.toList());
+
+        if (!sessionIds.isEmpty()) {
+            ratingRepository.deleteBySessionIdIn(sessionIds);
+        }
+
+        sessionRepository.deleteByRequestId(id);
         repository.deleteById(id);
     }
 

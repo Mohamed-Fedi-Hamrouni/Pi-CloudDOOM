@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface MentorSessionRepository extends JpaRepository<MentorSession, UUID> {
     List<MentorSession> findByRequestId(UUID requestId);
+
+    void deleteByRequestId(UUID requestId);
 }

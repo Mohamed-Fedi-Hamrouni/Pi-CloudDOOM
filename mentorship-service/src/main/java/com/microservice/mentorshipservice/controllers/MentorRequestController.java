@@ -25,7 +25,7 @@ public class MentorRequestController {
     private UserServiceClient userServiceClient;
 
     // CREATE
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     @PostMapping
     public ResponseEntity<MentorRequestResponseDTO> create(
             @RequestBody MentorRequestDTO dto,
@@ -43,31 +43,31 @@ public class MentorRequestController {
         return service.getAllRequests();
     }
 
-    @PreAuthorize("hasAnyRole('ROLE_USER','ROLE_MENTOR')")
+    @PreAuthorize("hasAnyRole('USER','MENTOR','ADMIN')")
     @GetMapping("/mentee/{id}")
     public List<MentorRequestResponseDTO> getByMentee(@PathVariable UUID id) {  // return DTO not entity
         return service.getRequestsByMentee(id);
     }
-    @PreAuthorize("hasAnyRole('ROLE_USER','ROLE_MENTOR')")
+    @PreAuthorize("hasAnyRole('USER','MENTOR','ADMIN')")
     @GetMapping("/mentor/{id}")
     public List<MentorRequestResponseDTO> getByMentor(@PathVariable UUID id) {  // return DTO not entity
         return service.getRequestsByMentor(id);
     }
     // ACCEPT
-    @PreAuthorize("hasRole('ROLE_MENTOR')")
+    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")
     @PutMapping("/{id}/accept")
     public MentorRequestResponseDTO accept(@PathVariable UUID id) {             // return DTO not entity
         return service.acceptRequest(id);
     }
     // DECLINE
-    @PreAuthorize("hasRole('ROLE_MENTOR')")
+    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")
     @PutMapping("/{id}/decline")
     public MentorRequestResponseDTO decline(@PathVariable UUID id) {            // return DTO not entity
         return service.declineRequest(id);
     }
 
     // DELETE
-    @PreAuthorize("hasAnyRole('ROLE_USER','ROLE_MENTOR')")
+    @PreAuthorize("hasAnyRole('USER','MENTOR','ADMIN')")
     @DeleteMapping("/{id}")
     public void delete(@PathVariable UUID id) {
         service.deleteRequest(id);
