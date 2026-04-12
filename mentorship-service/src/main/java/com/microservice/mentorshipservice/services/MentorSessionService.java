@@ -7,6 +7,8 @@ import com.microservice.mentorshipservice.enums.SessionStatus;
 import com.microservice.mentorshipservice.repository.MentorRequestRepository;
 import com.microservice.mentorshipservice.repository.MentorRatingRepository;
 import com.microservice.mentorshipservice.repository.MentorSessionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.UUID;
 @Service
 public class MentorSessionService {
 
+    private static final Logger log = LoggerFactory.getLogger(MentorSessionService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
@@ -30,6 +33,9 @@ public class MentorSessionService {
 
     @Autowired
     private MentorRatingRepository ratingRepository;
+
+    @Autowired
+    private SessionEmailNotificationService sessionEmailNotificationService;
 
     // CREATE SESSION (when request is accepted)
     public MentorSession createSession(UUID requestId, LocalDateTime scheduledAt, String meetingLink) {
@@ -54,7 +60,16 @@ public class MentorSessionService {
         session.setMeetingLink(normalizeOrGenerateRoomName(meetingLink));
         session.setStatus(SessionStatus.SCHEDULED);
 
-        return sessionRepository.save(session);
+        MentorSession saved = sessionRepository.save(session);
+
+        // Send reminder emails immediately (easy mode: uses forwarded Authorization header)
+        try {
+            sessionEmailNotificationService.notifySessionScheduled(request, saved.getScheduledAt());
+        } catch (Exception ex) {
+            log.warn("Failed sending schedule reminder emails (sessionId={})", saved.getId(), ex);
+        }
+
+        return saved;
     }
 
     private String normalizeOrGenerateRoomName(String meetingLink) {
@@ -93,8 +108,21 @@ public class MentorSessionService {
         MentorSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found"));
 
+        if (session.getStatus() == SessionStatus.CANCELLED) {
+            return session;
+        }
+
         session.setStatus(com.microservice.mentorshipservice.enums.SessionStatus.CANCELLED);
-        return sessionRepository.save(session);
+        MentorSession saved = sessionRepository.save(session);
+
+        try {
+            MentorRequest request = requestRepository.findById(saved.getRequestId()).orElse(null);
+            sessionEmailNotificationService.notifySessionCancelled(request, saved.getScheduledAt());
+        } catch (Exception ex) {
+            log.warn("Failed sending cancellation emails (sessionId={})", saved.getId(), ex);
+        }
+
+        return saved;
     }
 
     @Transactional
