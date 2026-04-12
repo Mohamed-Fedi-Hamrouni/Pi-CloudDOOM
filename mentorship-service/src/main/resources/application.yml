@@ -19,3 +19,19 @@ spring:
         jwt:
           issuer-uri: http://localhost:8080/realms/myapp-realm
           jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
+
+  mail:
+    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  email:
+    from: ${APP_EMAIL_FROM:no-reply@pi-clouddoom.local}

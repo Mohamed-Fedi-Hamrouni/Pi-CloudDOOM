@@ -296,6 +296,13 @@ services:
             SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
             SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
 
+            # SMTP (Mailtrap) - manual test endpoint /api/emails/test
+            APP_EMAIL_FROM: ${APP_EMAIL_FROM:-no-reply@pi-clouddoom.local}
+            MAIL_HOST: ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+            MAIL_PORT: ${MAIL_PORT:-587}
+            MAIL_USERNAME: ${MAIL_USERNAME:-}
+            MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+
 volumes:
     pgdata:
     redisdata:
