@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Observable, catchError, forkJoin, of } from 'rxjs';
 import { finalize } from 'rxjs/operators';
@@ -63,6 +63,71 @@ type SessionStatus = MentorSession['status'];
 				</div>
 			</div>
 
+			<!-- Charts -->
+			<div class="card" *ngIf="!loading()">
+				<app-section-header title="Overview Charts" icon="📊"></app-section-header>
+
+				<div class="admin-charts">
+					<div class="admin-chart-card">
+						<div class="admin-chart-title">Requests by status</div>
+						<div class="admin-chart-body">
+							<div class="chart-pie" [style.background]="requestsPieBackground()"></div>
+							<div class="chart-legend">
+								<div class="chart-legend-row">
+									<span class="chart-swatch swatch-pending"></span>
+									<span class="chart-label">PENDING</span>
+									<span class="chart-value">{{ requestCount('PENDING') }}</span>
+									<span class="chart-pct">{{ requestPendingPct() }}%</span>
+								</div>
+								<div class="chart-legend-row">
+									<span class="chart-swatch swatch-accepted"></span>
+									<span class="chart-label">ACCEPTED</span>
+									<span class="chart-value">{{ requestCount('ACCEPTED') }}</span>
+									<span class="chart-pct">{{ requestAcceptedPct() }}%</span>
+								</div>
+								<div class="chart-legend-row">
+									<span class="chart-swatch swatch-declined"></span>
+									<span class="chart-label">DECLINED</span>
+									<span class="chart-value">{{ requestCount('DECLINED') }}</span>
+									<span class="chart-pct">{{ requestDeclinedPct() }}%</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="admin-chart-card">
+						<div class="admin-chart-title">Sessions by status</div>
+						<div class="admin-chart-body">
+							<div class="chart-bars">
+								<div class="chart-bar-row">
+									<div class="chart-bar-label">SCHEDULED</div>
+									<div class="chart-bar-track">
+										<div class="chart-bar-fill fill-scheduled" [style.width.%]="sessionScheduledPct()"></div>
+									</div>
+									<div class="chart-bar-value">{{ sessionCount('SCHEDULED') }}</div>
+								</div>
+
+								<div class="chart-bar-row">
+									<div class="chart-bar-label">COMPLETED</div>
+									<div class="chart-bar-track">
+										<div class="chart-bar-fill fill-completed" [style.width.%]="sessionCompletedPct()"></div>
+									</div>
+									<div class="chart-bar-value">{{ sessionCount('COMPLETED') }}</div>
+								</div>
+
+								<div class="chart-bar-row">
+									<div class="chart-bar-label">CANCELLED</div>
+									<div class="chart-bar-track">
+										<div class="chart-bar-fill fill-cancelled" [style.width.%]="sessionCancelledPct()"></div>
+									</div>
+									<div class="chart-bar-value">{{ sessionCount('CANCELLED') }}</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<!-- Requests history table -->
 			<div class="card" *ngIf="!loading()">
 				<app-section-header title="Requests History" icon="📨"></app-section-header>
@@ -97,7 +162,7 @@ type SessionStatus = MentorSession['status'];
 							</tr>
 						</thead>
 						<tbody>
-							<tr *ngFor="let r of filteredRequests(); trackBy: trackById">
+							<tr *ngFor="let r of pagedRequests(); trackBy: trackById">
 								<td [title]="r.menteeId">{{ userLabel(r.menteeId) }}</td>
 								<td [title]="r.mentorId">{{ userLabel(r.mentorId) }}</td>
 								<td>
@@ -142,6 +207,23 @@ type SessionStatus = MentorSession['status'];
 						</tbody>
 					</table>
 				</div>
+
+				<div class="admin-pagination" *ngIf="filteredRequests().length > 0 && requestTotalPages() > 1">
+					<button class="page-btn" [disabled]="requestPage() === 0" (click)="setRequestPage(requestPage() - 1)">Preview</button>
+
+					<ng-container *ngFor="let item of requestPageItems()">
+						<span *ngIf="item === 'ellipsis'" class="page-ellipsis">…</span>
+						<button
+							*ngIf="item !== 'ellipsis'"
+							class="page-number"
+							[class.active]="$any(item) === requestPage()"
+							(click)="setRequestPage($any(item))">
+							{{ $any(item) + 1 }}
+						</button>
+					</ng-container>
+
+					<button class="page-btn" [disabled]="requestPage() >= requestTotalPages() - 1" (click)="setRequestPage(requestPage() + 1)">Next</button>
+				</div>
 			</div>
 
 			<!-- Sessions history table -->
@@ -181,7 +263,7 @@ type SessionStatus = MentorSession['status'];
 							</tr>
 						</thead>
 						<tbody>
-							<ng-container *ngFor="let s of filteredSessions(); trackBy: trackById">
+							<ng-container *ngFor="let s of pagedSessions(); trackBy: trackById">
 								<tr *ngIf="editingSessionId() !== s.id">
 									<td class="mono">{{ s.id }}</td>
 									<td class="mono">{{ s.requestId }}</td>
@@ -242,6 +324,23 @@ type SessionStatus = MentorSession['status'];
 						</tbody>
 					</table>
 				</div>
+
+				<div class="admin-pagination" *ngIf="filteredSessions().length > 0 && sessionTotalPages() > 1">
+					<button class="page-btn" [disabled]="sessionPage() === 0" (click)="setSessionPage(sessionPage() - 1)">Preview</button>
+
+					<ng-container *ngFor="let item of sessionPageItems()">
+						<span *ngIf="item === 'ellipsis'" class="page-ellipsis">…</span>
+						<button
+							*ngIf="item !== 'ellipsis'"
+							class="page-number"
+							[class.active]="$any(item) === sessionPage()"
+							(click)="setSessionPage($any(item))">
+							{{ $any(item) + 1 }}
+						</button>
+					</ng-container>
+
+					<button class="page-btn" [disabled]="sessionPage() >= sessionTotalPages() - 1" (click)="setSessionPage(sessionPage() + 1)">Next</button>
+				</div>
 			</div>
 
 		</div>
@@ -269,6 +368,85 @@ export class AdminViewComponent implements OnInit {
 	requestStatusFilter = signal<'' | RequestStatus>('');
 	sessionStatusFilter = signal<'' | SessionStatus>('');
 
+	readonly pageSize = 5;
+	requestPage = signal(0);
+	sessionPage = signal(0);
+
+	requestTotalPages = computed(() => Math.max(1, Math.ceil(this.filteredRequests().length / this.pageSize)));
+	sessionTotalPages = computed(() => Math.max(1, Math.ceil(this.filteredSessions().length / this.pageSize)));
+
+	requestPageItems = computed(() => this.buildPageItems(this.requestPage(), this.requestTotalPages()));
+	sessionPageItems = computed(() => this.buildPageItems(this.sessionPage(), this.sessionTotalPages()));
+
+	pagedRequests = computed(() => {
+		const rows = this.filteredRequests();
+		const totalPages = Math.max(1, Math.ceil(rows.length / this.pageSize));
+		const page = this.clampPage(this.requestPage(), totalPages);
+		const start = page * this.pageSize;
+		return rows.slice(start, start + this.pageSize);
+	});
+
+	pagedSessions = computed(() => {
+		const rows = this.filteredSessions();
+		const totalPages = Math.max(1, Math.ceil(rows.length / this.pageSize));
+		const page = this.clampPage(this.sessionPage(), totalPages);
+		const start = page * this.pageSize;
+		return rows.slice(start, start + this.pageSize);
+	});
+
+	private requestCountsByStatus = computed(() => {
+		const counts: Record<string, number> = { PENDING: 0, ACCEPTED: 0, DECLINED: 0 };
+		for (const r of this.requests()) {
+			counts[r.status] = (counts[r.status] ?? 0) + 1;
+		}
+		return counts as Record<RequestStatus, number>;
+	});
+
+	private sessionCountsByStatus = computed(() => {
+		const counts: Record<string, number> = { SCHEDULED: 0, COMPLETED: 0, CANCELLED: 0 };
+		for (const s of this.sessions()) {
+			counts[s.status] = (counts[s.status] ?? 0) + 1;
+		}
+		return counts as Record<SessionStatus, number>;
+	});
+
+	private percent(part: number, total: number): number {
+		if (!total || total <= 0) return 0;
+		return Math.round((part / total) * 100);
+	}
+
+	requestPendingPct = computed(() => this.percent(this.requestCount('PENDING'), this.totalRequests()));
+	requestAcceptedPct = computed(() => this.percent(this.requestCount('ACCEPTED'), this.totalRequests()));
+	requestDeclinedPct = computed(() => this.percent(this.requestCount('DECLINED'), this.totalRequests()));
+
+	sessionScheduledPct = computed(() => this.percent(this.sessionCount('SCHEDULED'), this.totalSessions()));
+	sessionCompletedPct = computed(() => this.percent(this.sessionCount('COMPLETED'), this.totalSessions()));
+	sessionCancelledPct = computed(() => this.percent(this.sessionCount('CANCELLED'), this.totalSessions()));
+
+	requestsPieBackground = computed(() => {
+		const total = this.totalRequests();
+		if (!total) {
+			return 'conic-gradient(var(--color-border) 0 360deg)';
+		}
+
+		const pending = this.requestCount('PENDING');
+		const accepted = this.requestCount('ACCEPTED');
+		const declined = this.requestCount('DECLINED');
+
+		const pendingDeg = (pending / total) * 360;
+		const acceptedDeg = (accepted / total) * 360;
+		// declined is the remainder (prevents rounding gaps)
+		const a0 = 0;
+		const a1 = pendingDeg;
+		const a2 = pendingDeg + acceptedDeg;
+
+		return `conic-gradient(
+			var(--neutral-300) ${a0}deg ${a1}deg,
+			var(--teal-500) ${a1}deg ${a2}deg,
+			var(--error-500) ${a2}deg 360deg
+		)`;
+	});
+
 	ngOnInit(): void {
 		this.load();
 	}
@@ -292,6 +470,7 @@ export class AdminViewComponent implements OnInit {
 						...requests.map(r => r.menteeId),
 						...requests.map(r => r.mentorId)
 					]);
+					this.ensurePagesInRange();
 				},
 				error: (err) => {
 					const message = err?.error?.message || err?.message || 'Failed to load mentorship admin data.';
@@ -314,6 +493,7 @@ export class AdminViewComponent implements OnInit {
 					next.set(requestId, updated);
 					return next;
 				});
+				this.ensurePagesInRange();
 				this.processingRequestId.set(null);
 			},
 			error: () => this.processingRequestId.set(null)
@@ -330,6 +510,7 @@ export class AdminViewComponent implements OnInit {
 					next.set(requestId, updated);
 					return next;
 				});
+				this.ensurePagesInRange();
 				this.processingRequestId.set(null);
 			},
 			error: () => this.processingRequestId.set(null)
@@ -350,6 +531,7 @@ export class AdminViewComponent implements OnInit {
 				});
 				// also remove sessions that belonged to that request (keeps UI consistent)
 				this.sessions.update(list => list.filter(s => s.requestId !== requestId));
+				this.ensurePagesInRange();
 				this.processingRequestId.set(null);
 			},
 			error: () => this.processingRequestId.set(null)
@@ -378,6 +560,7 @@ export class AdminViewComponent implements OnInit {
 				if (this.editingSessionId() === sessionId) {
 					this.cancelEditSession();
 				}
+				this.ensurePagesInRange();
 				this.processingSessionId.set(null);
 			},
 			error: () => this.processingSessionId.set(null)
@@ -403,6 +586,7 @@ export class AdminViewComponent implements OnInit {
 		this.mentorshipApi.updateSession(sessionId, this.editScheduledAt(), this.editMeetingLink()).subscribe({
 			next: (updated) => {
 				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.ensurePagesInRange();
 				this.processingSessionId.set(null);
 				this.cancelEditSession();
 			},
@@ -415,6 +599,7 @@ export class AdminViewComponent implements OnInit {
 		this.mentorshipApi.cancelSession(sessionId).subscribe({
 			next: (updated) => {
 				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.ensurePagesInRange();
 				this.processingSessionId.set(null);
 			},
 			error: () => this.processingSessionId.set(null)
@@ -426,6 +611,7 @@ export class AdminViewComponent implements OnInit {
 		this.mentorshipApi.completeSession(sessionId).subscribe({
 			next: (updated) => {
 				this.sessions.update(list => list.map(s => (s.id === sessionId ? updated : s)));
+				this.ensurePagesInRange();
 				this.processingSessionId.set(null);
 			},
 			error: () => this.processingSessionId.set(null)
@@ -484,7 +670,7 @@ export class AdminViewComponent implements OnInit {
 	}
 
 	requestCount(status: RequestStatus): number {
-		return this.requests().filter(r => r.status === status).length;
+		return this.requestCountsByStatus()[status] ?? 0;
 	}
 
 	totalSessions(): number {
@@ -492,7 +678,7 @@ export class AdminViewComponent implements OnInit {
 	}
 
 	sessionCount(status: SessionStatus): number {
-		return this.sessions().filter(s => s.status === status).length;
+		return this.sessionCountsByStatus()[status] ?? 0;
 	}
 
 	filteredRequests(): MentorRequest[] {
@@ -512,11 +698,50 @@ export class AdminViewComponent implements OnInit {
 	setRequestFilter(event: Event): void {
 		const next = String((event.target as HTMLSelectElement).value || '') as '' | RequestStatus;
 		this.requestStatusFilter.set(next);
+		this.requestPage.set(0);
 	}
 
 	setSessionFilter(event: Event): void {
 		const next = String((event.target as HTMLSelectElement).value || '') as '' | SessionStatus;
 		this.sessionStatusFilter.set(next);
+		this.sessionPage.set(0);
+	}
+
+	setRequestPage(page: number): void {
+		this.requestPage.set(this.clampPage(page, this.requestTotalPages()));
+	}
+
+	setSessionPage(page: number): void {
+		this.sessionPage.set(this.clampPage(page, this.sessionTotalPages()));
+	}
+
+	private ensurePagesInRange(): void {
+		this.requestPage.set(this.clampPage(this.requestPage(), this.requestTotalPages()));
+		this.sessionPage.set(this.clampPage(this.sessionPage(), this.sessionTotalPages()));
+	}
+
+	private clampPage(page: number, totalPages: number): number {
+		const max = Math.max(0, (totalPages || 1) - 1);
+		return Math.min(Math.max(0, Math.floor(page || 0)), max);
+	}
+
+	private buildPageItems(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+		if (!totalPages || totalPages <= 1) return [0];
+		if (totalPages <= 5) return Array.from({ length: totalPages }, (_v, i) => i);
+
+		const last = totalPages - 1;
+		const pages = new Set<number>([0, last]);
+		for (const p of [currentPage - 1, currentPage, currentPage + 1]) {
+			if (p > 0 && p < last) pages.add(p);
+		}
+
+		const sorted = [...pages].sort((a, b) => a - b);
+		const items: Array<number | 'ellipsis'> = [];
+		for (let i = 0; i < sorted.length; i++) {
+			if (i > 0 && sorted[i] - sorted[i - 1] > 1) items.push('ellipsis');
+			items.push(sorted[i]);
+		}
+		return items;
 	}
 
 	trackById(_index: number, row: { id: string }): string {

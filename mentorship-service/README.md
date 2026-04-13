@@ -56,6 +56,7 @@ The service authorizes requests using Keycloak realm roles (converted into Sprin
 - Calendar-friendly data (`scheduledAt`) for frontend calendar rendering
 - In-app meeting support (frontend embeds Jitsi; backend stores a room name)
 - Room name generation: if the mentor leaves room name empty, the service generates one (`mentorship-<random>`)
+- Email notifications (SMTP): when a session is scheduled/cancelled, the service sends emails to both mentor + mentee (best-effort, asynchronous)
 
 ---
 
@@ -77,6 +78,25 @@ Base path:
 - `GET /mentor-sessions/request/{requestId}` (mentee/mentor)
 - `PUT /mentor-sessions/{id}/complete` (mentor)
 - `PUT /mentor-sessions/{id}/cancel` (mentee/mentor)
+
+### Mentor ratings
+- `GET /mentor-ratings/mentor/{mentorId}/stats` (any authenticated user)
+- `POST /mentor-ratings/mentor/{mentorId}` (USER)
+- `DELETE /mentor-ratings/mentor/{mentorId}` (USER)
+- `GET /mentor-ratings/me` (USER)
+
+### Emails (admin test endpoints)
+Base path:
+- `http://localhost:8084/api/emails`
+
+Endpoints:
+- `POST /emails/test` (ADMIN) — send raw HTML email
+- `POST /emails/session-reminder/test` (ADMIN) — send a templated “Session reminder” email
+
+Automatic behavior:
+- When a mentor schedules a session, the service sends a “Session reminder” email to both mentor + mentee.
+- When a session is cancelled, the service sends a “Session cancelled” email to both mentor + mentee.
+- Email sending runs asynchronously so schedule/cancel endpoints return fast even if SMTP is slow or rate-limited.
 
 Authentication:
 - All endpoints require a Bearer token (JWT), except actuator/swagger if enabled in security config.
@@ -147,6 +167,7 @@ When running via Docker Compose, the `SERVER_PORT` is set to `8084` by environme
 - **403 Forbidden** usually means your token is missing the required realm role (`ROLE_USER` / `ROLE_MENTOR`).
 - **IDs**: the service uses user-service UUIDs. If you pass a Keycloak `sub` to list requests, you won’t see your data.
 - **Meeting room**: `meetingLink` is treated as a **room name** for Jitsi (e.g. `mentorship-abc123`).
+- **Email delivery can be delayed** in dev environments when your SMTP provider rate-limits (e.g., “too many emails per second”). The service retries in the background; API calls should not be blocked.
 
 ---
 
