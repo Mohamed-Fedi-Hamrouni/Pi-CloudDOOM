@@ -1,13 +1,15 @@
 package com.microservice.userservice.dto;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import com.microservice.userservice.enums.IndustryEnum;
 import com.microservice.userservice.enums.PlanEnum;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
-import lombok.Data;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import lombok.Data;
 
 @Data
 public class UserResponse {
@@ -21,6 +23,7 @@ public class UserResponse {
     private String city;
     private String bio;
     private String avatarUrl;
+    private String cvUrl;
     private Integer karmaPoints;
     private Boolean isVerified;
     private UserStatus status;
@@ -37,6 +40,7 @@ public class UserResponse {
     private IndustryEnum preferredIndustry;
     private String experiencesJson;
     private String educationsJson;
+    private List<String> skills;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

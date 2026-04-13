@@ -128,4 +128,13 @@ export class LandingComponent {
     register(): void {
         this.authService.register();
     }
+    loginWithGoogle(): void {
+        this.authService.loginWithGoogle();
+    }
+    loginWithLinkedIn(): void {
+        this.authService.loginWithLinkedIn();
+    }
+    loginWithGitHub(): void {
+        this.authService.loginWithGitHub();
+    }
 }

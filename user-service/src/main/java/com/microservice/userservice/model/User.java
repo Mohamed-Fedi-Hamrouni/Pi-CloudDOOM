@@ -1,17 +1,31 @@
 package com.microservice.userservice.model;
 
-import com.microservice.userservice.enums.IndustryEnum;
-import com.microservice.userservice.enums.PlanEnum;
-import com.microservice.userservice.enums.RoleEnum;
-import com.microservice.userservice.enums.UserStatus;
-import jakarta.persistence.*;
-import lombok.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.microservice.userservice.enums.IndustryEnum;
+import com.microservice.userservice.enums.PlanEnum;
+import com.microservice.userservice.enums.RoleEnum;
+import com.microservice.userservice.enums.UserStatus;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "users")
@@ -47,6 +61,8 @@ public class User {
     private String bio;
 
     private String avatarUrl;
+
+    private String cvUrl;
 
     @Column(nullable = false)
     @Builder.Default
@@ -104,6 +120,9 @@ public class User {
 
     @Column(columnDefinition = "TEXT")
     private String educationsJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String skillsJson;
 
     private LocalDateTime lastLoginAt;
 

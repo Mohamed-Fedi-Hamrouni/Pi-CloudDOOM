@@ -1,5 +1,9 @@
 package com.microservice.userservice.exception;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -8,10 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,6 +56,17 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(
+            IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+            "timestamp", LocalDateTime.now().toString(),
+            "status", 400,
+            "error", "Bad Request",
+            "message", ex.getMessage()
+        ));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
             AccessDeniedException ex) {
@@ -74,6 +86,18 @@ public class GlobalExceptionHandler {
             "status", 401,
             "error", "Unauthorized",
             "message", "Authentication required"
+        ));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(
+            ResponseStatusException ex) {
+        int status = ex.getStatusCode().value();
+        return ResponseEntity.status(status).body(Map.of(
+            "timestamp", LocalDateTime.now().toString(),
+            "status", status,
+            "error", ex.getStatusCode().toString(),
+            "message", ex.getReason() == null ? "" : ex.getReason()
         ));
     }
 

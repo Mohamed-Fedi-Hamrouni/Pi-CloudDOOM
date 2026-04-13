@@ -120,7 +120,14 @@ services:
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.created --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.updated --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.deleted --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.role-changed --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.verified --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.suspended --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.events.DLQ --partitions 1 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic interview.session.completed --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.created --partitions 2 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.updated --partitions 2 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.badge.earned --partitions 2 --replication-factor 1
             echo 'Topics créés :'
             kafka-topics --list --bootstrap-server kafka:29092
             "
@@ -144,6 +151,9 @@ services:
             KC_HOSTNAME_STRICT: "false"
             KC_HOSTNAME_STRICT_HTTPS: "false"
             KC_HTTP_ENABLED: "true"
+            KC_HOSTNAME: "localhost"
+            KC_HOSTNAME_PORT: "8080"
+            KC_FRONTEND_URL: "http://localhost:8080"
         volumes:
             - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
             - ./keycloak/themes/interv:/opt/keycloak/themes/interv
@@ -154,12 +164,35 @@ services:
             test:
                 [
                     "CMD-SHELL",
-                    "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/master HTTP/1.0\\r\\n\\r\\n\" >&3; cat <&3 | grep -q \"realm\"'",
+                    "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/master HTTP/1.1\\r\\nHost: localhost:8080\\r\\nConnection: close\\r\\n\\r\\n\" >&3; cat <&3 | grep -q \"realm\"'",
                 ]
             interval: 30s
             timeout: 15s
             retries: 10
             start_period: 90s
+
+    ollama:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama
+        restart: unless-stopped
+        volumes:
+            - ollamadata:/root/.ollama
+        healthcheck:
+            test: ["CMD", "ollama", "list"]
+            interval: 30s
+            timeout: 10s
+            retries: 10
+            start_period: 20s
+
+    ollama-init:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama-init
+        depends_on:
+            ollama:
+                condition: service_started
+        entrypoint: ["/bin/sh", "-c"]
+        command: >
+            "sleep 5 && OLLAMA_HOST=http://ollama:11434 ollama pull llama3.2:3b"
 
     user-service:
         build:
@@ -193,11 +226,52 @@ services:
             KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
+            APP_OLLAMA_BASE_URL: http://ollama:11434
+            APP_OLLAMA_MODEL: llama3.2:3b
+            APP_OLLAMA_TIMEOUT_SECONDS: 120
+
+            # AI (Google AI Studio / Gemini) — set these in your shell or an uncommitted infra/.env file
+            GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+            GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_FALLBACK_MODELS: ${GOOGLE_AI_FALLBACK_MODELS:-gemini-flash-lite-latest}
+            GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
+            GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
+            GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
+
+    interview-service:
+        build:
+            context: ../interview-service
+            dockerfile: Dockerfile
+        container_name: userservice-interview-service
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+        ports:
+            - "${INTERVIEW_SERVICE_PORT:-8082}:8082"
+        environment:
+            SERVER_PORT: 8082
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/interviewdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+            KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+            KEYCLOAK_SERVER_URL: http://keycloak:8080
+            KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_CLIENT_ID: interview-service
+            KEYCLOAK_CLIENT_SECRET: interview-service-secret-change-in-prod
 
     frontend:
         build:
             context: ../frontend
             dockerfile: Dockerfile
+            args:
+                NG_CONFIGURATION: development
         container_name: userservice-frontend
         restart: unless-stopped
         depends_on:
@@ -206,12 +280,50 @@ services:
         ports:
             - "${FRONTEND_PORT:-4200}:80"
 
+    training-service:
+        build:
+            context: ../training-service
+            dockerfile: Dockerfile
+        container_name: userservice-training-service
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+        ports:
+            - "${TRAINING_SERVICE_PORT:-8083}:8083"
+        environment:
+            SERVER_PORT: 8083
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainingdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+            KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+            KEYCLOAK_SERVER_URL: http://keycloak:8080
+            KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_CLIENT_ID: training-service
+            KEYCLOAK_CLIENT_SECRET: training-service-secret-change-in-prod
+            TRAINING_DEBUG_BADGE_SIMULATION_ENABLED: "true"
+
+            # AI (Google AI Studio / Gemini) — drafts + reranking in training-service
+            GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+            GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_FALLBACK_MODELS: ${GOOGLE_AI_FALLBACK_MODELS:-gemini-flash-lite-latest}
+            GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
+            GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
+            GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-900}
+
 volumes:
     pgdata:
     redisdata:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    ollamadata:
 
 networks:
     default:

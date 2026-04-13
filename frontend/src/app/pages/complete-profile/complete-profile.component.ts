@@ -113,6 +113,57 @@ import { environment } from "../../../environments/environment";
                         </select>
                     </div>
 
+                    <div class="cp-field">
+                        <label>Skills</label>
+                        <div class="skills-chip-grid">
+                            <button
+                                type="button"
+                                class="skill-chip"
+                                *ngFor="let skill of predefinedSkills"
+                                [class.selected]="isSkillSelected(skill)"
+                                (click)="toggleSkill(skill)"
+                            >
+                                {{ skill }}
+                            </button>
+                        </div>
+
+                        <div class="custom-skill-row">
+                            <input
+                                class="input"
+                                type="text"
+                                [(ngModel)]="customSkill"
+                                name="customSkill"
+                                placeholder="Add your own skill"
+                                (keydown.enter)="addCustomSkill($event)"
+                            />
+                            <button
+                                type="button"
+                                class="btn btn-ghost"
+                                (click)="addCustomSkill()"
+                            >
+                                Add
+                            </button>
+                        </div>
+
+                        <div
+                            class="selected-skills"
+                            *ngIf="selectedSkills.length"
+                        >
+                            <span
+                                class="selected-skill"
+                                *ngFor="let skill of selectedSkills"
+                            >
+                                {{ skill }}
+                                <button
+                                    type="button"
+                                    (click)="removeSkill(skill)"
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+
                     <button
                         type="submit"
                         class="btn btn-primary"
@@ -233,6 +284,63 @@ import { environment } from "../../../environments/environment";
                 color: var(--color-text);
             }
 
+            .skills-chip-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: var(--space-2);
+            }
+
+            .skill-chip {
+                border: 1px solid var(--color-border);
+                background: var(--color-surface);
+                color: var(--color-text);
+                border-radius: var(--radius-full);
+                padding: 0.35rem 0.75rem;
+                font-size: var(--text-xs);
+                cursor: pointer;
+            }
+
+            .skill-chip.selected {
+                background: var(--teal-50);
+                border-color: var(--teal-300);
+                color: var(--teal-700);
+                font-weight: 600;
+            }
+
+            .custom-skill-row {
+                margin-top: var(--space-2);
+                display: flex;
+                gap: var(--space-2);
+            }
+
+            .selected-skills {
+                margin-top: var(--space-2);
+                display: flex;
+                flex-wrap: wrap;
+                gap: var(--space-2);
+            }
+
+            .selected-skill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                background: var(--teal-50);
+                color: var(--teal-700);
+                border: 1px solid var(--teal-200);
+                border-radius: var(--radius-full);
+                padding: 0.3rem 0.65rem;
+                font-size: var(--text-xs);
+            }
+
+            .selected-skill button {
+                border: none;
+                background: transparent;
+                cursor: pointer;
+                color: var(--teal-700);
+                font-weight: 700;
+                line-height: 1;
+            }
+
             @media (max-width: 480px) {
                 .cp-row {
                     grid-template-columns: 1fr;
@@ -261,6 +369,22 @@ export class CompleteProfileComponent implements OnInit {
         preferredLanguage: "fr",
     };
 
+    predefinedSkills = [
+        "Java",
+        "Spring Boot",
+        "Angular",
+        "TypeScript",
+        "SQL",
+        "Docker",
+        "Kubernetes",
+        "AWS",
+        "Git",
+        "REST API",
+    ];
+
+    selectedSkills: string[] = [];
+    customSkill = "";
+
     ngOnInit(): void {
         if (!this.authService.isAuthenticated()) {
             this.authService.login();
@@ -285,11 +409,11 @@ export class CompleteProfileComponent implements OnInit {
                 email: this.authService.getEmail(),
                 firstName: this.form.firstName,
                 lastName: this.form.lastName,
-                password: "keycloak-managed",
                 phoneNumber: this.form.phoneNumber,
                 city: this.form.city,
                 preferredIndustry: this.form.preferredIndustry || null,
                 preferredLanguage: this.form.preferredLanguage,
+                skills: this.selectedSkills,
             };
 
             this.http
@@ -317,5 +441,39 @@ export class CompleteProfileComponent implements OnInit {
             this.error = "Authentication error. Please refresh and try again.";
             this.loading = false;
         }
+    }
+
+    isSkillSelected(skill: string): boolean {
+        return this.selectedSkills.includes(skill);
+    }
+
+    toggleSkill(skill: string): void {
+        if (this.isSkillSelected(skill)) {
+            this.selectedSkills = this.selectedSkills.filter(
+                (s) => s !== skill,
+            );
+            return;
+        }
+        this.selectedSkills = [...this.selectedSkills, skill];
+    }
+
+    addCustomSkill(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+        }
+
+        const normalized = this.customSkill.trim();
+        if (!normalized) {
+            return;
+        }
+
+        if (!this.selectedSkills.includes(normalized)) {
+            this.selectedSkills = [...this.selectedSkills, normalized];
+        }
+        this.customSkill = "";
+    }
+
+    removeSkill(skill: string): void {
+        this.selectedSkills = this.selectedSkills.filter((s) => s !== skill);
     }
 }
