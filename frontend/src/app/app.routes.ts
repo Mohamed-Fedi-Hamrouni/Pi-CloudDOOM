@@ -25,6 +25,8 @@ export const routes: Routes = [
       { path: 'library',               loadComponent: () => import('./pages/library/library.component').then(m => m.LibraryComponent) },
       { path: 'pricing',               loadComponent: () => import('./pages/pricing/pricing.component').then(m => m.PricingComponent) },
       { path: 'settings',              loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent) },
+      { path: 'community/career',      loadComponent: () => import('./pages/community/career-wizard/career-wizard.component').then(m => m.CareerWizardComponent) },
+      { path: 'community/jobs',        loadComponent: () => import('./pages/community/jobs/jobs.component').then(m => m.JobsComponent) },
     ]
   },
 {

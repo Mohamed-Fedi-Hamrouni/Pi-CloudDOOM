@@ -94,6 +94,71 @@ export interface UserProfileResponse {
   recentPosts: CommunityPost[];
 }
 
+export interface CareerWizardForm {
+  currentRole: string;
+  targetRoles: string[];
+  experienceYears: number;
+  careerLevel: 'ENTRY' | 'MID' | 'SENIOR' | 'LEAD';
+  skills: string[];
+  targetIndustries: string[];
+  workType: 'REMOTE' | 'HYBRID' | 'ONSITE' | 'ANY';
+  availability: 'IMMEDIATE' | 'ONE_MONTH' | 'THREE_MONTHS';
+  salaryMin?: number;
+  salaryMax?: number;
+}
+
+export interface JobCatalogItem {
+  id: number;
+  title: string;
+  company: string;
+  location: string;
+  requiredSkills: string;
+  industry: string;
+  careerLevel: string;
+  workType: string;
+  salaryMin: number;
+  salaryMax: number;
+  jobUrl: string;
+}
+
+export interface JobMatch {
+  job: JobCatalogItem;
+  matchScore: number;
+  matchReasons: string[];
+}
+
+export interface Post {
+  id: number;
+  title: string;
+  content: string;
+  tags?: string;
+  industry?: string;
+  authorKeycloakId: string;
+  createdAt: string;
+}
+
+export interface CareerRecommendationResult {
+  topJobs: JobMatch[];
+  skillsGap: string[];
+  peopleToFollow: string[];
+  postsToRead: Post[];
+  profile: any;
+  generatedAt: string;
+}
+
+export interface JobSubmission {
+  title: string;
+  company: string;
+  location: string;
+  requiredSkills: string[];
+  industry: string;
+  careerLevel: string;
+  workType: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  jobUrl?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CommunityApiService {
   private http = inject(HttpClient);
@@ -161,6 +226,10 @@ export class CommunityApiService {
     return this.http.post<CommunityComment>(`${this.apiUrl}/comments/${id}/upvote`, {});
   }
 
+  updateComment(id: number, content: string): Observable<CommunityComment> {
+    return this.http.put<CommunityComment>(`${this.apiUrl}/comments/${id}`, { content });
+  }
+
   followUser(keycloakId: string): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/follow/${keycloakId}`, {});
   }
@@ -223,5 +292,37 @@ export class CommunityApiService {
     return this.http.get<{ success: boolean; data: CommunityPost[]; total: number }>(
       `${this.apiUrl}/bookmarks`
     );
+  }
+
+  // ── Career Wizard ──────────────────────────────────────────────────────────
+
+  saveWizardProgress(data: Partial<CareerWizardForm>): Observable<any> {
+    return this.http.post(`${this.apiUrl}/career/wizard/save`, data);
+  }
+
+  completeWizard(data: CareerWizardForm): Observable<CareerRecommendationResult> {
+    return this.http.post<CareerRecommendationResult>(`${this.apiUrl}/career/wizard/complete`, data);
+  }
+
+  getWizardProgress(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/career/wizard/progress`);
+  }
+
+  getRecommendations(): Observable<CareerRecommendationResult> {
+    return this.http.get<CareerRecommendationResult>(`${this.apiUrl}/career/recommendations`);
+  }
+
+  submitJob(job: JobSubmission): Observable<any> {
+    return this.http.post(`${this.apiUrl}/career/jobs/submit`, job);
+  }
+
+  getJobs(page: number, size: number, industry?: string, workType?: string, keyword?: string): Observable<any> {
+    let params = new HttpParams()
+      .set('page', page)
+      .set('size', size);
+    if (industry) params = params.set('industry', industry);
+    if (workType) params = params.set('workType', workType);
+    if (keyword) params = params.set('keyword', keyword);
+    return this.http.get(`${this.apiUrl}/career/jobs`, { params });
   }
 }

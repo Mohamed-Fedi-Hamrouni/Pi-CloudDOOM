@@ -40,7 +40,13 @@ interface CommunitySuggestion {
         </div>
         <div class="page-header-actions">
           <button class="btn btn-secondary" type="button" (click)="findPracticePartner()">
-            🤝 Find Practice Partner
+            <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Find Practice Partner
+          </button>
+          <button class="btn btn-career" type="button" (click)="router.navigate(['/community/career'])">
+            <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></span> Career Match
+          </button>
+          <button class="btn btn-secondary" type="button" (click)="router.navigate(['/community/jobs'])">
+            <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M8 12h8M8 16h5"/></svg></span> Job Board
           </button>
           <button class="btn btn-primary" (click)="toggleCreateForm()">
             {{ showCreateForm ? 'Close Form' : '+ Create Post' }}
@@ -147,7 +153,7 @@ interface CommunitySuggestion {
             />
             <span style="position:absolute; left:14px; top:50%;
                          transform:translateY(-50%);
-                         color:var(--color-text-muted); font-size:var(--text-sm);">🔍</span>
+                         color:var(--color-text-muted); font-size:var(--text-sm);" class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
             <span *ngIf="searchQuery"
                   (click)="clearSearch()"
                   style="position:absolute; right:14px; top:50%;
@@ -165,7 +171,7 @@ interface CommunitySuggestion {
               type="button"
               title="All posts"
             >
-              🌐 All Posts
+              <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> All Posts
             </button>
             <button
               class="tab-btn"
@@ -174,7 +180,7 @@ interface CommunitySuggestion {
               type="button"
               title="Your posts"
             >
-              ✍️ My Posts
+              <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span> My Posts
             </button>
             <button
               class="tab-btn"
@@ -183,7 +189,7 @@ interface CommunitySuggestion {
               type="button"
               title="Posts from people you follow"
             >
-              👥 Following
+              <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Following
             </button>
             <button
               class="tab-btn"
@@ -192,7 +198,7 @@ interface CommunitySuggestion {
               type="button"
               title="Your saved posts"
             >
-              🔖 Bookmarks
+              <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span> Bookmarks
               <span *ngIf="bookmarkedPostIds.size > 0" class="badge">{{ bookmarkedPostIds.size }}</span>
             </button>
             <div class="tab-indicator"></div>
@@ -254,7 +260,7 @@ interface CommunitySuggestion {
 
           <div class="card empty-card practice-empty-card" *ngIf="!isInitialLoading && !posts.length && !errorMessage && activeTab === 'all' && selectedType === 'PRACTICE_REQUEST'">
             <div class="practice-empty-state">
-              <div class="practice-empty-icon">🤝</div>
+              <div class="practice-empty-icon"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
               <div class="practice-empty-title">No practice partner requests yet</div>
               <div class="practice-empty-subtitle">Be the first to find a practice partner in this community</div>
               <button class="btn btn-primary btn-sm" type="button" (click)="findPracticePartner()">Post a Request</button>
@@ -302,7 +308,16 @@ interface CommunitySuggestion {
                     style="cursor:pointer;"
                   >{{ getAuthorLabel(post.authorKeycloakId) }}</span>
                   <ng-container *ngIf="getAuthorKarma(post.authorKeycloakId) as karma">
-                    <span class="karma-badge" [ngClass]="karmaBadgeClass(karma)">{{ karmaBadgeEmoji(karma) }} {{ karma }}</span>
+                    <span class="karma-badge" [ngClass]="karmaBadgeClass(karma)">
+                      @if (karma >= 50) {
+                        <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></span>
+                      } @else if (karma >= 20) {
+                        <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></span>
+                      } @else {
+                        <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+                      }
+                      {{ karma }}
+                    </span>
                   </ng-container>
                 </div>
                 <div class="post-author-role">{{ post.authorKeycloakId }}</div>
@@ -348,7 +363,7 @@ interface CommunitySuggestion {
                 type="button"
                 (click)="toggleComments(post.id)"
               >
-                <span>🤝</span>
+                <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span>Connect</span>
               </button>
               <button
@@ -359,7 +374,11 @@ interface CommunitySuggestion {
                 (click)="onToggleBookmark(post)"
                 [title]="bookmarkedPostIds.has(post.id) ? 'Remove bookmark' : 'Add bookmark'"
               >
-                <span>{{ bookmarkedPostIds.has(post.id) ? '🔖' : '🏷️' }}</span>
+                @if (bookmarkedPostIds.has(post.id)) {
+                  <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
+                } @else {
+                  <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
+                }
               </button>
               <button class="post-action-btn" type="button" (click)="reportPost(post.id)">
                 <span><i class="bi bi-flag-fill"></i></span>
@@ -372,7 +391,7 @@ interface CommunitySuggestion {
                 type="button"
                 (click)="startEdit(post)"
               >
-                <span>✏️</span>
+                <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
                 <span>Edit</span>
               </button>
               <button
@@ -398,14 +417,47 @@ interface CommunitySuggestion {
               <div class="comment-item" *ngFor="let comment of getComments(post.id); trackBy: trackByCommentId">
                 <div class="avatar-placeholder" style="width:28px;height:28px;font-size:0.65rem;flex-shrink:0;">{{ getInitials(comment.authorKeycloakId) }}</div>
                 <div class="comment-content-wrap">
-                  <div class="comment-body">
-                    <span class="comment-author">{{ getAuthorLabel(comment.authorKeycloakId) }}</span>
-                    <span class="comment-text">{{ comment.content }}</span>
+                  <div *ngIf="editingCommentId === comment.id; else commentViewMode">
+                    <div class="comment-edit-form">
+                      <textarea
+                        class="comment-edit-input"
+                        rows="2"
+                        [(ngModel)]="editingCommentContent"
+                        [name]="'edit-comment-' + comment.id"
+                        [disabled]="commentEditSubmitting[comment.id]"
+                      ></textarea>
+                      <div *ngIf="commentEditErrors[comment.id]" class="comment-edit-error">{{ commentEditErrors[comment.id] }}</div>
+                      <div class="comment-edit-actions">
+                        <button class="btn-cancel-edit" type="button" (click)="cancelEditComment()">Cancel</button>
+                        <button
+                          class="btn-save-edit"
+                          type="button"
+                          (click)="submitEditComment(post.id, comment.id)"
+                          [disabled]="commentEditSubmitting[comment.id]"
+                        >{{ commentEditSubmitting[comment.id] ? 'Saving…' : 'Save' }}</button>
+                      </div>
+                    </div>
                   </div>
+                  <ng-template #commentViewMode>
+                    <div class="comment-body">
+                      <span class="comment-author">{{ getAuthorLabel(comment.authorKeycloakId) }}</span>
+                      <span class="comment-text">{{ comment.content }}</span>
+                      <span *ngIf="comment.isEdited" class="edited-badge">(edited)</span>
+                    </div>
+                  </ng-template>
                   <div class="comment-meta">
                     <span>{{ formatDate(comment.createdAt) }}</span>
                     <button class="btn btn-ghost btn-sm" type="button" (click)="upvoteComment(post.id, comment.id)">
                       <i class="bi bi-hand-thumbs-up"></i> {{ comment.upvotes }}
+                    </button>
+                    <button
+                      *ngIf="isOwnComment(comment) && editingCommentId !== comment.id"
+                      class="btn btn-ghost btn-sm comment-edit-btn"
+                      type="button"
+                      title="Edit comment"
+                      (click)="startEditComment(comment)"
+                    >
+                      <i class="bi bi-pencil-fill"></i> Edit
                     </button>
                     <button
                       *ngIf="isOwnComment(comment)"
@@ -547,15 +599,15 @@ interface CommunitySuggestion {
             <div class="your-network-divider"></div>
             <div class="your-network-stats">
               <div class="yn-row">
-                <span class="yn-label">⚡ Your Karma</span>
+                <span class="yn-label"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Your Karma</span>
                 <span class="yn-value">{{ myKarma?.totalKarma ?? 0 }}</span>
               </div>
               <div class="yn-row">
-                <span class="yn-label">📝 Posts</span>
+                <span class="yn-label"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span> Posts</span>
                 <span class="yn-value">{{ myKarma?.postsCount ?? 0 }}</span>
               </div>
               <div class="yn-row">
-                <span class="yn-label">👍 Upvotes received</span>
+                <span class="yn-label"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span> Upvotes received</span>
                 <span class="yn-value">{{ myKarma?.upvotesReceived ?? 0 }}</span>
               </div>
             </div>
@@ -565,7 +617,7 @@ interface CommunitySuggestion {
           <div class="card">
             <div class="section-header">
               <div class="section-header-left">
-                <span class="section-icon">🏆</span>
+                <span class="section-icon icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></span>
                 <div>
                   <h2 class="section-title">Karma Leaderboard</h2>
                   <div class="section-subtitle">Top contributors this week</div>
@@ -577,14 +629,14 @@ interface CommunitySuggestion {
             </div>
             <div class="karma-list">
               <div class="karma-item" *ngFor="let entry of leaderboard.slice(0, 5); let i = index">
-                <span class="karma-rank">{{ leaderboardRank(i) }}</span>
+                <span class="karma-rank" [class]="'rank-' + i">{{ leaderboardRank(i) }}</span>
                 <div class="avatar-placeholder" style="width:32px;height:32px;font-size:0.75rem;flex-shrink:0;">
                   {{ entry.displayName[0]?.toUpperCase() || '?' }}
                 </div>
                 <div class="karma-user-info">
                   <div class="karma-display-name">{{ truncateDisplayName(entry.displayName) }}</div>
                 </div>
-                <div class="karma-score">⚡ {{ entry.totalKarma }}</div>
+                <div class="karma-score"><span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> {{ entry.totalKarma }}</div>
               </div>
             </div>
           </div>
@@ -625,7 +677,7 @@ interface CommunitySuggestion {
                 {{ hoveredProfile.displayName }}
               </div>
               <div style="font-size:11px; color:var(--color-text-muted);">
-                ⚡ {{ hoveredProfile.totalKarma }} karma
+                <span class="icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> {{ hoveredProfile.totalKarma }} karma
               </div>
             </div>
           </div>
@@ -734,7 +786,9 @@ interface CommunitySuggestion {
       justify-content: flex-start;
     }
 
-    .page-header-actions { display: flex; gap: var(--space-3); align-items: center; }
+    .page-header-actions { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
+    .btn-career { background: linear-gradient(135deg, #1D9E75, #15c481); color: white; }
+    .btn-career:hover { background: linear-gradient(135deg, #17896a, #11ad72); transform: translateY(-1px); }
 
     /* Post card */
     .post-card { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -800,6 +854,17 @@ interface CommunitySuggestion {
     .comment-meta { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-light); font-size: var(--text-xs); flex-wrap: wrap; }
     .comment-form { display: flex; flex-direction: column; gap: var(--space-3); }
     .comment-form-actions { display: flex; justify-content: flex-end; }
+    .comment-edit-form { display: flex; flex-direction: column; gap: 6px; }
+    .comment-edit-input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: .875rem; resize: vertical; font-family: inherit; }
+    .comment-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+    .btn-cancel-edit { background: none; border: none; color: #6b7280; cursor: pointer; font-size: .85rem; }
+    .btn-cancel-edit:hover { color: #374151; }
+    .btn-save-edit { background: #0a66c2; color: #fff; border: none; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: .85rem; }
+    .btn-save-edit:disabled { opacity: .6; cursor: not-allowed; }
+    .comment-edit-error { font-size: .75rem; color: #dc2626; }
+    .edited-badge { font-size: .75rem; color: #9ca3af; margin-left: 4px; }
+    .comment-edit-btn { color: #9ca3af; }
+    .comment-edit-btn:hover { color: #374151; }
 
     .section-header {
       display: flex;
@@ -1253,6 +1318,16 @@ interface CommunitySuggestion {
       to { transform: rotate(360deg); }
     }
 
+    .icon {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .icon svg {
+      display: block;
+    }
+
     @media (max-width: 1024px) {
       .community-layout { grid-template-columns: 1fr; }
       .community-sidebar { display: grid; grid-template-columns: repeat(2,1fr); }
@@ -1268,7 +1343,7 @@ export class CommunityComponent implements OnInit {
   private communityApi = inject(CommunityApiService);
   private authService = inject(AuthService);
   private cdr = inject(ChangeDetectorRef);
-  private router = inject(Router);
+  router = inject(Router);
 
   posts: CommunityPost[] = [];
   activeTab: 'all' | 'mine' | 'following' | 'bookmarks' = 'all';
@@ -1325,6 +1400,10 @@ export class CommunityComponent implements OnInit {
   commentDrafts: Record<number, string> = {};
   commentSubmitting: Record<number, boolean> = {};
   commentErrors: Record<number, string> = {};
+  editingCommentId: number | null = null;
+  editingCommentContent = '';
+  commentEditErrors: Record<number, string> = {};
+  commentEditSubmitting: Record<number, boolean> = {};
 
   createPostForm: CreatePostBody = {
     title: '',
@@ -1760,6 +1839,44 @@ export class CommunityComponent implements OnInit {
     });
   }
 
+  startEditComment(comment: CommunityComment): void {
+    this.editingCommentId = comment.id;
+    this.editingCommentContent = comment.content;
+    this.commentEditErrors[comment.id] = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelEditComment(): void {
+    this.editingCommentId = null;
+    this.editingCommentContent = '';
+    this.cdr.markForCheck();
+  }
+
+  submitEditComment(postId: number, commentId: number): void {
+    if (!this.editingCommentContent.trim()) {
+      this.commentEditErrors[commentId] = 'Comment cannot be empty.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.commentEditSubmitting[commentId] = true;
+    this.communityApi.updateComment(commentId, this.editingCommentContent.trim())
+      .subscribe({
+        next: (updated) => {
+          this.commentsByPost[postId] = (this.commentsByPost[postId] || [])
+            .map(c => c.id === commentId ? updated : c);
+          this.editingCommentId = null;
+          this.editingCommentContent = '';
+          this.commentEditSubmitting[commentId] = false;
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          this.commentEditErrors[commentId] = this.getErrorMessage(err);
+          this.commentEditSubmitting[commentId] = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
   loadMore(): void {
     if (!this.hasMore || this.isLoadingMore) {
       return;
@@ -1796,7 +1913,7 @@ export class CommunityComponent implements OnInit {
       QUESTION: 'Question',
       SUCCESS_STORY: 'Success Story',
       TIP: 'Tip',
-      PRACTICE_REQUEST: '🤝 Looking for Partner',
+      PRACTICE_REQUEST: 'Looking for Partner',
     };
     return labels[type] || type.replaceAll('_', ' ');
   }
@@ -1897,10 +2014,10 @@ export class CommunityComponent implements OnInit {
     return 'karma-gray';
   }
 
-  karmaBadgeEmoji(karma: number): string {
-    if (karma >= 50) return '🏆';
-    if (karma >= 20) return '⭐';
-    return '⚡';
+  karmaBadgeIcon(karma: number): string {
+    if (karma >= 50) return 'badge-gold';
+    if (karma >= 20) return 'badge-silver';
+    return 'badge-default';
   }
 
   truncateDisplayName(name: string): string {
@@ -1908,9 +2025,9 @@ export class CommunityComponent implements OnInit {
   }
 
   leaderboardRank(index: number): string {
-    if (index === 0) return '🏆';
-    if (index === 1) return '⭐';
-    return `#${index + 1}`;
+    if (index === 0) return '1st';
+    if (index === 1) return '2nd';
+    return '#' + (index + 1);
   }
 
   navigateToProfile(keycloakId: string): void {
