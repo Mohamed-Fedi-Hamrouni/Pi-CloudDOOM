@@ -53,6 +53,7 @@ The service authorizes requests using Keycloak realm roles (converted into Sprin
 - Mentorship requests (create, list by mentee, list by mentor)
 - Mentor actions: accept/decline requests
 - Sessions: create, list by request, cancel, complete
+- Mentor recommendations: deterministic scoring + optional AI explanation/chat (Gemini → Groq fallback)
 - Calendar-friendly data (`scheduledAt`) for frontend calendar rendering
 - In-app meeting support (frontend embeds Jitsi; backend stores a room name)
 - Room name generation: if the mentor leaves room name empty, the service generates one (`mentorship-<random>`)
@@ -100,6 +101,50 @@ Automatic behavior:
 
 Authentication:
 - All endpoints require a Bearer token (JWT), except actuator/swagger if enabled in security config.
+
+---
+
+## Mentor recommendations (AI)
+
+Endpoints (JWT required):
+- `GET /api/recommendations` — returns a scored list of mentors for the current mentee.
+- `POST /api/recommendations/chat` — mentor-focused assistant (not a general chatbot). If the user sends only a greeting ("hi", "hello", "bonjour"…), the reply reminds them to ask only about the mentor recommendation.
+
+Chat request body:
+
+```json
+{
+  "mentorId": "<uuid>",
+  "message": "Why is this mentor recommended for me?"
+}
+```
+
+Chat response body:
+
+```json
+{
+  "reply": "..."
+}
+```
+
+### AI providers & env vars
+
+Provider chain:
+1) Gemini (primary)
+2) Groq (fallback)
+3) Offline/rule-based response (if both fail or are not configured)
+
+When running with Docker Compose, these env vars are passed from `infra/docker-compose.yml`:
+
+```bash
+GEMINI_API_KEY=...
+GEMINI_API_URL=...      # optional override
+GROQ_API_KEY=...
+GROQ_MODEL=...          # optional override
+GROQ_API_URL=...        # optional override
+```
+
+Recommended: set them in `infra/.env` (uncommitted).
 
 ---
 
