@@ -3,12 +3,14 @@ package com.microservice.mentorshipservice.services;
 import com.microservice.mentorshipservice.DTOs.MentorScoreDTO;
 import com.microservice.mentorshipservice.DTOs.UserResponse;
 import com.microservice.mentorshipservice.clients.GeminiClient;
-import com.microservice.mentorshipservice.clients.OpenAiClient;
+import com.microservice.mentorshipservice.clients.GroqClient;
 import com.microservice.mentorshipservice.clients.UserServiceClient;
 import com.microservice.mentorshipservice.enums.MentorStatus;
 import com.microservice.mentorshipservice.repository.MentorRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,10 +18,12 @@ import java.util.stream.Collectors;
 @Service
 public class RecommendationService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
+
     @Autowired private UserServiceClient userServiceClient;
     @Autowired private MentorRequestRepository requestRepository;
     @Autowired private GeminiClient geminiClient;
-    @Autowired private OpenAiClient openAiClient;
+    @Autowired private GroqClient groqClient;
 
     private static final int TOP_N = 3;
 
@@ -97,6 +101,14 @@ public class RecommendationService {
 
         MentorScoreDTO scoredMentor = score(mentee, mentor);
 
+    if (isGreetingOnly(trimmed)) {
+        String name = (safe(mentor.getFirstName()) + " " + safe(mentor.getLastName())).trim();
+        String who = name.isBlank() ? "this mentor" : name;
+        return ("Hi! I can only help with questions about " + who + " and why they were recommended. "
+            + "Ask about your match score, missing skills, session preparation, or next steps.")
+            .trim();
+    }
+
         String prompt = """
                 You are the interV AI assistant.
                 The user is a mentee chatting about a mentor recommendation.
@@ -137,21 +149,41 @@ public class RecommendationService {
         );
 
         String ai = geminiClient.generate(prompt);
-        if (ai != null && !ai.isBlank()) return ai.trim();
-
-        String reason = geminiClient.consumeLastError();
-
-        if ("quota".equalsIgnoreCase(reason)
-                || "disabled".equalsIgnoreCase(reason)
-                || "error".equalsIgnoreCase(reason)) {
-            String openAi = openAiClient.generate(prompt);
-            if (openAi != null && !openAi.isBlank()) return openAi.trim();
+        if (ai != null && !ai.isBlank()) {
+            log.info("AI chat: Gemini ok");
+            return ai.trim();
         }
 
-        return fallbackChatAnswer(mentee, scoredMentor, reason, trimmed);
+        String geminiReason = geminiClient.consumeLastError();
+        if (geminiReason != null && !geminiReason.isBlank()) {
+            log.info("AI chat: Gemini failed ({})", geminiReason);
+        } else {
+            log.info("AI chat: Gemini returned empty (no reason)");
+        }
+        String groqReason = null;
+
+        if ("quota".equalsIgnoreCase(geminiReason)
+                || "disabled".equalsIgnoreCase(geminiReason)
+                || "error".equalsIgnoreCase(geminiReason)) {
+            log.info("AI chat: attempting Groq fallback");
+            String groq = groqClient.generate(prompt);
+            if (groq != null && !groq.isBlank()) {
+                log.info("AI chat: Groq ok");
+                return groq.trim();
+            }
+
+			groqReason = groqClient.consumeLastError();
+            if (groqReason != null && !groqReason.isBlank()) {
+                log.info("AI chat: Groq failed ({})", groqReason);
+            } else {
+                log.info("AI chat: Groq returned empty (no reason)");
+            }
+        }
+
+        return fallbackChatAnswer(mentee, scoredMentor, geminiReason, groqReason, trimmed);
     }
 
-    private String fallbackChatAnswer(UserResponse mentee, MentorScoreDTO mentor, String aiError, String question) {
+    private String fallbackChatAnswer(UserResponse mentee, MentorScoreDTO mentor, String geminiError, String groqError, String question) {
         List<String> menteeSkills = normalize(mentee.getSkills());
         List<String> mentorSkills = normalize(mentor.getSkills());
 
@@ -176,14 +208,7 @@ public class RecommendationService {
             }
         }
 
-        String prefix;
-        if ("quota".equalsIgnoreCase(aiError)) {
-            prefix = "AI is temporarily unavailable (Gemini quota exceeded). ";
-        } else if ("disabled".equalsIgnoreCase(aiError)) {
-            prefix = "AI is not configured. ";
-        } else {
-            prefix = "AI is temporarily unavailable. ";
-        }
+        String prefix = buildAiPrefix(geminiError, groqError);
 
         String q = safe(question).toLowerCase(Locale.ROOT);
 
@@ -221,6 +246,67 @@ public class RecommendationService {
         }
 
         return prefix + "Ask about a learning plan and next steps based on the mentor's strengths, and share what you're trying to achieve so they can tailor advice.";
+    }
+
+    private boolean isGreetingOnly(String message) {
+        if (message == null) return false;
+        String s = message.trim().toLowerCase(Locale.ROOT);
+        s = s.replaceAll("[\\p{Punct}\\s]+", " ").trim();
+        return s.equals("hi")
+                || s.equals("hello")
+                || s.equals("hey")
+                || s.equals("salut")
+                || s.equals("bonjour")
+                || s.equals("hi there")
+                || s.equals("hello there")
+                || s.equals("hey there");
+    }
+
+    private String buildAiPrefix(String geminiError, String groqError) {
+        String g = normalizeAiError(geminiError);
+        String o = normalizeAiError(groqError);
+
+        if ((g == null || g.isBlank()) && (o == null || o.isBlank())) {
+            return "AI is temporarily unavailable. ";
+        }
+
+        List<String> parts = new ArrayList<>();
+        if (g != null && !g.isBlank()) {
+            parts.add("Gemini " + errorToHuman(g));
+        }
+        if (o != null && !o.isBlank()) {
+            parts.add("Groq " + errorToHuman(o));
+        }
+
+        boolean anyDisabled = "disabled".equalsIgnoreCase(g) || "disabled".equalsIgnoreCase(o);
+        boolean anyQuota = "quota".equalsIgnoreCase(g) || "quota".equalsIgnoreCase(o);
+        if (anyDisabled && !anyQuota && parts.size() == 1) {
+            return "AI is not configured. ";
+        }
+
+        return "AI is temporarily unavailable (" + String.join("; ", parts) + "). ";
+    }
+
+    private String normalizeAiError(String reason) {
+        if (reason == null) return null;
+        String r = reason.trim();
+        return r.isBlank() ? null : r;
+    }
+
+    private String errorToHuman(String reason) {
+        if (reason == null) return "unavailable";
+        switch (reason.toLowerCase(Locale.ROOT)) {
+            case "quota":
+                return "quota exceeded";
+            case "disabled":
+                return "not configured";
+            case "invalid_key":
+                return "invalid API key";
+            case "model_decommissioned":
+                return "model deprecated";
+            default:
+                return "unavailable";
+        }
     }
 
     // ── Rule-based scoring ────────────────────────────────────────────────────
@@ -319,17 +405,31 @@ public class RecommendationService {
 
         String ai = geminiClient.generate(prompt);
         if (ai != null && !ai.isBlank()) {
+			log.info("AI explanation: Gemini ok");
             return ai.trim();
         }
 
         String reason = geminiClient.consumeLastError();
+        if (reason != null && !reason.isBlank()) {
+			log.info("AI explanation: Gemini failed ({})", reason);
+		} else {
+			log.info("AI explanation: Gemini returned empty (no reason)");
+		}
         if ("quota".equalsIgnoreCase(reason)
                 || "disabled".equalsIgnoreCase(reason)
                 || "error".equalsIgnoreCase(reason)) {
-            String openAi = openAiClient.generate(prompt);
-            if (openAi != null && !openAi.isBlank()) {
-                return openAi.trim();
+        		log.info("AI explanation: attempting Groq fallback");
+            String groq = groqClient.generate(prompt);
+            if (groq != null && !groq.isBlank()) {
+				log.info("AI explanation: Groq ok");
+                return groq.trim();
             }
+			String groqReason = groqClient.consumeLastError();
+			if (groqReason != null && !groqReason.isBlank()) {
+				log.info("AI explanation: Groq failed ({})", groqReason);
+			} else {
+				log.info("AI explanation: Groq returned empty (no reason)");
+			}
         }
 
         // Fallback (no Gemini key / error): always return a logical 2-sentence explanation.

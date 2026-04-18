@@ -3,15 +3,16 @@ package com.microservice.mentorshipservice.clients;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
 
 @Component
-public class OpenAiClient {
+public class GroqClient {
 
-    private static final String DEFAULT_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String DEFAULT_MODEL = "gpt-4o-mini";
+    private static final String DEFAULT_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+    private static final String DEFAULT_MODEL = "llama-3.1-8b-instant";
 
     private final RestClient restClient;
     private final String apiKey;
@@ -19,11 +20,11 @@ public class OpenAiClient {
 
     private final ThreadLocal<String> lastError = new ThreadLocal<>();
 
-    public OpenAiClient(
+    public GroqClient(
             RestClient.Builder builder,
-            @Value("${openai.api.key:}") String apiKey,
-            @Value("${openai.api.url:}") String apiUrl,
-            @Value("${openai.model:}") String model
+            @Value("${groq.api.key:}") String apiKey,
+            @Value("${groq.api.url:}") String apiUrl,
+            @Value("${groq.model:}") String model
     ) {
         this.apiKey = apiKey;
 
@@ -36,7 +37,7 @@ public class OpenAiClient {
     }
 
     /**
-     * @return OpenAI output text, or empty string when disabled/unavailable.
+     * @return Groq output text, or empty string when disabled/unavailable.
      */
     public String generate(String prompt) {
         lastError.remove();
@@ -84,20 +85,39 @@ public class OpenAiClient {
 
             return "";
 
-        } catch (Exception e) {
-            String msg = e.getMessage() == null ? "" : e.getMessage();
-            String lower = msg.toLowerCase();
+        } catch (RestClientResponseException e) {
+            int status = e.getStatusCode() == null ? -1 : e.getStatusCode().value();
+            String body = e.getResponseBodyAsString();
 
-            if (lower.contains("429")
-                    || lower.contains("rate")
-                    || lower.contains("quota")
-                    || lower.contains("insufficient_quota")) {
+            String lowerBody = body == null ? "" : body.toLowerCase();
+            String lowerMsg = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+
+            if (status == 400
+                    && (lowerBody.contains("model_decommissioned")
+                    || lowerBody.contains("decommissioned")
+                    || lowerBody.contains("deprecated"))) {
+                lastError.set("model_decommissioned");
+
+            } else if (status == 401
+                    || lowerBody.contains("invalid_api_key")
+                    || lowerBody.contains("invalid api key")) {
+                lastError.set("invalid_key");
+            } else if (status == 429
+                    || lowerBody.contains("insufficient_quota")
+                    || lowerMsg.contains("quota")
+                    || lowerMsg.contains("rate")) {
                 lastError.set("quota");
             } else {
                 lastError.set("error");
             }
 
-            System.err.println("OpenAI API error: " + msg);
+            System.err.println("Groq API error: status=" + status + ", body=" + (body == null ? "" : body));
+            return "";
+
+        } catch (Exception e) {
+            lastError.set("error");
+            String msg = e.getMessage() == null ? "" : e.getMessage();
+            System.err.println("Groq API error: " + msg);
             return "";
         }
     }
