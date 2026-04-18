@@ -9,6 +9,15 @@ import { UserApiService, UserProfile } from '../../../core/services/user-api.ser
 
 type RequestStatus = MentorRequest['status'];
 type SessionStatus = MentorSession['status'];
+type SessionGroup = {
+	requestId: string;
+	menteeLabel: string;
+	mentorLabel: string;
+	allSessions: MentorSession[];
+	visibleSessions: MentorSession[];
+	latestScheduledAt: string | null;
+	totalCounts: Record<SessionStatus, number>;
+};
 
 @Component({
 	selector: 'app-admin-mentorship-view',
@@ -242,81 +251,119 @@ type SessionStatus = MentorSession['status'];
 					</div>
 				</div>
 
-				<div class="empty-state" *ngIf="filteredSessions().length === 0">
+				<div class="empty-state" *ngIf="sessionGroups().length === 0">
 					<div class="empty-icon">🎬</div>
 					<div class="empty-title">No sessions found</div>
 					<div class="empty-desc">Try changing the status filter.</div>
 				</div>
 
-				<div class="table-wrap" *ngIf="filteredSessions().length > 0">
+				<div class="table-wrap" *ngIf="sessionGroups().length > 0">
 					<table class="admin-table">
 						<thead>
 							<tr>
-								<th>Session ID</th>
-								<th>Request ID</th>
+								<th>Request</th>
 								<th>Mentee</th>
 								<th>Mentor</th>
-								<th>Date</th>
-								<th>Link</th>
-								<th>Status</th>
+								<th>Latest</th>
+								<th>Showing</th>
+								<th>All statuses</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
-							<ng-container *ngFor="let s of pagedSessions(); trackBy: trackById">
-								<tr *ngIf="editingSessionId() !== s.id">
-									<td class="mono">{{ s.id }}</td>
-									<td class="mono">{{ s.requestId }}</td>
-									<td [title]="sessionMenteeId(s)">{{ sessionMenteeLabel(s) }}</td>
-									<td [title]="sessionMentorId(s)">{{ sessionMentorLabel(s) }}</td>
-									<td>{{ s.scheduledAt | date:'medium' }}</td>
-									<td class="mono">{{ s.meetingLink }}</td>
+							<ng-container *ngFor="let g of pagedSessionGroups(); trackBy: trackByRequestId">
+								<tr class="session-group-row">
 									<td>
-										<span class="chip"
-											[class.chip-neutral]="s.status === 'SCHEDULED'"
-											[class.chip-teal]="s.status === 'COMPLETED'"
-											[class.chip-error]="s.status === 'CANCELLED'">
-											{{ s.status }}
+										<button class="btn btn-ghost btn-sm" (click)="toggleGroup(g.requestId)">
+											{{ isGroupOpen(g.requestId) ? '▾' : '▸' }} Sessions
+										</button>
+									</td>
+									<td>{{ g.menteeLabel }}</td>
+									<td>{{ g.mentorLabel }}</td>
+									<td>{{ g.latestScheduledAt ? (g.latestScheduledAt | date:'medium') : '—' }}</td>
+									<td>
+										<span class="session-group-showing">
+											Showing {{ g.visibleSessions.length }} of {{ g.allSessions.length }}
 										</span>
 									</td>
 									<td>
-										<div class="request-actions">
-											<button class="btn btn-ghost btn-sm" (click)="openMeetingLink(s)">🔗 Open</button>
-											<button class="btn btn-primary btn-sm"
-												*ngIf="s.status === 'SCHEDULED'"
-												(click)="startEditSession(s)">✏️ Edit</button>
-											<button class="btn btn-ghost btn-sm"
-												*ngIf="s.status === 'SCHEDULED'"
-												[disabled]="processingSessionId() === s.id"
-												(click)="cancelSession(s.id)">🗑 Cancel</button>
-											<button class="btn btn-teal btn-sm"
-												*ngIf="s.status === 'SCHEDULED'"
-												[disabled]="processingSessionId() === s.id"
-												(click)="completeSession(s.id)">✅ Complete</button>
-											<button class="btn btn-ghost btn-sm"
-												[disabled]="processingSessionId() === s.id"
-												(click)="deleteSession(s.id)">🗑 Delete</button>
+										<div class="session-group-counts">
+											<span class="chip chip-neutral">📅 {{ g.totalCounts['SCHEDULED'] || 0 }}</span>
+											<span class="chip chip-teal">✅ {{ g.totalCounts['COMPLETED'] || 0 }}</span>
+											<span class="chip chip-error">🛑 {{ g.totalCounts['CANCELLED'] || 0 }}</span>
 										</div>
 									</td>
+									<td class="session-group-actions">
+										<button class="btn btn-ghost btn-sm" (click)="toggleGroup(g.requestId)">
+											{{ isGroupOpen(g.requestId) ? 'Hide' : 'Show' }}
+										</button>
+									</td>
 								</tr>
-								<tr *ngIf="editingSessionId() === s.id">
-									<td class="mono">{{ s.id }}</td>
-									<td class="mono">{{ s.requestId }}</td>
-									<td [title]="sessionMenteeId(s)">{{ sessionMenteeLabel(s) }}</td>
-									<td [title]="sessionMentorId(s)">{{ sessionMentorLabel(s) }}</td>
-									<td>
-										<input class="input" type="datetime-local" [value]="editScheduledAt()" (change)="editScheduledAt.set($any($event.target).value)" />
-									</td>
-									<td>
-										<input class="input" type="text" [value]="editMeetingLink()" (input)="editMeetingLink.set($any($event.target).value)" />
-									</td>
-									<td>
-										<span class="chip chip-neutral">SCHEDULED</span>
-									</td>
-									<td>
-										<div class="request-actions">
-											<button class="btn btn-primary btn-sm" [disabled]="processingSessionId() === s.id" (click)="saveEditSession(s.id)">💾 Save</button>
-											<button class="btn btn-ghost btn-sm" (click)="cancelEditSession()">Cancel</button>
+								<tr *ngIf="isGroupOpen(g.requestId)" class="session-group-details">
+									<td colspan="7">
+										<div class="session-group-inner">
+											<table class="admin-table admin-table--nested">
+												<thead>
+													<tr>
+														<th>Date</th>
+														<th>Link</th>
+														<th>Status</th>
+														<th>Actions</th>
+													</tr>
+												</thead>
+												<tbody>
+													<ng-container *ngFor="let s of g.visibleSessions; trackBy: trackById">
+														<tr *ngIf="editingSessionId() !== s.id">
+															<td>{{ s.scheduledAt | date:'medium' }}</td>
+															<td class="mono">{{ s.meetingLink }}</td>
+															<td>
+																<span class="chip"
+																	[class.chip-neutral]="s.status === 'SCHEDULED'"
+																	[class.chip-teal]="s.status === 'COMPLETED'"
+																	[class.chip-error]="s.status === 'CANCELLED'">
+																	{{ s.status }}
+																</span>
+															</td>
+															<td>
+																<div class="request-actions">
+																	<button class="btn btn-ghost btn-sm" (click)="openMeetingLink(s)">🔗 Open</button>
+																	<button class="btn btn-primary btn-sm"
+																		*ngIf="s.status === 'SCHEDULED'"
+																		(click)="startEditSession(s)">✏️ Edit</button>
+																	<button class="btn btn-ghost btn-sm"
+																		*ngIf="s.status === 'SCHEDULED'"
+																		[disabled]="processingSessionId() === s.id"
+																		(click)="cancelSession(s.id)">🗑 Cancel</button>
+																	<button class="btn btn-teal btn-sm"
+																		*ngIf="s.status === 'SCHEDULED'"
+																		[disabled]="processingSessionId() === s.id"
+																		(click)="completeSession(s.id)">✅ Complete</button>
+																	<button class="btn btn-ghost btn-sm"
+																		[disabled]="processingSessionId() === s.id"
+																		(click)="deleteSession(s.id)">🗑 Delete</button>
+																</div>
+															</td>
+														</tr>
+														<tr *ngIf="editingSessionId() === s.id">
+															<td>
+																<input class="input" type="datetime-local" [value]="editScheduledAt()" (change)="editScheduledAt.set($any($event.target).value)" />
+															</td>
+															<td>
+																<input class="input" type="text" [value]="editMeetingLink()" (input)="editMeetingLink.set($any($event.target).value)" />
+															</td>
+															<td>
+																<span class="chip chip-neutral">SCHEDULED</span>
+															</td>
+															<td>
+																<div class="request-actions">
+																	<button class="btn btn-primary btn-sm" [disabled]="processingSessionId() === s.id" (click)="saveEditSession(s.id)">💾 Save</button>
+																	<button class="btn btn-ghost btn-sm" (click)="cancelEditSession()">Cancel</button>
+																</div>
+															</td>
+														</tr>
+													</ng-container>
+												</tbody>
+											</table>
 										</div>
 									</td>
 								</tr>
@@ -325,7 +372,7 @@ type SessionStatus = MentorSession['status'];
 					</table>
 				</div>
 
-				<div class="admin-pagination" *ngIf="filteredSessions().length > 0 && sessionTotalPages() > 1">
+				<div class="admin-pagination" *ngIf="sessionGroups().length > 0 && sessionTotalPages() > 1">
 					<button class="page-btn" [disabled]="sessionPage() === 0" (click)="setSessionPage(sessionPage() - 1)">Preview</button>
 
 					<ng-container *ngFor="let item of sessionPageItems()">
@@ -373,7 +420,7 @@ export class AdminViewComponent implements OnInit {
 	sessionPage = signal(0);
 
 	requestTotalPages = computed(() => Math.max(1, Math.ceil(this.filteredRequests().length / this.pageSize)));
-	sessionTotalPages = computed(() => Math.max(1, Math.ceil(this.filteredSessions().length / this.pageSize)));
+	sessionTotalPages = computed(() => Math.max(1, Math.ceil(this.sessionGroups().length / this.pageSize)));
 
 	requestPageItems = computed(() => this.buildPageItems(this.requestPage(), this.requestTotalPages()));
 	sessionPageItems = computed(() => this.buildPageItems(this.sessionPage(), this.sessionTotalPages()));
@@ -386,8 +433,83 @@ export class AdminViewComponent implements OnInit {
 		return rows.slice(start, start + this.pageSize);
 	});
 
-	pagedSessions = computed(() => {
-		const rows = this.filteredSessions();
+	openSessionGroups = signal<Record<string, boolean>>({});
+
+	isGroupOpen(requestId: string): boolean {
+		return Boolean(this.openSessionGroups()[requestId]);
+	}
+
+	toggleGroup(requestId: string): void {
+		this.openSessionGroups.update(curr => ({ ...curr, [requestId]: !curr[requestId] }));
+	}
+
+	private groupByRequestId(list: MentorSession[]): Map<string, MentorSession[]> {
+		const map = new Map<string, MentorSession[]>();
+		for (const s of list || []) {
+			const rid = s?.requestId;
+			if (!rid) continue;
+			const arr = map.get(rid) ?? [];
+			arr.push(s);
+			map.set(rid, arr);
+		}
+		for (const [rid, arr] of map.entries()) {
+			map.set(rid, this.sortByDateDesc(arr, x => x.scheduledAt));
+		}
+		return map;
+	}
+
+	private countSessionStatuses(list: MentorSession[]): Record<SessionStatus, number> {
+		const counts: Record<SessionStatus, number> = { SCHEDULED: 0, COMPLETED: 0, CANCELLED: 0 };
+		for (const s of list || []) {
+			counts[s.status] = (counts[s.status] ?? 0) + 1;
+		}
+		return counts;
+	}
+
+	sessionGroups = computed<SessionGroup[]>(() => {
+		const allSessions = this.sessions();
+		const visibleSessions = this.filteredSessions();
+
+		const allMap = this.groupByRequestId(allSessions);
+		const visibleMap = this.groupByRequestId(visibleSessions);
+		const filterActive = Boolean(this.sessionStatusFilter());
+
+		const requestIds = filterActive
+			? Array.from(visibleMap.keys())
+			: Array.from(allMap.keys());
+
+		const groups: SessionGroup[] = [];
+		for (const requestId of requestIds) {
+			const all = allMap.get(requestId) ?? [];
+			const visible = visibleMap.get(requestId) ?? [];
+
+			// When filter is active, hide groups with 0 matching sessions.
+			if (filterActive && visible.length === 0) continue;
+
+			const req = this.requestById().get(requestId);
+			const menteeLabel = req?.menteeId ? this.userLabel(req.menteeId) : '—';
+			const mentorLabel = req?.mentorId ? this.userLabel(req.mentorId) : '—';
+
+			groups.push({
+				requestId,
+				menteeLabel,
+				mentorLabel,
+				allSessions: all,
+				visibleSessions: visible,
+				latestScheduledAt: all[0]?.scheduledAt ?? null,
+				totalCounts: this.countSessionStatuses(all)
+			});
+		}
+
+		return groups.sort((a, b) => {
+			const at = Date.parse(a.latestScheduledAt ?? '');
+			const bt = Date.parse(b.latestScheduledAt ?? '');
+			return (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at);
+		});
+	});
+
+	pagedSessionGroups = computed(() => {
+		const rows = this.sessionGroups();
 		const totalPages = Math.max(1, Math.ceil(rows.length / this.pageSize));
 		const page = this.clampPage(this.sessionPage(), totalPages);
 		const start = page * this.pageSize;
@@ -746,6 +868,10 @@ export class AdminViewComponent implements OnInit {
 
 	trackById(_index: number, row: { id: string }): string {
 		return row.id;
+	}
+
+	trackByRequestId(_index: number, row: { requestId: string }): string {
+		return row.requestId;
 	}
 
 	private sortByDateDesc<T>(items: T[], getDate: (item: T) => string): T[] {

@@ -137,6 +137,46 @@
 	background: var(--neutral-50);
 }
 
+.session-group-row td {
+	background: var(--neutral-50);
+	font-weight: 700;
+}
+
+.session-group-details td {
+	padding: 0;
+	background: var(--color-surface);
+}
+
+.session-group-inner {
+	padding: var(--space-3);
+	background: var(--color-surface);
+}
+
+.session-group-showing {
+	color: var(--color-text-muted);
+	font-weight: 600;
+}
+
+.session-group-counts {
+	display: flex;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+}
+
+.admin-table--nested {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+}
+
+.admin-table--nested th {
+	background: var(--color-surface);
+}
+
+.admin-table--nested tr:hover td {
+	background: var(--color-surface);
+}
+
 .admin-pagination {
 	display: flex;
 	align-items: center;
