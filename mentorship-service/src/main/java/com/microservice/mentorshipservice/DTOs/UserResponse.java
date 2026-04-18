@@ -18,5 +18,8 @@ public class UserResponse {
     private String bio;
     private List<String> skills;
     private String role;
+    private String status;
+    private String preferredIndustry;
+    private Boolean isVerified;
 
 }

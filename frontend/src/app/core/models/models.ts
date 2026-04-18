@@ -62,6 +62,19 @@ export interface Mentor {
   myRatingComment?: string | null;
 }
 
+export interface MentorScoreDTO {
+  mentorId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  bio: string;
+  preferredIndustry: string;
+  skills: string[];
+  score: number;
+  aiExplanation: string;
+  status: string;
+}
+
 // Resource model
 export interface Resource {
   id: string;

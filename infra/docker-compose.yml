@@ -303,6 +303,18 @@ services:
             MAIL_USERNAME: ${MAIL_USERNAME:-}
             MAIL_PASSWORD: ${MAIL_PASSWORD:-}
 
+            # AI (Gemini) — set GEMINI_API_KEY in infra/.env (not committed) or your shell
+            GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+            # Optional override: set GEMINI_API_URL to switch models/endpoints (e.g. gemini-1.5-flash).
+            # Keep a non-empty default to avoid misconfiguring the client.
+            GEMINI_API_URL: "${GEMINI_API_URL:-https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent}"
+
+            # AI (OpenAI) — optional fallback when Gemini is quota'd/unavailable
+            OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+            OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+            OPENAI_API_URL: "${OPENAI_API_URL:-https://api.openai.com/v1/chat/completions}"
+
+
 volumes:
     pgdata:
     redisdata:

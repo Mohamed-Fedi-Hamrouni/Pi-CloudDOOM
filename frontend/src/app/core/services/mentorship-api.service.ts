@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
     MentorRequest,
     MentorSession,
+    MentorScoreDTO,
     CreateMentorRequestDTO,
     CreateMentorSessionDTO
 } from '../models/models';
@@ -24,6 +25,17 @@ export class MentorshipApiService {
     getMentors(): Observable<any> {
         // This returns a paginated response from user-service
         return this.http.get<any>(`${environment.apiUrl}/api/users/by-role?role=MENTOR`);
+    }
+
+    getRecommendations(): Observable<MentorScoreDTO[]> {
+        return this.http.get<MentorScoreDTO[]>(`${this.api}/api/recommendations`);
+    }
+
+    chatRecommendation(mentorId: string, message: string): Observable<{ reply: string }> {
+        return this.http.post<{ reply: string }>(`${this.api}/api/recommendations/chat`, {
+            mentorId,
+            message,
+        });
     }
 
     sendRequest(dto: CreateMentorRequestDTO): Observable<MentorRequest> {

@@ -10,8 +10,10 @@ import { MentorCardComponent } from '../../../shared/components/mentor-card/ment
 import { JitsiMeetComponent } from '../../../shared/components/jitsi-meet/jitsi-meet.component';
 import { MentorshipApiService } from '../../../core/services/mentorship-api.service';
 import { UserApiService, UserProfile } from '../../../core/services/user-api.service';
-import { MentorRequest, MentorSession, Mentor } from '../../../core/models/models';
+import { MentorRequest, MentorSession, Mentor, MentorScoreDTO } from '../../../core/models/models';
 import { Observable, catchError, forkJoin, of } from 'rxjs';
+
+type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
 @Component({
     selector: 'app-mentee-view',
@@ -220,6 +222,108 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
         </div>
       </div>
 
+
+      <!-- AI Recommendations -->
+      <div class="card recommendations-card">
+        <app-section-header title="Recommended for You" icon="🤖"></app-section-header>
+        <p class="rec-subtitle">Matched based on your profile and skills</p>
+
+        <div class="loading-card" *ngIf="loadingRecommendations()">Loading recommendations…</div>
+        <div class="card error-card" *ngIf="recommendationsError()">⚠️ {{ recommendationsError() }}</div>
+
+        <ng-container *ngIf="!loadingRecommendations() && !recommendationsError()">
+          <div class="empty-state" *ngIf="recommendations().length === 0">
+            <div class="empty-icon">🤖</div>
+            <div class="empty-title">No recommendations yet</div>
+            <div class="empty-desc">Complete your profile (skills/industry) then try again.</div>
+            <button class="btn btn-primary btn-sm" (click)="loadRecommendations()">Retry</button>
+          </div>
+
+          <div class="recommendations-grid" *ngIf="recommendations().length > 0">
+            <div class="rec-card" *ngFor="let rec of recommendations()">
+
+              <div class="rec-header">
+                <div class="avatar-placeholder" style="width:48px;height:48px;font-size:1rem;">
+                  {{ rec.firstName[0] }}{{ rec.lastName[0] }}
+                </div>
+                <div class="rec-meta">
+                  <div class="rec-name">{{ rec.firstName }} {{ rec.lastName }}</div>
+                  <div class="rec-industry" *ngIf="rec.preferredIndustry">
+                    {{ rec.preferredIndustry }}
+                  </div>
+                </div>
+                <div class="rec-score">
+                  <span class="score-value">{{ rec.score }}</span>
+                  <span class="score-label">match</span>
+                </div>
+              </div>
+
+              <div class="rec-skills" *ngIf="rec.skills.length > 0">
+                <span *ngFor="let skill of rec.skills.slice(0,3)"
+                  class="chip chip-teal">{{ skill }}</span>
+              </div>
+
+              <!-- AI explanation -->
+              <div class="rec-explanation" *ngIf="rec.aiExplanation">
+                <span class="ai-badge">✨ AI</span>
+                <p class="rec-explanation-text">{{ rec.aiExplanation }}</p>
+              </div>
+
+              <!-- AI chat -->
+              <div class="rec-chat">
+                <button class="btn btn-ghost btn-sm" (click)="toggleRecChat(rec.mentorId)">
+                  {{ isRecChatOpen(rec.mentorId) ? 'Hide AI Chat' : 'Chat with AI' }}
+                </button>
+
+                <div class="rec-chat-panel" *ngIf="isRecChatOpen(rec.mentorId)">
+                  <div class="card error-card" *ngIf="recChatError(rec.mentorId)">
+                    ⚠️ {{ recChatError(rec.mentorId) }}
+                  </div>
+
+                  <div class="rec-chat-messages" *ngIf="recChatMessages(rec.mentorId).length > 0">
+                    <div
+                      class="rec-chat-msg"
+                      *ngFor="let m of recChatMessages(rec.mentorId)"
+                      [class.is-user]="m.role === 'user'"
+                      [class.is-ai]="m.role === 'ai'">
+                      {{ m.text }}
+                    </div>
+                  </div>
+
+                  <div class="rec-chat-hint" *ngIf="recChatMessages(rec.mentorId).length === 0">
+                    Ask something like: “What should I prepare for a first session?”
+                  </div>
+
+                  <div class="rec-chat-input">
+                    <input
+                      class="input"
+                      placeholder="Ask a question…"
+                      [value]="recChatInput(rec.mentorId)"
+                      (input)="setRecChatInput(rec.mentorId, $any($event.target).value)"
+                      (keydown.enter)="sendRecChat(rec.mentorId)">
+                    <button
+                      class="btn btn-primary btn-sm"
+                      [disabled]="recChatLoading(rec.mentorId) || !recChatInput(rec.mentorId).trim()"
+                      (click)="sendRecChat(rec.mentorId)">
+                      {{ recChatLoading(rec.mentorId) ? 'Sending…' : 'Send' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                class="btn btn-primary btn-sm rec-btn"
+                [disabled]="hasRequestFor(rec.mentorId) || requestingId() === rec.mentorId"
+                (click)="sendRequest(rec.mentorId)">
+                {{ hasRequestFor(rec.mentorId) ? '✓ Requested' :
+                   requestingId() === rec.mentorId ? 'Sending...' : 'Request Mentor' }}
+              </button>
+
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
     </div>
   `,
     styleUrls: ['../mentorship-shared.scss']
@@ -229,9 +333,20 @@ export class MenteeViewComponent implements OnInit {
   private userApi = inject(UserApiService);
 
   private userNameById = signal<Record<string, string>>({});
+  
 
   displayName = signal<string>('');
   activeRoomName = signal<string | null>(null);
+
+  recommendations = signal<MentorScoreDTO[]>([]);
+  loadingRecommendations = signal(false);
+  recommendationsError = signal<string | null>(null);
+
+  openRecChatMentorId = signal<string | null>(null);
+  recChatByMentorId = signal<Record<string, RecChatMessage[]>>({});
+  recChatInputByMentorId = signal<Record<string, string>>({});
+  recChatLoadingByMentorId = signal<Record<string, boolean>>({});
+  recChatErrorByMentorId = signal<Record<string, string | null>>({});
 
   calendarEvents = signal<EventInput[]>([]);
   calendarOptions = signal<CalendarOptions>({
@@ -297,6 +412,8 @@ export class MenteeViewComponent implements OnInit {
     ngOnInit() {
       this.loadMentors();
       this.loadMyRequests();
+      this.loadRecommendations();
+
     }
 
     loadMentors() {
@@ -381,6 +498,91 @@ export class MenteeViewComponent implements OnInit {
         error: () => {}
       });
     }
+
+    loadRecommendations() {
+      this.recommendationsError.set(null);
+      this.loadingRecommendations.set(true);
+
+      this.mentorshipApi.getRecommendations().subscribe({
+        next: (recs) => {
+          this.recommendations.set(recs);
+          this.loadingRecommendations.set(false);
+        },
+        error: () => {
+          this.loadingRecommendations.set(false);
+          this.recommendationsError.set('Failed to load recommendations (check login / backend).');
+        }
+      });
+    }
+
+    isRecChatOpen(mentorId: string): boolean {
+      return this.openRecChatMentorId() === mentorId;
+    }
+
+    toggleRecChat(mentorId: string): void {
+      this.recChatErrorByMentorId.update(curr => ({ ...curr, [mentorId]: null }));
+      this.openRecChatMentorId.set(this.isRecChatOpen(mentorId) ? null : mentorId);
+    }
+
+    recChatMessages(mentorId: string): RecChatMessage[] {
+      return this.recChatByMentorId()[mentorId] ?? [];
+    }
+
+    recChatInput(mentorId: string): string {
+      return this.recChatInputByMentorId()[mentorId] ?? '';
+    }
+
+    setRecChatInput(mentorId: string, value: string): void {
+      this.recChatInputByMentorId.update(curr => ({ ...curr, [mentorId]: value }));
+    }
+
+    recChatLoading(mentorId: string): boolean {
+      return Boolean(this.recChatLoadingByMentorId()[mentorId]);
+    }
+
+    recChatError(mentorId: string): string | null {
+      return this.recChatErrorByMentorId()[mentorId] ?? null;
+    }
+
+    sendRecChat(mentorId: string): void {
+      if (this.recChatLoading(mentorId)) return;
+
+      const text = this.recChatInput(mentorId).trim();
+      if (!text) return;
+      if (text.length > 800) {
+        this.recChatErrorByMentorId.update(curr => ({ ...curr, [mentorId]: 'Message too long (max 800 characters).' }));
+        return;
+      }
+
+      this.recChatErrorByMentorId.update(curr => ({ ...curr, [mentorId]: null }));
+      this.setRecChatInput(mentorId, '');
+
+      this.recChatByMentorId.update(curr => ({
+        ...curr,
+        [mentorId]: [...(curr[mentorId] ?? []), { role: 'user', text }]
+      }));
+      this.recChatLoadingByMentorId.update(curr => ({ ...curr, [mentorId]: true }));
+
+      this.mentorshipApi.chatRecommendation(mentorId, text).subscribe({
+        next: (res) => {
+          const reply = (res?.reply ?? '').trim();
+          if (reply) {
+            this.recChatByMentorId.update(curr => ({
+              ...curr,
+              [mentorId]: [...(curr[mentorId] ?? []), { role: 'ai', text: reply }]
+            }));
+          } else {
+            this.recChatErrorByMentorId.update(curr => ({ ...curr, [mentorId]: 'No reply from AI.' }));
+          }
+          this.recChatLoadingByMentorId.update(curr => ({ ...curr, [mentorId]: false }));
+        },
+        error: () => {
+          this.recChatLoadingByMentorId.update(curr => ({ ...curr, [mentorId]: false }));
+          this.recChatErrorByMentorId.update(curr => ({ ...curr, [mentorId]: 'Failed to chat with AI (check backend / GEMINI_API_KEY).' }));
+        }
+      });
+    }
+
 
         userLabel(userId: string): string {
           if (!userId) return '';
@@ -641,4 +843,6 @@ export class MenteeViewComponent implements OnInit {
         { icon: '🎙️', title: 'Meet & Practice', desc: 'Join a live 1:1 video session with your mentor.' },
         { icon: '📊', title: 'Get Feedback', desc: 'Receive personalized feedback and an action plan.' },
     ];
+
+    
 }
