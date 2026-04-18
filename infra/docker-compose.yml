@@ -308,6 +308,7 @@ services:
             KEYCLOAK_CLIENT_ID: training-service
             KEYCLOAK_CLIENT_SECRET: training-service-secret-change-in-prod
             TRAINING_DEBUG_BADGE_SIMULATION_ENABLED: "true"
+            AI_MODEL_URL: http://ai-training-path:8000/predict-path
 
             # AI (Google AI Studio / Gemini) — drafts + reranking in training-service
             GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
@@ -316,6 +317,15 @@ services:
             GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
             GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
             GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-900}
+
+    ai-training-path:
+        build:
+            context: ../ai-training-path
+            dockerfile: Dockerfile
+        container_name: userservice-ai-training-path
+        restart: unless-stopped
+        ports:
+            - "8000:8000"
 
 volumes:
     pgdata:

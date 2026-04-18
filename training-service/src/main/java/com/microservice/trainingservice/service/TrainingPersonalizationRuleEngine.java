@@ -2,7 +2,11 @@ package com.microservice.trainingservice.service;
 
 import com.microservice.trainingservice.event.InterviewSessionCompletedEvent;
 import com.microservice.trainingservice.model.TrainingCategory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,17 +35,43 @@ public class TrainingPersonalizationRuleEngine {
         return plans;
     }
 
-    public List<PersonalizedModulePlan> buildPlan(InterviewSessionCompletedEvent event) {
-        Map<TrainingCategory, Integer> priority = new EnumMap<>(TrainingCategory.class);
-        for (TrainingCategory category : TrainingCategory.values()) {
-            priority.put(category, 50);
-        }
+    private static final Logger log = LoggerFactory.getLogger(TrainingPersonalizationRuleEngine.class);
+    private final RestTemplate restTemplate = new RestTemplate();
 
+    public record AiPathRequest(double globalScore, String preparationLevel, int totalSessionsCompleted) {}
+    public record AiPathResponse(List<PersonalizedModulePlan> plans) {}
+
+    public List<PersonalizedModulePlan> buildPlan(InterviewSessionCompletedEvent event) {
         double score = event.getGlobalScore() == null ? 60.0 : event.getGlobalScore();
         String prepLevel = event.getPreparationLevel() == null
             ? ""
             : event.getPreparationLevel().toLowerCase(Locale.ROOT);
         int sessions = event.getTotalSessionsCompleted() == null ? 0 : event.getTotalSessionsCompleted();
+
+        try {
+            String aiModelUrl = System.getenv("AI_MODEL_URL");
+            if (aiModelUrl == null || aiModelUrl.isBlank()) {
+                aiModelUrl = "http://localhost:8000/predict-path";
+            }
+            AiPathRequest request = new AiPathRequest(score, prepLevel, sessions);
+            ResponseEntity<AiPathResponse> response = restTemplate.postForEntity(
+                aiModelUrl, request, AiPathResponse.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null && response.getBody().plans() != null) {
+                log.info("Successfully fetched AI path from local model");
+                return response.getBody().plans();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch path from AI model, falling back to rule engine", e);
+        }
+
+        return buildFallbackPlan(score, prepLevel, sessions);
+    }
+
+    private List<PersonalizedModulePlan> buildFallbackPlan(double score, String prepLevel, int sessions) {
+        Map<TrainingCategory, Integer> priority = new EnumMap<>(TrainingCategory.class);
+        for (TrainingCategory category : TrainingCategory.values()) {
+            priority.put(category, 50);
+        }
 
         if (score < 55) {
             bump(priority, TrainingCategory.COMMUNICATION, 25);

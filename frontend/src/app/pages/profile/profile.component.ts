@@ -2,8 +2,6 @@ import {
     Component,
     inject,
     OnInit,
-    ChangeDetectorRef,
-    ChangeDetectionStrategy,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -75,16 +73,16 @@ type ActiveEditSection =
     imports: [CommonModule, FormsModule, SectionHeaderComponent],
     templateUrl: "./profile.component.html",
     styleUrls: ["./profile.component.css"],
-    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfileComponent implements OnInit {
     private http = inject(HttpClient);
-    private cdr = inject(ChangeDetectorRef);
     private userApi = inject(UserApiService);
     private currentUserStore = inject(CurrentUserStoreService);
     private router = inject(Router);
 
     user: UserProfile | null = null;
+    profileLoading = true;
+    profileLoadError = "";
     initials = "";
     memberSinceLabel = "";
     editing = false;
@@ -159,26 +157,61 @@ export class ProfileComponent implements OnInit {
     }
 
     loadProfile(): void {
+        this.profileLoading = true;
+        this.profileLoadError = "";
         this.userApi.getCurrentUser().subscribe({
             next: (user) => {
-                user.skills = user.skills || [];
-                this.user = user;
-                this.initials = this.computeInitials(user.firstName, user.lastName);
-                this.currentUserStore.setCurrentUser(user);
-                this.avatarPreviewUrl = user.avatarUrl || "";
-                this.selectedSkills = [...user.skills];
-                this.experiences = this.parseExperiences(user.experiencesJson);
-                this.educations = this.parseEducations(user.educationsJson);
-                this.selectedCvFileName = this.extractFileNameFromUrl(user.cvUrl || null);
-                this.refreshDerivedFields();
-                this.refreshCompletion();
-                this.syncPreferences();
-                this.cdr.markForCheck();
+                this.profileLoading = false;
+
+                if (!user || typeof user !== "object") {
+                    this.profileLoadError = "Unexpected profile response.";
+                    return;
+                }
+
+                const normalized: UserProfile = {
+                    ...(user as UserProfile),
+                    skills: Array.isArray((user as UserProfile).skills)
+                        ? (user as UserProfile).skills
+                        : [],
+                };
+
+                this.user = normalized;
+
+                try {
+                    this.initials = this.computeInitials(
+                        normalized.firstName,
+                        normalized.lastName,
+                    );
+                    this.currentUserStore.setCurrentUser(normalized);
+                    this.avatarPreviewUrl = normalized.avatarUrl || "";
+                    this.selectedSkills = [...normalized.skills];
+                    this.experiences = this.parseExperiences(normalized.experiencesJson);
+          this.educations = this.parseEducations(normalized.educationsJson);
+                    this.selectedCvFileName = this.extractFileNameFromUrl(
+                        normalized.cvUrl || null,
+                    );
+                    this.refreshDerivedFields();
+                    this.refreshCompletion();
+                    this.syncPreferences();
+                } catch (e) {
+                    console.error("Profile initialization error:", e);
+                }
             },
             error: (err) => {
+                this.profileLoading = false;
                 console.error("Profile load error:", err);
                 if (err.status === 404) {
                     this.router.navigate(["/complete-profile"]);
+                    return;
+                }
+
+                if (err.status === 0) {
+                    this.profileLoadError =
+                        "Failed to load profile (network/CORS).";
+                } else if (err.status) {
+                    this.profileLoadError = `Failed to load profile (HTTP ${err.status}).`;
+                } else {
+                    this.profileLoadError = "Failed to load profile.";
                 }
             },
         });
@@ -318,16 +351,13 @@ export class ProfileComponent implements OnInit {
                 this.saving = false;
                 this.saveSuccess = true;
                 this.syncPreferences();
-                this.cdr.markForCheck();
                 setTimeout(() => {
                     this.saveSuccess = false;
-                    this.cdr.markForCheck();
                 }, 3000);
             },
             error: () => {
                 this.saving = false;
                 this.saveError = "Failed to save. Please try again.";
-                this.cdr.markForCheck();
             },
         });
     }
@@ -815,13 +845,11 @@ export class ProfileComponent implements OnInit {
                     this.clearAvatarObjectUrl();
                     this.refreshDerivedFields();
                     this.refreshCompletion();
-                    this.cdr.markForCheck();
                 },
                 error: () => {
                     this.avatarUploadLoading = false;
                     this.avatarUploadError =
                         "Avatar upload failed. Please try again.";
-                    this.cdr.markForCheck();
                 },
             });
     }
@@ -931,14 +959,12 @@ export class ProfileComponent implements OnInit {
                 this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();
-                this.cdr.markForCheck();
             },
             error: (err) => {
                 this.cvUploadLoading = false;
                 this.cvUploadError =
                     err?.error?.message ||
                     "CV upload failed. Please try again.";
-                this.cdr.markForCheck();
             },
         });
     }

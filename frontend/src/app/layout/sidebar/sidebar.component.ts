@@ -461,9 +461,12 @@ export class SidebarComponent implements OnChanges {
 
     avatarFailed = false;
 
+    accountNav: NavItem[] = this.buildAccountNav();
+
     ngOnChanges(changes: SimpleChanges): void {
         if ("currentUser" in changes) {
             this.avatarFailed = false;
+            this.accountNav = this.buildAccountNav();
         }
     }
 
@@ -548,7 +551,7 @@ export class SidebarComponent implements OnChanges {
         { label: "Community", icon: "💬", route: "/community" },
     ];
 
-    get accountNav(): NavItem[] {
+    private buildAccountNav(): NavItem[] {
         const base: NavItem[] = [
             { label: "Profile", icon: "👤", route: "/profile" },
             { label: "Pricing", icon: "✦", route: "/pricing" },

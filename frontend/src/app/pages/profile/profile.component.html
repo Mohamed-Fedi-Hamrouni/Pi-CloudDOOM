@@ -1049,4 +1049,11 @@
     </div>
 </div>
 
-<div *ngIf="!user" class="loading-profile">Loading your profile...</div>
+<div *ngIf="!user" class="loading-profile">
+    <ng-container *ngIf="profileLoading; else loadResult">
+        Loading your profile...
+    </ng-container>
+    <ng-template #loadResult>
+        {{ profileLoadError || "Unable to load your profile." }}
+    </ng-template>
+</div>
