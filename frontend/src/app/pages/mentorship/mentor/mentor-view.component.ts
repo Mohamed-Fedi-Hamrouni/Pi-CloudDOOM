@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, computed, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FullCalendarModule } from '@fullcalendar/angular';
 import { CalendarOptions, EventClickArg, EventInput } from '@fullcalendar/core';
@@ -70,6 +70,24 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
       <div class="card">
         <app-section-header title="Incoming Requests" icon="📨"></app-section-header>
 
+        <div class="admin-table-toolbar" style="justify-content:flex-start;gap:var(--space-3);flex-wrap:wrap;">
+          <div class="admin-filter">
+            <label class="form-label">Search by mentee</label>
+            <input
+              class="input"
+              placeholder="Type mentee name..."
+              [value]="incomingSearchQuery()"
+              (input)="setIncomingSearch($event)">
+          </div>
+          <div class="admin-filter">
+            <label class="form-label">Order</label>
+            <select class="input" [value]="incomingSortOrder()" (change)="setIncomingSortOrder($event)">
+              <option value="recent">Recent</option>
+              <option value="old">Old</option>
+            </select>
+          </div>
+        </div>
+
         <div class="loading-state" *ngIf="loadingRequests()">Loading requests...</div>
 
         <div class="empty-state"
@@ -79,8 +97,15 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
           <div class="empty-desc">When users request your mentorship, they'll appear here.</div>
         </div>
 
-        <div class="requests-list" *ngIf="incomingRequests().length > 0">
-          <div class="request-block" *ngFor="let req of incomingRequests()">
+        <div class="empty-state"
+          *ngIf="!loadingRequests() && incomingRequests().length > 0 && displayedIncomingRequests().length === 0">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-title">No matching requests</div>
+          <div class="empty-desc">Try a different search.</div>
+        </div>
+
+        <div class="requests-list" *ngIf="displayedIncomingRequests().length > 0">
+          <div class="request-block" *ngFor="let req of displayedIncomingRequests()">
 
             <!-- Request row -->
             <div class="request-item">
@@ -288,6 +313,30 @@ export class MentorViewComponent implements OnInit {
   });
 
     incomingRequests = signal<MentorRequest[]>([]);
+
+    incomingSearchQuery = signal('');
+    incomingSortOrder = signal<'recent' | 'old'>('recent');
+
+    displayedIncomingRequests = computed(() => {
+      const q = this.incomingSearchQuery().toLowerCase().trim();
+      let rows = [...this.incomingRequests()];
+
+      if (q) {
+        rows = rows.filter(r => {
+          const mentee = this.userLabel(r.menteeId).toLowerCase();
+          const menteeId = (r.menteeId || '').toLowerCase();
+          return mentee.includes(q) || menteeId.includes(q);
+        });
+      }
+
+      const order = this.incomingSortOrder();
+      return rows.sort((a, b) => {
+        const at = Date.parse(a.createdAt || '');
+        const bt = Date.parse(b.createdAt || '');
+        const diff = (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at);
+        return order === 'recent' ? diff : -diff;
+      });
+    });
     sessionsByRequest = signal<Map<string, MentorSession[]>>(new Map());
     loadingRequests = signal(false);
     processingId = signal<string | null>(null);
@@ -329,6 +378,15 @@ export class MentorViewComponent implements OnInit {
 
     get pendingCount() {
         return () => this.incomingRequests().filter(r => r.status === 'PENDING').length;
+    }
+
+    setIncomingSearch(event: Event) {
+      this.incomingSearchQuery.set(String((event.target as HTMLInputElement).value || ''));
+    }
+
+    setIncomingSortOrder(event: Event) {
+      const next = String((event.target as HTMLSelectElement).value || 'recent') as 'recent' | 'old';
+      this.incomingSortOrder.set(next);
     }
 
     ngOnInit() {

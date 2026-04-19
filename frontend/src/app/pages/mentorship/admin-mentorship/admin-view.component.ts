@@ -143,12 +143,29 @@ type SessionGroup = {
 
 				<div class="admin-table-toolbar">
 					<div class="admin-filter">
+						<label class="form-label">Search</label>
+						<input
+							class="input"
+							placeholder="Search mentee / mentor / status..."
+							[value]="requestSearchQuery()"
+							(input)="setRequestSearch($event)">
+					</div>
+
+					<div class="admin-filter">
 						<label class="form-label">Filter by status</label>
 						<select class="input" [value]="requestStatusFilter()" (change)="setRequestFilter($event)">
 							<option value="">All</option>
 							<option value="PENDING">PENDING</option>
 							<option value="ACCEPTED">ACCEPTED</option>
 							<option value="DECLINED">DECLINED</option>
+						</select>
+					</div>
+
+					<div class="admin-filter">
+						<label class="form-label">Order</label>
+						<select class="input" [value]="requestSortOrder()" (change)="setRequestSortOrder($event)">
+							<option value="recent">Recent</option>
+							<option value="old">Old</option>
 						</select>
 					</div>
 				</div>
@@ -241,12 +258,29 @@ type SessionGroup = {
 
 				<div class="admin-table-toolbar">
 					<div class="admin-filter">
+						<label class="form-label">Search</label>
+						<input
+							class="input"
+							placeholder="Search request / mentee / mentor..."
+							[value]="sessionSearchQuery()"
+							(input)="setSessionSearch($event)">
+					</div>
+
+					<div class="admin-filter">
 						<label class="form-label">Filter by status</label>
 						<select class="input" [value]="sessionStatusFilter()" (change)="setSessionFilter($event)">
 							<option value="">All</option>
 							<option value="SCHEDULED">SCHEDULED</option>
 							<option value="COMPLETED">COMPLETED</option>
 							<option value="CANCELLED">CANCELLED</option>
+						</select>
+					</div>
+
+					<div class="admin-filter">
+						<label class="form-label">Order</label>
+						<select class="input" [value]="sessionSortOrder()" (change)="setSessionSortOrder($event)">
+							<option value="recent">Recent</option>
+							<option value="old">Old</option>
 						</select>
 					</div>
 				</div>
@@ -415,6 +449,12 @@ export class AdminViewComponent implements OnInit {
 	requestStatusFilter = signal<'' | RequestStatus>('');
 	sessionStatusFilter = signal<'' | SessionStatus>('');
 
+	requestSearchQuery = signal('');
+	requestSortOrder = signal<'recent' | 'old'>('recent');
+
+	sessionSearchQuery = signal('');
+	sessionSortOrder = signal<'recent' | 'old'>('recent');
+
 	readonly pageSize = 5;
 	requestPage = signal(0);
 	sessionPage = signal(0);
@@ -501,10 +541,20 @@ export class AdminViewComponent implements OnInit {
 			});
 		}
 
-		return groups.sort((a, b) => {
+		const q = this.sessionSearchQuery().toLowerCase().trim();
+		const filtered = q
+			? groups.filter(g => {
+				const hay = `${g.requestId} ${g.menteeLabel} ${g.mentorLabel}`.toLowerCase();
+				return hay.includes(q);
+			})
+			: groups;
+
+		const order = this.sessionSortOrder();
+		return filtered.sort((a, b) => {
 			const at = Date.parse(a.latestScheduledAt ?? '');
 			const bt = Date.parse(b.latestScheduledAt ?? '');
-			return (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at);
+			const diff = (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at);
+			return order === 'recent' ? diff : -diff;
 		});
 	});
 
@@ -805,9 +855,37 @@ export class AdminViewComponent implements OnInit {
 
 	filteredRequests(): MentorRequest[] {
 		const status = this.requestStatusFilter();
-		const rows = this.requests();
-		if (!status) return rows;
-		return rows.filter(r => r.status === status);
+		const q = this.requestSearchQuery().toLowerCase().trim();
+		const order = this.requestSortOrder();
+
+		let rows = this.requests();
+		if (status) rows = rows.filter(r => r.status === status);
+
+		if (q) {
+			rows = rows.filter(r => {
+				const mentee = this.userLabel(r.menteeId).toLowerCase();
+				const mentor = this.userLabel(r.mentorId).toLowerCase();
+				const menteeId = (r.menteeId || '').toLowerCase();
+				const mentorId = (r.mentorId || '').toLowerCase();
+				const statusText = (r.status || '').toLowerCase();
+				const idText = (r.id || '').toLowerCase();
+				return (
+					mentee.includes(q) ||
+					mentor.includes(q) ||
+					menteeId.includes(q) ||
+					mentorId.includes(q) ||
+					statusText.includes(q) ||
+					idText.includes(q)
+				);
+			});
+		}
+
+		return [...rows].sort((a, b) => {
+			const at = Date.parse(a.createdAt || '');
+			const bt = Date.parse(b.createdAt || '');
+			const diff = (isNaN(bt) ? 0 : bt) - (isNaN(at) ? 0 : at);
+			return order === 'recent' ? diff : -diff;
+		});
 	}
 
 	filteredSessions(): MentorSession[] {
@@ -823,9 +901,31 @@ export class AdminViewComponent implements OnInit {
 		this.requestPage.set(0);
 	}
 
+	setRequestSearch(event: Event): void {
+		this.requestSearchQuery.set(String((event.target as HTMLInputElement).value || ''));
+		this.requestPage.set(0);
+	}
+
+	setRequestSortOrder(event: Event): void {
+		const next = String((event.target as HTMLSelectElement).value || 'recent') as 'recent' | 'old';
+		this.requestSortOrder.set(next);
+		this.requestPage.set(0);
+	}
+
 	setSessionFilter(event: Event): void {
 		const next = String((event.target as HTMLSelectElement).value || '') as '' | SessionStatus;
 		this.sessionStatusFilter.set(next);
+		this.sessionPage.set(0);
+	}
+
+	setSessionSearch(event: Event): void {
+		this.sessionSearchQuery.set(String((event.target as HTMLInputElement).value || ''));
+		this.sessionPage.set(0);
+	}
+
+	setSessionSortOrder(event: Event): void {
+		const next = String((event.target as HTMLSelectElement).value || 'recent') as 'recent' | 'old';
+		this.sessionSortOrder.set(next);
 		this.sessionPage.set(0);
 	}
 

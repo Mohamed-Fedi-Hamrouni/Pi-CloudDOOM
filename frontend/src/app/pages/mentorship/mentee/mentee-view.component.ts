@@ -93,9 +93,30 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
       <!-- My requests + sessions -->
       <div class="card" *ngIf="myRequests().length > 0">
         <app-section-header title="My Mentor Requests" icon="📨"></app-section-header>
+
+        <div class="admin-table-toolbar" style="justify-content:flex-start;gap:var(--space-3);flex-wrap:wrap;">
+          <div class="admin-filter">
+            <label class="form-label">Search by mentor</label>
+            <input
+              class="input"
+              placeholder="Type mentor name..."
+              [value]="myRequestsSearchQuery()"
+              (input)="setMyRequestsSearch($event)">
+          </div>
+
+          <div class="admin-filter">
+            <label class="form-label">Sort</label>
+            <select class="input" [value]="myRequestsSort()" (change)="setMyRequestsSort($event)">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="pending-first">Pending first</option>
+            </select>
+          </div>
+        </div>
+
         <div class="requests-list">
 
-          <div class="request-block" *ngFor="let req of myRequests()">
+          <div class="request-block" *ngFor="let req of displayedMyRequests()">
 
             <!-- Request row -->
             <div class="request-item">
@@ -171,7 +192,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
           <input class="input"
             placeholder="Search by name, expertise, company..."
             [value]="searchQuery()"
-            (input)="searchQuery.set($any($event.target).value)">
+            (input)="searchQuery.set($any($event.target).value); mentorPage.set(0)">
         </div>
         <div class="mentor-filters">
           <button class="chip"
@@ -193,7 +214,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
       <!-- Mentor grid -->
       <div class="mentors-grid">
         <app-mentor-card
-          *ngFor="let mentor of displayedMentors()"
+          *ngFor="let mentor of pagedMentors()"
           [mentor]="mentor"
           [requested]="hasRequestFor(mentor.id)"
           [requesting]="requestingId() === mentor.id"
@@ -201,6 +222,23 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
           (rateSubmitted)="onRateSubmitted($event)"
           (unrateClicked)="onUnrate($event)">
         </app-mentor-card>
+      </div>
+
+      <div class="admin-pagination" *ngIf="displayedMentors().length > 0 && mentorTotalPages() > 1">
+        <button class="page-btn" [disabled]="mentorPage() === 0" (click)="setMentorPage(mentorPage() - 1)">Preview</button>
+
+        <ng-container *ngFor="let item of mentorPageItems()">
+          <span *ngIf="item === 'ellipsis'" class="page-ellipsis">…</span>
+          <button
+            *ngIf="item !== 'ellipsis'"
+            class="page-number"
+            [class.active]="$any(item) === mentorPage()"
+            (click)="setMentorPage($any(item))">
+            {{ $any(item) + 1 }}
+          </button>
+        </ng-container>
+
+        <button class="page-btn" [disabled]="mentorPage() >= mentorTotalPages() - 1" (click)="setMentorPage(mentorPage() + 1)">Next</button>
       </div>
 
       <!-- Empty search result -->
@@ -373,6 +411,43 @@ export class MenteeViewComponent implements OnInit {
     mentors: Mentor[] = [];
   realMentors = signal<Mentor[]>([]);
     myRequests = signal<MentorRequest[]>([]);
+
+    myRequestsSearchQuery = signal('');
+    myRequestsSort = signal<'newest' | 'oldest' | 'pending-first'>('newest');
+
+    displayedMyRequests = () => {
+      const q = this.myRequestsSearchQuery().toLowerCase().trim();
+      let rows = [...this.myRequests()];
+
+      if (q) {
+        rows = rows.filter(r => {
+          const mentorLabel = this.userLabel(r.mentorId).toLowerCase();
+          const mentorId = (r.mentorId || '').toLowerCase();
+          return mentorLabel.includes(q) || mentorId.includes(q);
+        });
+      }
+
+      const time = (r: MentorRequest) => {
+        const t = Date.parse(r.createdAt || '');
+        return isNaN(t) ? 0 : t;
+      };
+
+      const mode = this.myRequestsSort();
+      if (mode === 'oldest') {
+        rows.sort((a, b) => time(a) - time(b));
+      } else if (mode === 'pending-first') {
+        rows.sort((a, b) => {
+          const ap = a.status === 'PENDING' ? 0 : 1;
+          const bp = b.status === 'PENDING' ? 0 : 1;
+          if (ap !== bp) return ap - bp;
+          return time(b) - time(a);
+        });
+      } else {
+        rows.sort((a, b) => time(b) - time(a));
+      }
+
+      return rows;
+    };
     sessionsByRequest = signal<Map<string, MentorSession[]>>(new Map());
     upcomingSession = signal<MentorSession | null>(null);
     requestingId = signal<string | null>(null);
@@ -382,6 +457,20 @@ export class MenteeViewComponent implements OnInit {
     activeFilter = signal<'all' | 'available'>('all');
     searchQuery = signal('');
     sortBy = signal('rating');
+// mentor per page pagination
+    readonly mentorPageSize = 3;
+    mentorPage = signal(0);
+
+    mentorTotalPages = () => Math.max(1, Math.ceil(this.displayedMentors().length / this.mentorPageSize));
+    mentorPageItems = () => this.buildPageItems(this.mentorPage(), this.mentorTotalPages());
+
+    pagedMentors = () => {
+      const rows = this.displayedMentors();
+      const totalPages = this.mentorTotalPages();
+      const page = this.clampPage(this.mentorPage(), totalPages);
+      const start = page * this.mentorPageSize;
+      return rows.slice(start, start + this.mentorPageSize);
+    };
 
     displayedMentors = () => {
     let list = [...this.realMentors()];
@@ -408,6 +497,43 @@ export class MenteeViewComponent implements OnInit {
 
         return list;
     };
+
+    setMentorPage(page: number): void {
+      this.mentorPage.set(this.clampPage(page, this.mentorTotalPages()));
+    }
+
+    setMyRequestsSearch(event: Event) {
+      this.myRequestsSearchQuery.set(String((event.target as HTMLInputElement).value || ''));
+    }
+
+    setMyRequestsSort(event: Event) {
+      const next = String((event.target as HTMLSelectElement).value || 'newest') as 'newest' | 'oldest' | 'pending-first';
+      this.myRequestsSort.set(next);
+    }
+
+    private clampPage(page: number, totalPages: number): number {
+      const max = Math.max(0, (totalPages || 1) - 1);
+      return Math.min(Math.max(0, Math.floor(page || 0)), max);
+    }
+
+    private buildPageItems(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+      if (!totalPages || totalPages <= 1) return [0];
+      if (totalPages <= 5) return Array.from({ length: totalPages }, (_v, i) => i);
+
+      const last = totalPages - 1;
+      const pages = new Set<number>([0, last]);
+      for (const p of [currentPage - 1, currentPage, currentPage + 1]) {
+        if (p > 0 && p < last) pages.add(p);
+      }
+
+      const sorted = [...pages].sort((a, b) => a - b);
+      const items: Array<number | 'ellipsis'> = [];
+      for (let i = 0; i < sorted.length; i++) {
+        if (i > 0 && sorted[i] - sorted[i - 1] > 1) items.push('ellipsis');
+        items.push(sorted[i]);
+      }
+      return items;
+    }
 
     ngOnInit() {
       this.loadMentors();
@@ -819,8 +945,8 @@ export class MenteeViewComponent implements OnInit {
       });
     }
 
-    setFilter(f: 'all' | 'available') { this.activeFilter.set(f); }
-    setSortBy(s: string) { this.sortBy.set(s); }
+    setFilter(f: 'all' | 'available') { this.activeFilter.set(f); this.mentorPage.set(0); }
+    setSortBy(s: string) { this.sortBy.set(s); this.mentorPage.set(0); }
 
     private showSuccess(msg: string) {
         this.successMessage.set(msg);
