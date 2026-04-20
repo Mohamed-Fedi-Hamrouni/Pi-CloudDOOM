@@ -7,6 +7,7 @@ import {
     UserApiService,
     UserProfile,
 } from "../../core/services/user-api.service";
+import { ThemeService, Theme } from "../../core/services/theme.service";
 
 @Component({
     selector: "app-settings",
@@ -135,7 +136,6 @@ import {
 
                         <div class="sp-divider"></div>
                         <div class="sp-title">Account Details</div>
-
                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">Plan</div>
@@ -258,7 +258,8 @@ import {
                                         width="18"
                                         height="18"
                                         viewBox="0 0 24 24"
-                                        fill="#1f2328"
+                                        fill="currentColor"
+                                        style="color:#1f2328"
                                     >
                                         <path
                                             d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"
@@ -358,8 +359,8 @@ import {
 
                         <div class="security-section">
                             <div class="ss-label">Current Session</div>
-                            <div class="session-row">
-                                <span class="session-icon">💻</span>
+                            <div class="signin-method">
+                                <span style="font-size:1.3rem;">💻</span>
                                 <div class="sm-info">
                                     <div class="sm-name">This device</div>
                                     <div class="sm-sub">
@@ -380,7 +381,6 @@ import {
                         <div class="sp-desc">
                             Control how and when you hear from us.
                         </div>
-
                         <div
                             class="notif-group"
                             *ngFor="let group of notificationGroups"
@@ -425,6 +425,30 @@ import {
                             Customize how interV looks and feels.
                         </div>
 
+                        <!-- Color theme -->
+                        <div class="appear-section-title">Color Theme</div>
+                        <div class="theme-grid">
+                            <button
+                                class="theme-card"
+                                *ngFor="let t of themes"
+                                [class.active]="currentTheme === t.value"
+                                (click)="setTheme(t.value)"
+                            >
+                                <div
+                                    class="theme-preview"
+                                    [class]="t.previewClass"
+                                ></div>
+                                <span class="theme-name">{{ t.label }}</span>
+                                <span
+                                    class="theme-check"
+                                    *ngIf="currentTheme === t.value"
+                                    >✓</span
+                                >
+                            </button>
+                        </div>
+
+                        <div class="sp-divider"></div>
+
                         <!-- Compact mode -->
                         <div class="appear-row">
                             <div class="ar-info">
@@ -466,61 +490,31 @@ import {
                             <div class="ar-info">
                                 <div class="ar-label">Font Size</div>
                                 <div class="ar-desc">
-                                    Adjust the base text size across the app.
+                                    Adjusts the base text size across the entire
+                                    app.
                                 </div>
                             </div>
                             <div class="font-size-options">
                                 <button
                                     class="fs-btn"
-                                    *ngFor="let size of fontSizes"
-                                    [class.active]="fontSize === size.value"
-                                    (click)="setFontSize(size.value)"
+                                    *ngFor="let s of fontSizes"
+                                    [class.active]="fontSize === s.value"
+                                    (click)="setFontSize(s.value)"
                                 >
-                                    {{ size.label }}
+                                    {{ s.label }}
                                 </button>
                             </div>
                         </div>
 
                         <div class="sp-divider"></div>
 
-                        <!-- Theme (light only for now) -->
-                        <div
-                            class="sp-title"
-                            style="font-size:var(--text-base);"
-                        >
-                            Color Theme
-                        </div>
-                        <div class="theme-grid">
-                            <button class="theme-card active">
-                                <div class="theme-preview light-preview"></div>
-                                <span>Light</span>
-                                <span class="theme-check">✓</span>
-                            </button>
-                            <button
-                                class="theme-card coming-soon"
-                                disabled
-                                title="Coming soon"
-                            >
-                                <div class="theme-preview dark-preview"></div>
-                                <span>Dark</span>
-                                <span class="theme-soon-badge">Soon</span>
-                            </button>
-                            <button
-                                class="theme-card coming-soon"
-                                disabled
-                                title="Coming soon"
-                            >
-                                <div class="theme-preview system-preview"></div>
-                                <span>System</span>
-                                <span class="theme-soon-badge">Soon</span>
-                            </button>
-                        </div>
-
                         <!-- Live preview -->
+                        <div class="appear-section-title">Live Preview</div>
                         <div class="appear-preview">
-                            <div class="preview-label">Live Preview</div>
                             <div class="preview-card">
-                                <div class="preview-avatar">MH</div>
+                                <div class="preview-avatar">
+                                    {{ getInitials() }}
+                                </div>
                                 <div>
                                     <div class="preview-name">
                                         {{ user?.firstName || "Your" }}
@@ -613,7 +607,6 @@ import {
                         >
                             Usage This Month
                         </div>
-
                         <div class="usage-block">
                             <div class="usage-row">
                                 <span class="usage-name">Mock Sessions</span>
@@ -639,21 +632,6 @@ import {
                                     "
                                 ></div>
                             </div>
-                            <div
-                                class="usage-hint"
-                                *ngIf="
-                                    user?.plan === 'FREE' &&
-                                    (user?.simulationsUsedThisMonth ?? 0) >=
-                                        (user?.simulationsLimit ?? 3)
-                                "
-                            >
-                                🚫 Monthly limit reached —
-                                <a
-                                    (click)="setTab('subscription')"
-                                    style="color:var(--teal-600);cursor:pointer;"
-                                    >upgrade to continue</a
-                                >
-                            </div>
                         </div>
 
                         <div class="sp-divider"></div>
@@ -661,14 +639,12 @@ import {
                             class="sp-title"
                             style="font-size:var(--text-base);"
                         >
-                            What's included
+                            What's Included
                         </div>
-
                         <div class="features-compare">
                             <div class="fc-row header">
-                                <span>Feature</span>
-                                <span>Free</span>
-                                <span>Premium</span>
+                                <span>Feature</span><span>Free</span
+                                ><span>Premium</span>
                             </div>
                             <div class="fc-row" *ngFor="let f of features">
                                 <span>{{ f.name }}</span>
@@ -848,6 +824,7 @@ import {
             .info-value {
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
             }
             .badge-plan {
                 display: inline-block;
@@ -924,8 +901,7 @@ import {
                 color: var(--color-text-muted);
                 margin-top: -4px;
             }
-            .signin-method,
-            .session-row {
+            .signin-method {
                 display: flex;
                 align-items: center;
                 gap: var(--space-4);
@@ -938,15 +914,12 @@ import {
                 width: 38px;
                 height: 38px;
                 border-radius: var(--radius-md);
-                background: white;
+                background: var(--color-surface);
                 border: 1px solid var(--color-border-light);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
-            }
-            .session-icon {
-                font-size: 1.3rem;
             }
             .sm-info {
                 flex: 1;
@@ -954,6 +927,7 @@ import {
             .sm-name {
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
             }
             .sm-sub {
                 font-size: var(--text-xs);
@@ -1007,6 +981,7 @@ import {
                 font-size: var(--text-sm);
                 font-weight: 700;
                 margin-bottom: 2px;
+                color: var(--color-text);
             }
             .pk-desc {
                 font-size: var(--text-xs);
@@ -1033,6 +1008,10 @@ import {
                 border: none;
                 cursor: pointer;
                 font-family: var(--font-body);
+                transition: opacity 0.2s;
+            }
+            .btn-passkey-setup:hover {
+                opacity: 0.9;
             }
             .pk-badge-ok {
                 font-size: var(--text-xs);
@@ -1084,6 +1063,7 @@ import {
             .nr-name {
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
             }
             .nr-desc {
                 font-size: var(--text-xs);
@@ -1107,6 +1087,13 @@ import {
             }
 
             /* Appearance */
+            .appear-section-title {
+                font-size: var(--text-sm);
+                font-weight: 700;
+                color: var(--color-text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
             .appear-row {
                 display: flex;
                 align-items: center;
@@ -1115,12 +1102,16 @@ import {
                 padding: var(--space-4) 0;
                 border-bottom: 1px solid var(--color-border-light);
             }
+            .appear-row:last-of-type {
+                border-bottom: none;
+            }
             .ar-info {
                 flex: 1;
             }
             .ar-label {
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
                 margin-bottom: 2px;
             }
             .ar-desc {
@@ -1128,6 +1119,67 @@ import {
                 color: var(--color-text-muted);
             }
 
+            /* Theme cards */
+            .theme-grid {
+                display: flex;
+                gap: var(--space-3);
+            }
+            .theme-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: var(--space-2);
+                padding: var(--space-4) var(--space-5);
+                border: 1.5px solid var(--color-border);
+                border-radius: var(--radius-lg);
+                background: var(--color-surface);
+                cursor: pointer;
+                font-family: var(--font-body);
+                font-size: var(--text-sm);
+                font-weight: 600;
+                color: var(--color-text-muted);
+                transition: all var(--transition-fast);
+                position: relative;
+                min-width: 90px;
+            }
+            .theme-card:hover {
+                border-color: var(--teal-300);
+                color: var(--color-text);
+            }
+            .theme-card.active {
+                border-color: var(--teal-500);
+                background: var(--teal-50);
+                color: var(--teal-700);
+            }
+            .theme-preview {
+                width: 64px;
+                height: 40px;
+                border-radius: var(--radius-sm);
+                border: 1px solid var(--color-border-light);
+                margin-bottom: 2px;
+            }
+            .light-preview {
+                background: linear-gradient(135deg, #f8fafc 60%, #f0fdfa);
+            }
+            .dark-preview {
+                background: linear-gradient(135deg, #1e293b 60%, #0f172a);
+            }
+            .system-preview {
+                background: linear-gradient(to right, #f8fafc 50%, #1e293b 50%);
+            }
+            .theme-name {
+                font-size: var(--text-xs);
+                font-weight: 600;
+            }
+            .theme-check {
+                position: absolute;
+                top: 7px;
+                right: 9px;
+                font-size: 0.75rem;
+                color: var(--teal-600);
+            }
+
+            /* Font size */
             .font-size-options {
                 display: flex;
                 gap: var(--space-2);
@@ -1138,13 +1190,15 @@ import {
                 border-radius: var(--radius-md);
                 font-size: var(--text-xs);
                 font-weight: 600;
-                background: white;
+                background: var(--color-surface);
+                color: var(--color-text-muted);
                 cursor: pointer;
                 font-family: var(--font-body);
                 transition: all var(--transition-fast);
             }
             .fs-btn:hover {
                 border-color: var(--teal-300);
+                color: var(--color-text);
             }
             .fs-btn.active {
                 border-color: var(--teal-500);
@@ -1152,86 +1206,18 @@ import {
                 color: var(--teal-700);
             }
 
-            .theme-grid {
-                display: flex;
-                gap: var(--space-3);
-            }
-            .theme-card {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: var(--space-2);
-                padding: var(--space-4);
-                border: 1.5px solid var(--color-border);
-                border-radius: var(--radius-lg);
-                background: white;
-                cursor: pointer;
-                font-family: var(--font-body);
-                font-size: var(--text-sm);
-                font-weight: 600;
-                transition: all var(--transition-fast);
-                min-width: 90px;
-                position: relative;
-            }
-            .theme-card.active {
-                border-color: var(--teal-500);
-                background: var(--teal-50);
-                color: var(--teal-700);
-            }
-            .theme-card.coming-soon {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
-            .theme-preview {
-                width: 60px;
-                height: 36px;
-                border-radius: var(--radius-sm);
-                border: 1px solid var(--color-border-light);
-            }
-            .light-preview {
-                background: linear-gradient(135deg, #f8fafc 60%, #f0fdfa);
-            }
-            .dark-preview {
-                background: linear-gradient(135deg, #1e293b 60%, #0f172a);
-            }
-            .system-preview {
-                background: linear-gradient(135deg, #f8fafc 50%, #1e293b 50%);
-            }
-            .theme-check {
-                position: absolute;
-                top: 6px;
-                right: 8px;
-                color: var(--teal-600);
-                font-size: 0.8rem;
-            }
-            .theme-soon-badge {
-                font-size: 0.6rem;
-                font-weight: 700;
-                padding: 2px 6px;
-                background: var(--neutral-100);
-                color: var(--color-text-muted);
-                border-radius: var(--radius-full);
-            }
-
+            /* Preview */
             .appear-preview {
                 background: var(--neutral-50);
                 border: 1px solid var(--color-border-light);
                 border-radius: var(--radius-lg);
                 padding: var(--space-4);
             }
-            .preview-label {
-                font-size: var(--text-xs);
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.06em;
-                color: var(--color-text-muted);
-                margin-bottom: var(--space-3);
-            }
             .preview-card {
                 display: flex;
                 align-items: center;
                 gap: var(--space-3);
-                background: white;
+                background: var(--color-surface);
                 border: 1px solid var(--color-border-light);
                 border-radius: var(--radius-md);
                 padding: var(--space-3) var(--space-4);
@@ -1256,6 +1242,7 @@ import {
             .preview-name {
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
             }
             .preview-role {
                 font-size: var(--text-xs);
@@ -1284,6 +1271,7 @@ import {
             .plan-name {
                 font-size: var(--text-lg);
                 font-weight: 700;
+                color: var(--color-text);
                 margin-bottom: var(--space-2);
             }
             .plan-price {
@@ -1309,7 +1297,6 @@ import {
                 align-items: flex-end;
                 flex-shrink: 0;
             }
-
             .usage-block {
                 display: flex;
                 flex-direction: column;
@@ -1320,6 +1307,10 @@ import {
                 justify-content: space-between;
                 font-size: var(--text-sm);
                 font-weight: 600;
+                color: var(--color-text);
+            }
+            .usage-count {
+                color: var(--color-text-muted);
             }
             .usage-track {
                 height: 8px;
@@ -1340,14 +1331,6 @@ import {
             .usage-fill.usage-warn {
                 background: linear-gradient(90deg, #f59e0b, #ef4444);
             }
-            .usage-hint {
-                font-size: var(--text-xs);
-                color: var(--color-text-muted);
-            }
-            .usage-count {
-                color: var(--color-text-muted);
-            }
-
             .features-compare {
                 border: 1px solid var(--color-border-light);
                 border-radius: var(--radius-md);
@@ -1359,6 +1342,7 @@ import {
                 gap: var(--space-4);
                 padding: var(--space-3) var(--space-4);
                 font-size: var(--text-sm);
+                color: var(--color-text);
                 border-bottom: 1px solid var(--color-border-light);
             }
             .fc-row:last-child {
@@ -1405,6 +1389,7 @@ export class SettingsComponent implements OnInit {
     private authService = inject(AuthService);
     private userStore = inject(CurrentUserStoreService);
     private userApi = inject(UserApiService);
+    private themeService = inject(ThemeService);
 
     activeTab = signal("account");
     saved = false;
@@ -1414,7 +1399,6 @@ export class SettingsComponent implements OnInit {
     passkeyRegistered = false;
 
     user: UserProfile | null = null;
-
     form = {
         firstName: "",
         lastName: "",
@@ -1424,10 +1408,24 @@ export class SettingsComponent implements OnInit {
         preferredLanguage: "en",
     };
 
-    // Appearance state — persisted in localStorage
+    // Appearance
     compactMode = false;
     animationsEnabled = true;
     fontSize = "base";
+
+    themes = [
+        {
+            label: "Light",
+            value: "light" as Theme,
+            previewClass: "light-preview",
+        },
+        { label: "Dark", value: "dark" as Theme, previewClass: "dark-preview" },
+        {
+            label: "System",
+            value: "system" as Theme,
+            previewClass: "system-preview",
+        },
+    ];
 
     fontSizes = [
         { label: "Small", value: "sm" },
@@ -1451,6 +1449,13 @@ export class SettingsComponent implements OnInit {
         { name: "Resource Library", free: "Limited", premium: "Full" },
         { name: "Priority Support", free: "❌", premium: "✅" },
     ];
+
+    get currentTheme(): Theme {
+        return this.themeService.active;
+    }
+    setTheme(t: Theme): void {
+        this.themeService.apply(t);
+    }
 
     ngOnInit() {
         this.passkeyRegistered = this.authService.isPasskeyAuthenticated();
@@ -1561,6 +1566,17 @@ export class SettingsComponent implements OnInit {
             });
     }
 
+    getInitials(): string {
+        const f = this.user?.firstName?.[0] || "";
+        const l = this.user?.lastName?.[0] || "";
+        return (f + l).toUpperCase() || "?";
+    }
+
+    getUsagePct(used?: number, limit?: number): number {
+        if (!limit) return 0;
+        return Math.min(100, ((used ?? 0) / limit) * 100);
+    }
+
     setupPasskey(): void {
         this.authService.registerPasskeyViaAIA();
     }
@@ -1573,11 +1589,6 @@ export class SettingsComponent implements OnInit {
     setTab(key: string): void {
         this.activeTab.set(key);
         this.saved = false;
-    }
-
-    getUsagePct(used?: number, limit?: number): number {
-        if (!limit || limit === 0) return 0;
-        return Math.min(100, ((used ?? 0) / limit) * 100);
     }
 
     channels = ["Email", "Push"];
