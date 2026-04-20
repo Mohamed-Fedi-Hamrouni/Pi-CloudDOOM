@@ -19,12 +19,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
+import com.microservice.userservice.service.AvatarStorageService;
 import com.microservice.userservice.service.UserService;
 
 import jakarta.validation.Valid;
@@ -36,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+    private final AvatarStorageService avatarStorageService;
 
     // ── PUBLIC ────────────────────────────────────────────────────────────────
 
@@ -50,11 +54,9 @@ public class UserController {
     // ── CURRENT USER ──────────────────────────────────────────────────────────
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(
-            userService.findByKeycloakId(jwt.getSubject()));
-    }
+public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+    return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
+}
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateCurrentUser(
@@ -63,6 +65,25 @@ public class UserController {
         UserResponse current = userService.findByKeycloakId(jwt.getSubject());
         return ResponseEntity.ok(
             userService.update(current.getId(), request));
+    }
+
+    @PostMapping("/me/avatar")
+    public ResponseEntity<java.util.Map<String, String>> uploadAvatar(
+            @RequestParam("file") MultipartFile file) {
+        String storedPath = avatarStorageService.storeAvatar(file);
+        String publicUrl = ServletUriComponentsBuilder
+                .fromCurrentContextPath()
+                .path(storedPath)
+                .toUriString();
+
+        return ResponseEntity.ok(java.util.Map.of("url", publicUrl));
+    }
+
+    @PostMapping("/me/cv")
+    public ResponseEntity<UserResponse> uploadCv(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.uploadCv(jwt.getSubject(), file));
     }
 
     // ── ADMIN ENDPOINTS ───────────────────────────────────────────────────────

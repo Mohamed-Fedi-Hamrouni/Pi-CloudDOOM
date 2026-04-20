@@ -6,11 +6,17 @@ import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.model.User;
 import org.mapstruct.*;
 
+import java.util.Collections;
+import java.util.List;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Mapper(componentModel = "spring",
         nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface UserMapper {
 
-    UserResponse toResponse(User user);
+    @Mapping(target = "skills", expression = "java(parseSkills(user.getSkillsJson()))")
+UserResponse toResponse(User user);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "keycloakId", ignore = true)
@@ -28,6 +34,8 @@ public interface UserMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deletedAt", ignore = true)
+    @Mapping(target = "skillsJson", ignore = true)
+@Mapping(target = "cvUrl", ignore = true)
     User toEntity(CreateUserRequest request);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -48,5 +56,16 @@ public interface UserMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deletedAt", ignore = true)
+    @Mapping(target = "skillsJson", ignore = true)
+@Mapping(target = "cvUrl", ignore = true)
     void updateEntity(UpdateUserRequest request, @MappingTarget User user);
+
+    default List<String> parseSkills(String skillsJson) {
+        if (skillsJson == null || skillsJson.isBlank()) return Collections.emptyList();
+        try {
+            return new ObjectMapper().readValue(skillsJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
 }

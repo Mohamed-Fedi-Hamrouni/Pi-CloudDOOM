@@ -42,6 +42,7 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             .requestMatchers("/actuator/health").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
             .requestMatchers("/api/public/**").permitAll()
+            .requestMatchers("/uploads/**").permitAll()
             .anyRequest().authenticated()
         )
         .oauth2ResourceServer(oauth2 -> oauth2

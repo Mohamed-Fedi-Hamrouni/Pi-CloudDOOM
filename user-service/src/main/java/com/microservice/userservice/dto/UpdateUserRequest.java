@@ -1,6 +1,9 @@
 package com.microservice.userservice.dto;
 
+import java.util.List;
+
 import com.microservice.userservice.enums.IndustryEnum;
+
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -27,4 +30,5 @@ public class UpdateUserRequest {
     private Boolean profileVisible;
     private String experiencesJson;
     private String educationsJson;
+    private List<String> skills;
 }

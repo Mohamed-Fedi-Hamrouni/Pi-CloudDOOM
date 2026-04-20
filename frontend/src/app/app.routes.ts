@@ -1,5 +1,5 @@
-import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { Routes } from "@angular/router";
+import { authGuard } from "./core/auth/auth.guard";
 
 export const routes: Routes = [
   {
@@ -21,12 +21,9 @@ export const routes: Routes = [
       { path: 'training-gamification', loadComponent: () => import('./pages/training-gamification/training-gamification.component').then(m => m.TrainingGamificationComponent) },
       { path: 'mentorship',            loadComponent: () => import('./pages/mentorship/mentorship.component').then(m => m.MentorshipComponent) },
       { path: 'community',             loadComponent: () => import('./pages/community/community.component').then(m => m.CommunityComponent) },
-      { path: 'profile/:keycloakId',   loadComponent: () => import('./pages/user-profile/user-profile.component').then(m => m.UserProfileComponent) },
       { path: 'library',               loadComponent: () => import('./pages/library/library.component').then(m => m.LibraryComponent) },
       { path: 'pricing',               loadComponent: () => import('./pages/pricing/pricing.component').then(m => m.PricingComponent) },
       { path: 'settings',              loadComponent: () => import('./pages/settings/settings.component').then(m => m.SettingsComponent) },
-      { path: 'community/career',      loadComponent: () => import('./pages/community/career-wizard/career-wizard.component').then(m => m.CareerWizardComponent) },
-      { path: 'community/jobs',        loadComponent: () => import('./pages/community/jobs/jobs.component').then(m => m.JobsComponent) },
     ]
   },
 {

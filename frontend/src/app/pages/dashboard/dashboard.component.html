@@ -1,173 +1,364 @@
 <div class="dashboard animate-fade">
 
-  <div *ngIf="isAdmin" class="tab-bar">
-    <button class="tab-btn" [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'"><i class="bi bi-bar-chart-fill"></i> Overview</button>
-    <button class="tab-btn" [class.active]="activeTab === 'admin'" (click)="activeTab = 'admin'"><i class="bi bi-gear-fill"></i> Admin Panel</button>
-  </div>
-
-  <div *ngIf="isAdmin && activeTab === 'admin'">
-    <app-admin-dashboard></app-admin-dashboard>
-  </div>
-
-  <div *ngIf="activeTab === 'overview'" class="overview-wrap">
-
-    <!-- Welcome Banner -->
-    <div class="welcome-banner">
-      <div class="welcome-left">
-        <h1 class="welcome-title">Welcome back, {{ currentUser ? (currentUser.firstName + ' ' + currentUser.lastName) : (authService.getFullName() || 'there') }}! 👋</h1>
-        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! <i class="bi bi-rocket-fill"></i></p>
-        <div class="welcome-ctas">
-          <a routerLink="/interviews" class="btn btn-primary">Start Mock Session <i class="bi bi-arrow-right"></i></a>
-          <a routerLink="/reports" class="btn btn-secondary">View My Reports</a>
+    <ng-container *ngIf="loading; else dashboardReady">
+        <div class="card">
+            <h3>Loading dashboard...</h3>
+            <p>Please wait while your profile data is loaded.</p>
         </div>
-      </div>
-      <div class="welcome-right">
-        <div class="readiness-ring">
-          <svg viewBox="0 0 120 120" width="120" height="120">
-            <circle cx="60" cy="60" r="48" fill="none" stroke="var(--neutral-100)" stroke-width="10"/>
-            <circle cx="60" cy="60" r="48" fill="none" stroke="url(#readGrad)" stroke-width="10"
-              [attr.stroke-dasharray]="readinessDash + ' ' + circumference"
-              stroke-linecap="round" transform="rotate(-90 60 60)"/>
-            <defs>
-              <linearGradient id="readGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="var(--teal-400)"/>
-                <stop offset="100%" stop-color="var(--cyan-400)"/>
-              </linearGradient>
-            </defs>
-          </svg>
-          <div class="ring-label">
-            <div class="ring-score">{{ user.readinessScore }}</div>
-            <div class="ring-sub">Readiness</div>
-          </div>
-        </div>
-        <div class="welcome-badges">
-          <div class="wb-item">
-            <span class="wb-val"><i class="bi bi-fire"></i> 0</span>
-            <span class="wb-label">Day Streak</span>
-          </div>
-          <div class="wb-divider"></div>
-          <div class="wb-item">
-            <span class="wb-val"><i class="bi bi-lightning-fill"></i> {{ currentUser?.karmaPoints || 0 }}</span>
-            <span class="wb-label">Karma Points</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    </ng-container>
 
-    <!-- Stats Row -->
-    <div class="stats-row">
-      <app-stat-card icon='<i class="bi bi-mic-fill"></i>' value="{{ dashboard.totalSessions }}" label="Mock Sessions Done" color="teal" change="4 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon='<i class="bi bi-pencil-square"></i>' value="{{ dashboard.totalQuizzes }}" label="Quizzes Completed" color="cyan" change="2 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon='<i class="bi bi-bar-chart-fill"></i>' value="{{ dashboard.recentScore }}%" label="Latest Score" color="mint" change="vs 71% last time" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon='<i class="bi bi-book-fill"></i>' value="{{ dashboard.hoursStudied }}h" label="Total Study Time" color="sky"></app-stat-card>
-    </div>
+    <ng-template #dashboardReady>
+        <ng-container *ngIf="currentUser; else dashboardEmpty">
+            <div *ngIf="isAdmin" class="tab-bar">
+                <button
+                    class="tab-btn"
+                    [class.active]="activeTab === 'overview'"
+                    (click)="activeTab = 'overview'"
+                >
+                    📊 Overview
+                </button>
 
-    <!-- Main Grid -->
-    <div class="dashboard-grid">
-
-      <!-- Left Column -->
-      <div class="dash-col dash-col-main">
-
-        <div class="card next-session-card">
-          <div class="ns-left">
-            <span class="chip chip-teal">Upcoming</span>
-            <h3 class="ns-title">{{ dashboard.nextSession.title }}</h3>
-            <div class="ns-meta">
-              <span><i class="bi bi-calendar3"></i> {{ dashboard.nextSession.date }}</span>
-              <span><i class="bi bi-stopwatch-fill"></i> {{ dashboard.nextSession.duration }}</span>
-              <span class="chip chip-neutral">{{ dashboard.nextSession.type }}</span>
+                <button
+                    class="tab-btn"
+                    [class.active]="activeTab === 'admin'"
+                    (click)="activeTab = 'admin'"
+                >
+                    ⚙️ Admin Panel
+                </button>
             </div>
-          </div>
-          <div class="ns-right">
-            <a routerLink="/interviews" class="btn btn-primary">Join Session <i class="bi bi-arrow-right"></i></a>
-            <button class="btn btn-ghost btn-sm">Reschedule</button>
-          </div>
-        </div>
 
-        <div class="card profile-completeness">
-          <div class="pc-header">
-            <div>
-              <div class="pc-title">Profile Completeness</div>
-              <div class="pc-sub">Complete your profile to get better recommendations</div>
+            <div *ngIf="isAdmin && activeTab === 'admin'">
+                <app-admin-dashboard></app-admin-dashboard>
             </div>
-            <div class="pc-pct">{{ user.profileCompletion }}%</div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" [style.width]="user.profileCompletion + '%'"></div>
-          </div>
-          <div class="pc-todos">
-            <div class="pc-todo done"><i class="bi bi-check-lg"></i> Add target roles</div>
-            <div class="pc-todo done"><i class="bi bi-check-lg"></i> Complete first mock session</div>
-            <div class="pc-todo"><i class="bi bi-plus"></i> Upload your CV</div>
-            <div class="pc-todo"><i class="bi bi-plus"></i> Book a mentor session</div>
-          </div>
-        </div>
 
-        <app-chart-placeholder title="Session Score Trend" badge="Last 7 sessions" type="line" height="240px"></app-chart-placeholder>
+            <div *ngIf="activeTab === 'overview'" class="overview-wrap">
+                <section class="hero-card">
+                    <div class="hero-content">
+                        <div>
+                            <h1>Welcome back, {{ fullWelcomeName }}! 👋</h1>
+                            <p>
+                                You've practiced {{ sessionsThisWeek }} sessions
+                                this week. Keep it up — your interview journey
+                                is getting closer! 🚀
+                            </p>
 
-        <div class="card training-recs">
-          <app-section-header title="Recommended Training" icon='<i class="bi bi-rocket-fill"></i>' actionLabel="View All"></app-section-header>
-          <div class="recs-list">
-            <div class="rec-item" *ngFor="let rec of recommendations">
-              <div class="rec-icon" [innerHTML]="rec.icon"></div>
-              <div class="rec-body">
-                <div class="rec-title">{{ rec.title }}</div>
-                <div class="progress-bar" style="height:4px;margin-top:6px;">
-                  <div class="progress-fill" [style.width]="rec.progress + '%'"></div>
+                            <div class="hero-actions">
+                                <a
+                                    routerLink="/interviews"
+                                    class="btn btn-primary"
+                                >
+                                    Start Mock Session →
+                                </a>
+                                <a
+                                    routerLink="/reports"
+                                    class="btn btn-secondary"
+                                >
+                                    View My Reports
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="hero-right">
+                            <div class="readiness-ring">
+                                <svg
+                                    width="120"
+                                    height="120"
+                                    viewBox="0 0 120 120"
+                                >
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r="48"
+                                        stroke="#e9eef5"
+                                        stroke-width="10"
+                                        fill="none"
+                                    ></circle>
+
+                                    <circle
+                                        cx="60"
+                                        cy="60"
+                                        r="48"
+                                        stroke="url(#readinessGradient)"
+                                        stroke-width="10"
+                                        fill="none"
+                                        stroke-linecap="round"
+                                        [attr.stroke-dasharray]="circumference"
+                                        [attr.stroke-dashoffset]="
+                                            circumference - readinessDash
+                                        "
+                                        transform="rotate(-90 60 60)"
+                                    ></circle>
+
+                                    <defs>
+                                        <linearGradient
+                                            id="readinessGradient"
+                                            x1="0%"
+                                            y1="0%"
+                                            x2="100%"
+                                            y2="100%"
+                                        >
+                                            <stop
+                                                offset="0%"
+                                                stop-color="#19c2c9"
+                                            ></stop>
+                                            <stop
+                                                offset="100%"
+                                                stop-color="#36d29c"
+                                            ></stop>
+                                        </linearGradient>
+                                    </defs>
+
+                                    <text
+                                        x="60"
+                                        y="56"
+                                        text-anchor="middle"
+                                        class="ring-score"
+                                    >
+                                        {{ readinessScore }}
+                                    </text>
+                                    <text
+                                        x="60"
+                                        y="74"
+                                        text-anchor="middle"
+                                        class="ring-label"
+                                    >
+                                        READINESS
+                                    </text>
+                                </svg>
+                            </div>
+
+                            <div class="hero-mini-stats">
+                                <div class="mini-stat">
+                                    <span>🔥</span>
+                                    <strong>{{ dayStreak }}</strong>
+                                    <small>Day Streak</small>
+                                </div>
+
+                                <div class="mini-stat">
+                                    <span>⚡</span>
+                                    <strong>{{ karmaPoints }}</strong>
+                                    <small>Karma Points</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="stats-grid">
+                    <app-stat-card
+                        icon="🎙️"
+                        [value]="totalSessions.toString()"
+                        label="Mock Sessions Done"
+                        color="teal"
+                        change="this month"
+                        [changePositive]="true"
+                    ></app-stat-card>
+
+                    <app-stat-card
+                        icon="📝"
+                        [value]="totalQuizzes.toString()"
+                        label="Quizzes Completed"
+                        color="cyan"
+                    ></app-stat-card>
+
+                    <app-stat-card
+                        icon="📊"
+                        [value]="recentScore + '%'"
+                        label="Latest Score"
+                        color="mint"
+                    ></app-stat-card>
+
+                    <app-stat-card
+                        icon="📚"
+                        [value]="hoursStudied + 'h'"
+                        label="Total Study Time"
+                        color="sky"
+                    ></app-stat-card>
                 </div>
-              </div>
-              <div class="rec-xp">+{{ rec.xp }} XP</div>
+
+                <section class="next-session-card card">
+                    <div class="session-left">
+                        <span class="session-badge">Upcoming</span>
+                        <h3>Next Interview Session</h3>
+                        <p class="session-meta">
+                            📅 To be scheduled · ⏱️ 45 min ·
+                            <span class="chip">Technical</span>
+                        </p>
+                    </div>
+
+                    <div class="session-right">
+                        <a routerLink="/interviews" class="btn btn-primary">
+                            Join Session →
+                        </a>
+                        <button class="link-btn" type="button">
+                            Reschedule
+                        </button>
+                    </div>
+                </section>
+
+                <section class="completion-card card">
+                    <div class="completion-header">
+                        <div>
+                            <h3>Profile Completeness</h3>
+                            <p>
+                                Complete your profile to get better
+                                recommendations
+                            </p>
+                        </div>
+                        <div class="completion-score">
+                            {{ readinessScore }}%
+                        </div>
+                    </div>
+
+                    <div class="completion-bar">
+                        <div
+                            class="completion-bar-fill"
+                            [style.width]="readinessScore + '%'"
+                        ></div>
+                    </div>
+
+                    <div class="completion-list">
+                        <div
+                            *ngFor="let item of profileCompletionItems"
+                            class="completion-item"
+                            [class.done]="item.done"
+                        >
+                            <span>{{ item.done ? "✓" : "+" }}</span>
+                            {{ item.label }}
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dashboard-grid-2">
+                    <section class="card">
+                        <app-section-header
+                            title="Recommended Next Steps"
+                            subtitle="Based on your current progress"
+                        ></app-section-header>
+
+                        <div class="recommendation-list">
+                            <div
+                                class="simple-card"
+                                *ngFor="let rec of recommendations"
+                            >
+                                <div class="simple-card-icon">
+                                    {{ rec.icon }}
+                                </div>
+                                <div class="simple-card-body">
+                                    <div class="simple-card-title">
+                                        {{ rec.title }}
+                                    </div>
+                                    <div class="simple-card-subtitle">
+                                        {{ rec.progress }}% complete
+                                    </div>
+                                    <div class="simple-card-highlight">
+                                        +{{ rec.xp }} XP
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <app-section-header
+                            title="Recent Activity"
+                            subtitle="Your latest learning actions"
+                        ></app-section-header>
+
+                        <div class="activity-list">
+                            <app-activity-item
+                                icon="🎯"
+                                title="Profile updated"
+                                subtitle="Your profile data is synced"
+                                time="just now"
+                            ></app-activity-item>
+
+                            <app-activity-item
+                                icon="🧠"
+                                title="Skills added"
+                                subtitle="Your strengths are now visible"
+                                time="today"
+                            ></app-activity-item>
+
+                            <app-activity-item
+                                icon="📘"
+                                title="Education updated"
+                                subtitle="Academic background completed"
+                                time="today"
+                            ></app-activity-item>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="dashboard-grid-2">
+                    <section class="card">
+                        <app-section-header
+                            title="Saved Resources"
+                            subtitle="Helpful content for interview success"
+                        ></app-section-header>
+
+                        <div class="resource-list">
+                            <div
+                                class="resource-item"
+                                *ngFor="let resource of savedResources"
+                            >
+                                <div class="resource-icon">
+                                    {{ resource.icon }}
+                                </div>
+                                <div class="resource-body">
+                                    <div class="resource-title">
+                                        {{ resource.title }}
+                                    </div>
+                                    <div class="resource-meta">
+                                        {{ resource.duration }} ·
+                                        {{ resource.category }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <app-section-header
+                            title="Performance Trends"
+                            subtitle="Charts will become dynamic later"
+                        ></app-section-header>
+
+                        <app-chart-placeholder
+                            title="Progress Over Time"
+                            subtitle="Profile, interviews, quizzes"
+                        ></app-chart-placeholder>
+                    </section>
+                </div>
+
+                <section class="card">
+                    <app-section-header
+                        title="Achievements"
+                        subtitle="Badges you have earned so far"
+                    ></app-section-header>
+
+                    <div class="badges-grid">
+                        <app-badge-card
+                            *ngFor="let badge of earnedBadges"
+                            [badge]="badge"
+                        ></app-badge-card>
+                    </div>
+                </section>
             </div>
-          </div>
-        </div>
+        </ng-container>
+    </ng-template>
 
-      </div>
-
-      <!-- Right Column -->
-      <div class="dash-col dash-col-side">
-
+    <ng-template #dashboardEmpty>
         <div class="card">
-          <app-section-header title="Recent Activity" icon='<i class="bi bi-clock-fill"></i>' actionLabel="View All"></app-section-header>
-          <app-activity-item *ngFor="let act of dashboard.recentActivity" [icon]="act.icon" [text]="act.text" [time]="act.time"></app-activity-item>
+            <h3>Unable to load dashboard</h3>
+            <p>Your profile data could not be loaded.</p>
+            <button
+                class="btn btn-primary"
+                type="button"
+                (click)="reloadDashboard()"
+            >
+                Retry
+            </button>
         </div>
-
-        <div class="card">
-          <app-section-header title="Your Badges" icon='<i class="bi bi-award-fill"></i>' actionLabel="View All"></app-section-header>
-          <div class="badges-mini-grid">
-            <app-badge-card *ngFor="let badge of earnedBadges.slice(0,4)" [badge]="badge"></app-badge-card>
-          </div>
-        </div>
-
-        <div class="card mentor-suggest">
-          <app-section-header title="Suggested Mentor" icon='<i class="bi bi-people-fill"></i>' actionLabel="Browse All"></app-section-header>
-          <div class="ms-card">
-            <div class="ms-header">
-              <div class="avatar-placeholder" style="width:48px;height:48px;font-size:0.9rem;">PK</div>
-              <div>
-                <div class="ms-name">Dr. Priya Kapoor</div>
-                <div class="ms-role">Senior EM @ Google</div>
-                <div class="stars" style="margin-top:2px;"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i> <small style="font-size:0.65rem;color:var(--color-text-muted);">4.9 (148)</small></div>
-              </div>
-            </div>
-            <p class="ms-bio">Expert in FAANG behavioral and system design interviews. Next available tomorrow.</p>
-            <a routerLink="/mentorship" class="btn btn-outline btn-sm" style="width:100%;margin-top:var(--space-2);">Book Session · $80</a>
-          </div>
-        </div>
-
-        <div class="card">
-          <app-section-header title="Saved Resources" icon='<i class="bi bi-book-fill"></i>' actionLabel="Library"></app-section-header>
-          <div class="saved-resources">
-            <div class="sr-item" *ngFor="let r of savedResources">
-              <span class="sr-type" [innerHTML]="r.icon"></span>
-              <div class="sr-body">
-                <div class="sr-title">{{ r.title }}</div>
-                <div class="sr-meta">{{ r.duration }} · {{ r.category }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
+    </ng-template>
 </div>

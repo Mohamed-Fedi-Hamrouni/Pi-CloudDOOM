@@ -3,37 +3,65 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HttpClient } from "@angular/common/http";
 import { SectionHeaderComponent } from "../../shared/components/section-header/section-header.component";
-import { AuthService } from "../../core/auth/auth.service";
 import { environment } from "../../../environments/environment";
 import { Router } from "@angular/router";
+import {
+    CurrentUserStoreService,
+    UserApiService,
+    UserProfile,
+} from "../../core/services";
 
-interface UserProfile {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-    plan: string;
-    status: string;
-    isVerified: boolean;
-    karmaPoints: number;
-    bio: string;
-    avatarUrl: string;
-    city: string;
-    phoneNumber: string;
-    preferredIndustry: string;
-    preferredLanguage: string;
-    simulationsUsedThisMonth: number;
-    simulationsLimit: number;
-    subscriptionActive: boolean;
-    subscriptionStart: string;
-    subscriptionEnd: string;
-    emailNotificationsEnabled: boolean;
-    pushNotificationsEnabled: boolean;
-    profileVisible: boolean;
-    createdAt: string;
-    updatedAt: string;
+type CompletionState = "complete" | "incomplete" | "pending" | "rejected";
+
+interface CompletionItem {
+    key: string;
+    label: string;
+    points: number;
+    state: CompletionState;
 }
+
+interface CompletionSection {
+    title: string;
+    items: CompletionItem[];
+    totalPoints: number;
+    earnedPoints: number;
+}
+
+interface ExperienceItem {
+    id: string;
+    title: string;
+    company: string;
+    location?: string;
+    employmentType?: string;
+    startDate: string;
+    endDate?: string;
+    current: boolean;
+    description?: string;
+}
+
+interface EducationItem {
+    id: string;
+    school: string;
+    degree: string;
+    fieldOfStudy?: string;
+    startDate: string;
+    endDate?: string;
+    current: boolean;
+    description?: string;
+}
+
+interface AvatarUploadResponse {
+    url: string;
+}
+
+type ActiveEditSection =
+    | "photo"
+    | "about"
+    | "skills"
+    | "experience"
+    | "education"
+    | "preferences"
+    | null;
 
 @Component({
     selector: "app-profile",
@@ -44,28 +72,66 @@ interface UserProfile {
 })
 export class ProfileComponent implements OnInit {
     private http = inject(HttpClient);
-    private authService = inject(AuthService);
     private cdr = inject(ChangeDetectorRef);
+    private userApi = inject(UserApiService);
+    private currentUserStore = inject(CurrentUserStoreService);
 
     user: UserProfile | null = null;
     editing = false;
     saving = false;
     saveError = "";
     saveSuccess = false;
-    cvUploaded = false;
+    localDraftNotice = "";
+    activeEditSection: ActiveEditSection = null;
+    cvUploadLoading = false;
+    cvUploadError = "";
+    selectedCvFileName = "";
+    completionScore = 0;
+    completionSections: CompletionSection[] = [];
+    avatarInputMode: "upload" | "url" = "upload";
+    avatarUploadLoading = false;
+    avatarUploadError = "";
+    avatarPreviewUrl = "";
+    selectedAvatarFile: File | null = null;
+    private avatarObjectUrl: string | null = null;
+    selectedSkills: string[] = [];
+    experiences: ExperienceItem[] = [];
+    educations: EducationItem[] = [];
+    editingExperienceIndex: number | null = null;
+    editingEducationIndex: number | null = null;
+    showExperienceForm = false;
+    showEducationForm = false;
+    experienceForm: ExperienceItem = this.createEmptyExperience();
+    educationForm: EducationItem = this.createEmptyEducation();
 
     editForm = {
         firstName: "",
         lastName: "",
         bio: "",
+        avatarUrl: "",
         phoneNumber: "",
         city: "",
         preferredIndustry: "",
         preferredLanguage: "fr",
+        skills: [] as string[],
         emailNotificationsEnabled: true,
         pushNotificationsEnabled: false,
         profileVisible: true,
     };
+
+    customSkill = "";
+    suggestedSkills = [
+        "Java",
+        "Spring Boot",
+        "Angular",
+        "TypeScript",
+        "SQL",
+        "Docker",
+        "Kubernetes",
+        "AWS",
+        "Git",
+        "REST API",
+    ];
 
     preferences = [
         { label: "Interview format", value: "Video call" },
@@ -82,21 +148,29 @@ export class ProfileComponent implements OnInit {
     private router = inject(Router);
 
     loadProfile(): void {
-        this.http
-            .get<UserProfile>(`${environment.apiUrl}/api/users/me`)
-            .subscribe({
-                next: (user) => {
-                    this.user = user;
-                    this.syncPreferences();
-                    this.cdr.detectChanges();
-                },
-                error: (err) => {
-                    console.error("Profile load error:", err);
-                    if (err.status === 404) {
-                        this.router.navigate(["/complete-profile"]);
-                    }
-                },
-            });
+        this.userApi.getCurrentUser().subscribe({
+            next: (user) => {
+                user.skills = user.skills || [];
+                this.user = user;
+                this.currentUserStore.setCurrentUser(user);
+                this.avatarPreviewUrl = user.avatarUrl || "";
+                this.selectedSkills = [...user.skills];
+                this.experiences = this.parseExperiences(user.experiencesJson);
+                this.educations = this.parseEducations(user.educationsJson);
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    user.cvUrl || null,
+                );
+                this.refreshCompletion();
+                this.syncPreferences();
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                console.error("Profile load error:", err);
+                if (err.status === 404) {
+                    this.router.navigate(["/complete-profile"]);
+                }
+            },
+        });
     }
 
     syncPreferences(): void {
@@ -118,78 +192,413 @@ export class ProfileComponent implements OnInit {
             this.saveProfile();
             return;
         }
-        if (this.user) {
-            this.editForm = {
-                firstName: this.user.firstName || "",
-                lastName: this.user.lastName || "",
-                bio: this.user.bio || "",
-                phoneNumber: this.user.phoneNumber || "",
-                city: this.user.city || "",
-                preferredIndustry: this.user.preferredIndustry || "",
-                preferredLanguage: this.user.preferredLanguage || "fr",
-                emailNotificationsEnabled:
-                    this.user.emailNotificationsEnabled ?? true,
-                pushNotificationsEnabled:
-                    this.user.pushNotificationsEnabled ?? false,
-                profileVisible: this.user.profileVisible ?? true,
-            };
-        }
-        this.editing = true;
-        this.saveError = "";
-        this.saveSuccess = false;
+        this.enterEditMode();
+        this.activeEditSection = null;
+    }
+
+    openPhotoEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "photo";
+        this.scrollToEditSection("photo");
+    }
+
+    openAboutEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "about";
+        this.scrollToEditSection("about");
+    }
+
+    openSkillsEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "skills";
+        this.scrollToEditSection("skills");
+    }
+
+    openExperienceEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "experience";
+        this.startAddExperience();
+        this.scrollToEditSection("experience");
+    }
+
+    openExperienceItemEditor(index: number): void {
+        this.enterEditMode();
+        this.activeEditSection = "experience";
+        this.startEditExperience(index);
+        this.scrollToEditSection("experience");
+    }
+
+    openEducationEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "education";
+        this.startAddEducation();
+        this.scrollToEditSection("education");
+    }
+
+    openEducationItemEditor(index: number): void {
+        this.enterEditMode();
+        this.activeEditSection = "education";
+        this.startEditEducation(index);
+        this.scrollToEditSection("education");
+    }
+
+    openPreferencesEditor(): void {
+        this.enterEditMode();
+        this.activeEditSection = "preferences";
+        this.scrollToEditSection("preferences");
     }
 
     saveProfile(): void {
         this.saving = true;
         this.saveError = "";
         this.saveSuccess = false;
-        this.http
-            .put<UserProfile>(
-                `${environment.apiUrl}/api/users/me`,
-                this.editForm,
-            )
-            .subscribe({
-                next: (updated) => {
-                    this.user = updated;
-                    this.editing = false;
-                    this.saving = false;
-                    this.saveSuccess = true;
-                    this.syncPreferences();
-                    this.cdr.detectChanges();
-                    setTimeout(() => {
-                        this.saveSuccess = false;
-                        this.cdr.detectChanges();
-                    }, 3000);
-                },
-                error: () => {
-                    this.saving = false;
-                    this.saveError = "Failed to save. Please try again.";
-                    this.cdr.detectChanges();
-                },
-            });
+
+        if (!this.user) {
+            this.saving = false;
+            return;
+        }
+
+        const payload = {
+            firstName: this.editForm.firstName,
+            lastName: this.editForm.lastName,
+            phoneNumber: this.editForm.phoneNumber,
+            city: this.editForm.city,
+            bio: this.editForm.bio,
+            avatarUrl: this.editForm.avatarUrl,
+            preferredIndustry: this.editForm.preferredIndustry?.trim()
+                ? this.editForm.preferredIndustry
+                : null,
+            preferredLanguage: this.editForm.preferredLanguage,
+            emailNotificationsEnabled: this.editForm.emailNotificationsEnabled,
+            pushNotificationsEnabled: this.editForm.pushNotificationsEnabled,
+            profileVisible: this.editForm.profileVisible,
+            educationsJson: this.serializeEducations(this.educations),
+            experiencesJson: this.serializeExperiences(this.experiences),
+            skills: this.selectedSkills,
+        };
+
+        this.userApi.updateCurrentUser(payload).subscribe({
+            next: (updated) => {
+                updated.skills = updated.skills || [];
+                this.user = updated;
+                this.currentUserStore.setCurrentUser(updated);
+                this.avatarPreviewUrl = updated.avatarUrl || "";
+                this.avatarUploadLoading = false;
+                this.avatarUploadError = "";
+                this.selectedAvatarFile = null;
+                this.clearAvatarObjectUrl();
+                this.selectedSkills = [...updated.skills];
+                this.editForm.skills = [...this.selectedSkills];
+                this.experiences = this.parseExperiences(
+                    updated.experiencesJson,
+                );
+                this.educations = this.parseEducations(updated.educationsJson);
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    updated.cvUrl || null,
+                );
+                this.refreshCompletion();
+                this.editing = false;
+                this.localDraftNotice = "";
+                this.activeEditSection = null;
+                this.showExperienceForm = false;
+                this.showEducationForm = false;
+                this.saving = false;
+                this.saveSuccess = true;
+                this.syncPreferences();
+                this.cdr.markForCheck();
+                setTimeout(() => {
+                    this.saveSuccess = false;
+                    this.cdr.markForCheck();
+                }, 3000);
+            },
+            error: () => {
+                this.saving = false;
+                this.saveError = "Failed to save. Please try again.";
+                this.cdr.markForCheck();
+            },
+        });
     }
 
     cancelEdit(): void {
         this.editing = false;
+        this.localDraftNotice = "";
+        this.activeEditSection = null;
         this.saveError = "";
+        this.showExperienceForm = false;
+        this.showEducationForm = false;
+        this.editingExperienceIndex = null;
+        this.editingEducationIndex = null;
+        this.experienceForm = this.createEmptyExperience();
+        this.educationForm = this.createEmptyEducation();
+        if (this.user) {
+            this.selectedSkills = [...(this.user.skills || [])];
+            this.editForm.skills = [...this.selectedSkills];
+            this.editForm.avatarUrl = this.user.avatarUrl || "";
+            this.avatarPreviewUrl = this.user.avatarUrl || "";
+            this.avatarUploadError = "";
+            this.avatarUploadLoading = false;
+            this.selectedAvatarFile = null;
+            this.setAvatarInputMode(this.editForm.avatarUrl ? "url" : "upload");
+            this.clearAvatarObjectUrl();
+            this.experiences = this.parseExperiences(this.user.experiencesJson);
+            this.educations = this.parseEducations(this.user.educationsJson);
+            this.refreshCompletion();
+        }
     }
-    triggerCvUpload(): void {
-        this.cvUploaded = !this.cvUploaded;
+
+    addSkill(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+        }
+
+        const normalized = this.customSkill.trim();
+        if (!normalized) {
+            return;
+        }
+
+        if (!this.selectedSkills.includes(normalized)) {
+            this.selectedSkills = [...this.selectedSkills, normalized];
+            this.editForm.skills = [...this.selectedSkills];
+            this.refreshCompletion();
+        }
+        this.customSkill = "";
+    }
+
+    removeSkill(skill: string): void {
+        this.selectedSkills = this.selectedSkills.filter((s) => s !== skill);
+        this.editForm.skills = [...this.selectedSkills];
+        this.refreshCompletion();
+    }
+
+    toggleSuggestedSkill(skill: string): void {
+        if (this.selectedSkills.includes(skill)) {
+            this.removeSkill(skill);
+            return;
+        }
+        this.selectedSkills = [...this.selectedSkills, skill];
+        this.editForm.skills = [...this.selectedSkills];
+        this.refreshCompletion();
+    }
+
+    hasSkill(skill: string): boolean {
+        return this.selectedSkills.includes(skill);
+    }
+
+    setAvatarInputMode(mode: "upload" | "url"): void {
+        this.avatarInputMode = mode;
+        this.avatarUploadError = "";
+        if (mode === "url") {
+            this.clearAvatarObjectUrl();
+            this.selectedAvatarFile = null;
+            this.onAvatarUrlChange();
+        }
+    }
+
+    onAvatarUrlChange(): void {
+        this.clearAvatarObjectUrl();
+        this.avatarUploadError = "";
+        this.selectedAvatarFile = null;
+        this.avatarPreviewUrl = this.editForm.avatarUrl?.trim() || "";
+        this.refreshCompletion();
+    }
+
+    onAvatarFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        this.avatarUploadError = "";
+
+        const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+        if (!allowedTypes.includes(file.type)) {
+            this.avatarUploadError =
+                "Only PNG, JPEG, and WEBP images are allowed.";
+            input.value = "";
+            return;
+        }
+
+        const maxSizeBytes = 5 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            this.avatarUploadError = "Image size must be 5MB or less.";
+            input.value = "";
+            return;
+        }
+
+        this.selectedAvatarFile = file;
+        this.clearAvatarObjectUrl();
+        this.avatarObjectUrl = URL.createObjectURL(file);
+        this.avatarPreviewUrl = this.avatarObjectUrl;
+        this.uploadAvatar(file);
+    }
+
+    removeAvatar(): void {
+        this.editForm.avatarUrl = "";
+        this.avatarPreviewUrl = "";
+        this.selectedAvatarFile = null;
+        this.avatarUploadError = "";
+        this.avatarUploadLoading = false;
+        this.clearAvatarObjectUrl();
+        this.refreshCompletion();
+    }
+
+    onCvFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        this.cvUploadError = "";
+
+        if (file.type !== "application/pdf") {
+            this.cvUploadError = "Only PDF files are allowed.";
+            input.value = "";
+            return;
+        }
+
+        const maxSizeBytes = 5 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            this.cvUploadError = "CV size must be 5MB or less.";
+            input.value = "";
+            return;
+        }
+
+        this.uploadCv(file);
+        input.value = "";
+    }
+
+    startAddExperience(): void {
+        this.activeEditSection = "experience";
+        this.localDraftNotice = "";
+        this.showEducationForm = false;
+        this.editingEducationIndex = null;
+        this.editingExperienceIndex = null;
+        this.experienceForm = this.createEmptyExperience();
+        this.showExperienceForm = true;
+    }
+
+    startEditExperience(index: number): void {
+        this.activeEditSection = "experience";
+        this.localDraftNotice = "";
+        this.showEducationForm = false;
+        this.editingEducationIndex = null;
+        this.editingExperienceIndex = index;
+        this.experienceForm = { ...this.experiences[index] };
+        this.showExperienceForm = true;
+    }
+
+    saveExperience(): void {
+        if (!this.isValidExperience(this.experienceForm)) {
+            return;
+        }
+
+        const normalized: ExperienceItem = {
+            ...this.experienceForm,
+            endDate: this.experienceForm.current
+                ? ""
+                : this.experienceForm.endDate,
+        };
+
+        if (this.editingExperienceIndex === null) {
+            this.experiences = [...this.experiences, normalized];
+        } else {
+            this.experiences = this.experiences.map((exp, index) =>
+                index === this.editingExperienceIndex ? normalized : exp,
+            );
+        }
+
+        this.editingExperienceIndex = null;
+        this.experienceForm = this.createEmptyExperience();
+        this.showExperienceForm = false;
+        this.localDraftNotice =
+            "Experience saved locally. Click Save Changes to persist.";
+        this.refreshCompletion();
+    }
+
+    removeExperience(index: number): void {
+        this.experiences = this.experiences.filter((_, i) => i !== index);
+        if (this.editingExperienceIndex === index) {
+            this.cancelExperienceEdit();
+        }
+        this.refreshCompletion();
+    }
+
+    cancelExperienceEdit(): void {
+        this.editingExperienceIndex = null;
+        this.experienceForm = this.createEmptyExperience();
+        this.showExperienceForm = false;
+    }
+
+    startAddEducation(): void {
+        this.activeEditSection = "education";
+        this.localDraftNotice = "";
+        this.showExperienceForm = false;
+        this.editingExperienceIndex = null;
+        this.editingEducationIndex = null;
+        this.educationForm = this.createEmptyEducation();
+        this.showEducationForm = true;
+    }
+
+    startEditEducation(index: number): void {
+        this.activeEditSection = "education";
+        this.localDraftNotice = "";
+        this.showExperienceForm = false;
+        this.editingExperienceIndex = null;
+        this.editingEducationIndex = index;
+        this.educationForm = { ...this.educations[index] };
+        this.showEducationForm = true;
+    }
+
+    saveEducation(): void {
+        if (!this.isValidEducation(this.educationForm)) {
+            return;
+        }
+
+        const normalized: EducationItem = {
+            ...this.educationForm,
+            endDate: this.educationForm.current
+                ? ""
+                : this.educationForm.endDate,
+        };
+
+        if (this.editingEducationIndex === null) {
+            this.educations = [...this.educations, normalized];
+        } else {
+            this.educations = this.educations.map((edu, index) =>
+                index === this.editingEducationIndex ? normalized : edu,
+            );
+        }
+
+        this.editingEducationIndex = null;
+        this.educationForm = this.createEmptyEducation();
+        this.showEducationForm = false;
+        this.localDraftNotice =
+            "Education saved locally. Click Save Changes to persist.";
+        this.refreshCompletion();
+    }
+
+    removeEducation(index: number): void {
+        this.educations = this.educations.filter((_, i) => i !== index);
+
+        if (this.editingEducationIndex === index) {
+            this.cancelEducationEdit();
+        }
+
+        this.refreshCompletion();
+    }
+
+    cancelEducationEdit(): void {
+        this.editingEducationIndex = null;
+        this.educationForm = this.createEmptyEducation();
+        this.showEducationForm = false;
     }
 
     getCompleteness(): number {
-        if (!this.user) return 0;
-        const checks = [
-            !!this.user.firstName && !!this.user.lastName,
-            this.user.simulationsUsedThisMonth > 0,
-            true,
-            !!this.user.bio,
-            !!this.user.city,
-            this.user.isVerified,
-        ];
-        return Math.round(
-            (checks.filter(Boolean).length / checks.length) * 100,
-        );
+        return this.completionScore;
     }
 
     getInitials(): string {
@@ -206,5 +615,445 @@ export class ProfileComponent implements OnInit {
             ar: "Arabic",
         };
         return map[lang] || lang || "Not set";
+    }
+
+    private refreshCompletion(): void {
+        if (!this.user) {
+            this.completionSections = [];
+            this.completionScore = 0;
+            return;
+        }
+
+        const currentFirstName = this.editing
+            ? this.editForm.firstName
+            : this.user.firstName;
+        const currentLastName = this.editing
+            ? this.editForm.lastName
+            : this.user.lastName;
+        const currentCity = this.editing ? this.editForm.city : this.user.city;
+        const currentIndustry = this.editing
+            ? this.editForm.preferredIndustry
+            : this.user.preferredIndustry;
+        const currentLanguage = this.editing
+            ? this.editForm.preferredLanguage
+            : this.user.preferredLanguage;
+        const currentBio = this.editing ? this.editForm.bio : this.user.bio;
+        const currentAvatarUrl = this.editing
+            ? this.editForm.avatarUrl
+            : this.user.avatarUrl;
+        const currentCvUrl = this.user.cvUrl;
+
+        const coreItems: CompletionItem[] = [
+            this.buildItem(
+                "name",
+                "Name completed",
+                15,
+                this.hasText(currentFirstName) && this.hasText(currentLastName),
+            ),
+            this.buildItem("city", "City added", 10, this.hasText(currentCity)),
+            this.buildItem(
+                "industry",
+                "Preferred industry set",
+                10,
+                this.hasText(currentIndustry),
+            ),
+            this.buildItem(
+                "language",
+                "Preferred language set",
+                5,
+                this.hasText(currentLanguage),
+            ),
+            this.buildItem(
+                "bio",
+                "Bio quality",
+                15,
+                this.hasStrongBio(currentBio),
+            ),
+            this.buildItem(
+                "avatar",
+                "Profile photo",
+                5,
+                this.hasText(currentAvatarUrl),
+            ),
+            this.buildItem(
+                "skills",
+                "Skills added",
+                15,
+                this.selectedSkills.length > 0,
+            ),
+            this.buildItem("cv", "CV uploaded", 10, this.hasText(currentCvUrl)),
+        ];
+
+        const professionalItems: CompletionItem[] = [
+            this.buildItem(
+                "experience",
+                "Work experience",
+                10,
+                this.experiences.length > 0,
+            ),
+            this.buildItem(
+                "education",
+                "Education added",
+                10,
+                this.educations.length > 0,
+            ),
+        ];
+
+        const trustItems: CompletionItem[] = [
+            this.buildItem(
+                "adminVerification",
+                "Admin verification approved",
+                5,
+                !!this.user.isVerified,
+            ),
+        ];
+
+        this.completionSections = [
+            this.buildSection("Core Profile", coreItems),
+            this.buildSection("Professional Readiness", professionalItems),
+            this.buildSection("Trust & Identity", trustItems),
+        ];
+
+        const earnedPoints = this.completionSections.reduce(
+            (total, section) => total + section.earnedPoints,
+            0,
+        );
+        const totalPoints = this.completionSections.reduce(
+            (total, section) => total + section.totalPoints,
+            0,
+        );
+
+        this.completionScore = totalPoints
+            ? Math.round((earnedPoints / totalPoints) * 100)
+            : 0;
+    }
+
+    private buildItem(
+        key: string,
+        label: string,
+        points: number,
+        completed: boolean,
+    ): CompletionItem {
+        return {
+            key,
+            label,
+            points,
+            state: completed ? "complete" : "incomplete",
+        };
+    }
+
+    private buildSection(
+        title: string,
+        items: CompletionItem[],
+    ): CompletionSection {
+        const totalPoints = items.reduce((sum, item) => sum + item.points, 0);
+        const earnedPoints = items
+            .filter((item) => item.state === "complete")
+            .reduce((sum, item) => sum + item.points, 0);
+
+        return {
+            title,
+            items,
+            totalPoints,
+            earnedPoints,
+        };
+    }
+
+    private hasText(value: string | null | undefined): boolean {
+        return !!value && value.trim().length > 0;
+    }
+
+    private hasStrongBio(bio: string | null | undefined): boolean {
+        return !!bio && bio.trim().length >= 30;
+    }
+
+    private uploadAvatar(file: File): void {
+        this.avatarUploadLoading = true;
+        this.avatarUploadError = "";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        this.http
+            .post<AvatarUploadResponse>(
+                `${environment.apiUrl}/api/users/me/avatar`,
+                formData,
+            )
+            .subscribe({
+                next: (response) => {
+                    this.editForm.avatarUrl = response.url;
+                    this.avatarPreviewUrl = response.url;
+
+                    if (this.user) {
+                        const updatedUser = {
+                            ...this.user,
+                            avatarUrl: response.url,
+                        };
+                        this.user = updatedUser;
+                        this.currentUserStore.setCurrentUser(updatedUser);
+                    }
+
+                    this.avatarUploadLoading = false;
+                    this.avatarUploadError = "";
+                    this.clearAvatarObjectUrl();
+                    this.refreshCompletion();
+                    this.cdr.markForCheck();
+                },
+                error: () => {
+                    this.avatarUploadLoading = false;
+                    this.avatarUploadError =
+                        "Avatar upload failed. Please try again.";
+                    this.cdr.markForCheck();
+                },
+            });
+    }
+
+    private clearAvatarObjectUrl(): void {
+        if (this.avatarObjectUrl) {
+            URL.revokeObjectURL(this.avatarObjectUrl);
+            this.avatarObjectUrl = null;
+        }
+    }
+
+    private enterEditMode(): void {
+        if (this.editing) {
+            return;
+        }
+
+        if (this.user) {
+            this.editForm = {
+                firstName: this.user.firstName || "",
+                lastName: this.user.lastName || "",
+                bio: this.user.bio || "",
+                avatarUrl: this.user.avatarUrl || "",
+                phoneNumber: this.user.phoneNumber || "",
+                city: this.user.city || "",
+                preferredIndustry: this.user.preferredIndustry || "",
+                preferredLanguage: this.user.preferredLanguage || "fr",
+                skills: [...(this.user.skills || [])],
+                emailNotificationsEnabled:
+                    this.user.emailNotificationsEnabled ?? true,
+                pushNotificationsEnabled:
+                    this.user.pushNotificationsEnabled ?? false,
+                profileVisible: this.user.profileVisible ?? true,
+            };
+            this.avatarPreviewUrl = this.user.avatarUrl || "";
+            this.avatarUploadError = "";
+            this.avatarUploadLoading = false;
+            this.selectedAvatarFile = null;
+            this.setAvatarInputMode(this.editForm.avatarUrl ? "url" : "upload");
+            this.selectedSkills = [...(this.user.skills || [])];
+            this.experiences = this.parseExperiences(this.user.experiencesJson);
+            this.educations = this.parseEducations(this.user.educationsJson);
+        }
+
+        this.showExperienceForm = false;
+        this.showEducationForm = false;
+        this.editingExperienceIndex = null;
+        this.editingEducationIndex = null;
+        this.localDraftNotice = "";
+        this.experienceForm = this.createEmptyExperience();
+        this.educationForm = this.createEmptyEducation();
+        this.editing = true;
+        this.saveError = "";
+        this.saveSuccess = false;
+        this.refreshCompletion();
+    }
+
+    private scrollToEditSection(
+        section: Exclude<ActiveEditSection, null>,
+    ): void {
+        const targetIdBySection: Record<
+            Exclude<ActiveEditSection, null>,
+            string
+        > = {
+            photo: "photo-edit-section",
+            about: "about-edit-section",
+            skills: "skills-edit-section",
+            experience: "experience-edit-section",
+            education: "education-edit-section",
+            preferences: "preferences-edit-section",
+        };
+
+        const targetId = targetIdBySection[section];
+        setTimeout(() => {
+            const element = document.getElementById(targetId);
+            element?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 0);
+    }
+
+    private uploadCv(file: File): void {
+        this.cvUploadLoading = true;
+        this.cvUploadError = "";
+
+        this.userApi.uploadCv(file).subscribe({
+            next: (updated) => {
+                updated.skills = updated.skills || [];
+                this.user = updated;
+                this.currentUserStore.setCurrentUser(updated);
+
+                this.selectedSkills = [...updated.skills];
+                this.editForm.skills = [...updated.skills];
+
+                this.experiences = this.parseExperiences(
+                    updated.experiencesJson,
+                );
+                this.educations = this.parseEducations(updated.educationsJson);
+
+                if (this.editing) {
+                    this.editForm.bio = updated.bio || "";
+                }
+
+                this.selectedCvFileName = this.extractFileNameFromUrl(
+                    updated.cvUrl || null,
+                );
+
+                this.cvUploadLoading = false;
+                this.cvUploadError = "";
+                this.refreshCompletion();
+                this.syncPreferences();
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                this.cvUploadLoading = false;
+                this.cvUploadError =
+                    err?.error?.message ||
+                    "CV upload failed. Please try again.";
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
+    getCvFileName(): string {
+        if (this.selectedCvFileName) {
+            return this.selectedCvFileName;
+        }
+
+        return this.extractFileNameFromUrl(this.user?.cvUrl || null);
+    }
+
+    getCvLink(): string {
+        const cvUrl = this.user?.cvUrl;
+        if (!cvUrl) return "";
+
+        if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
+            return cvUrl;
+        }
+
+        if (cvUrl.startsWith("/uploads/")) {
+            return `${environment.apiUrl}${cvUrl}`;
+        }
+
+        return `${environment.apiUrl}/uploads/${cvUrl}`;
+    }
+
+    private extractFileNameFromUrl(cvUrl: string | null): string {
+        if (!cvUrl) {
+            return "";
+        }
+
+        const sanitized = cvUrl.split("?")[0];
+        const segments = sanitized.split("/").filter(Boolean);
+        return segments.length ? segments[segments.length - 1] : "";
+    }
+
+    private createEmptyExperience(): ExperienceItem {
+        return {
+            id: crypto.randomUUID(),
+            title: "",
+            company: "",
+            location: "",
+            employmentType: "",
+            startDate: "",
+            endDate: "",
+            current: false,
+            description: "",
+        };
+    }
+
+    private createEmptyEducation(): EducationItem {
+        return {
+            id: crypto.randomUUID(),
+            school: "",
+            degree: "",
+            fieldOfStudy: "",
+            startDate: "",
+            endDate: "",
+            current: false,
+            description: "",
+        };
+    }
+
+    private parseExperiences(raw: string | null | undefined): ExperienceItem[] {
+        if (!raw) return [];
+
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+
+            return parsed
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    id: item.id || crypto.randomUUID(),
+                    title: item.title || "",
+                    company: item.company || "",
+                    location: item.location || "",
+                    employmentType: item.employmentType || "",
+                    startDate: item.startDate || "",
+                    endDate: item.endDate || "",
+                    current: !!item.current,
+                    description: item.description || "",
+                }));
+        } catch {
+            return [];
+        }
+    }
+
+    private serializeExperiences(items: ExperienceItem[]): string {
+        return JSON.stringify(items);
+    }
+
+    private parseEducations(raw: string | null | undefined): EducationItem[] {
+        if (!raw) return [];
+
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+
+            return parsed
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    id: item.id || crypto.randomUUID(),
+                    school: item.school || "",
+                    degree: item.degree || "",
+                    fieldOfStudy: item.fieldOfStudy || "",
+                    startDate: item.startDate || "",
+                    endDate: item.endDate || "",
+                    current: !!item.current,
+                    description: item.description || "",
+                }));
+        } catch {
+            return [];
+        }
+    }
+
+    private serializeEducations(items: EducationItem[]): string {
+        return JSON.stringify(items);
+    }
+
+    private isValidExperience(exp: ExperienceItem): boolean {
+        if (!exp.title.trim()) return false;
+        if (!exp.company.trim()) return false;
+        if (!exp.startDate) return false;
+        if (!exp.current && !exp.endDate) return false;
+        return true;
+    }
+
+    private isValidEducation(edu: EducationItem): boolean {
+        if (!edu.school.trim()) return false;
+        if (!edu.degree.trim()) return false;
+        if (!edu.startDate) return false;
+        if (!edu.current && !edu.endDate) return false;
+        return true;
     }
 }
