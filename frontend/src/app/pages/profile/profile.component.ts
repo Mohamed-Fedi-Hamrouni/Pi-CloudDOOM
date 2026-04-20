@@ -15,6 +15,7 @@ import {
     UserApiService,
     UserProfile,
 } from "../../core/services";
+import { AuthService } from "../../core/auth/auth.service";
 
 type CompletionState = "complete" | "incomplete" | "pending" | "rejected";
 
