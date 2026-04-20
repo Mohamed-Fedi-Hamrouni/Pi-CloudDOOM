@@ -5,9 +5,9 @@ spring:
   application:
     name: community-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/communitydb
-    username: postgres
-    password: "0000"
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:communitydb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:0000}
     driver-class-name: org.postgresql.Driver
   jackson:
     serialization:
@@ -23,9 +23,30 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  ai:
+    openai:
+      base-url: https://api.groq.com/openai
+      api-key: ${GROQ_API_KEY:}
+      chat:
+        options:
+          model: llama-3.3-70b-versatile
+          temperature: 0.3
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8080/realms/myapp-realm
-          jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:myapp-realm}
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:myapp-realm}/protocol/openid-connect/certs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
