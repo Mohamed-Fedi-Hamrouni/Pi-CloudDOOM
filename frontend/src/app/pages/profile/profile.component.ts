@@ -1,4 +1,9 @@
-import { Component, inject, OnInit, ChangeDetectorRef } from "@angular/core";
+import {
+    Component,
+    inject,
+    OnInit,
+    ChangeDetectorRef
+} from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HttpClient } from "@angular/common/http";
@@ -10,6 +15,7 @@ import {
     UserApiService,
     UserProfile,
 } from "../../core/services";
+import { AuthService } from "../../core/auth/auth.service";
 
 type CompletionState = "complete" | "incomplete" | "pending" | "rejected";
 
@@ -72,11 +78,17 @@ type ActiveEditSection =
 })
 export class ProfileComponent implements OnInit {
     private http = inject(HttpClient);
-    private cdr = inject(ChangeDetectorRef);
     private userApi = inject(UserApiService);
     private currentUserStore = inject(CurrentUserStoreService);
+    private authService = inject(AuthService);
+    private cdr = inject(ChangeDetectorRef);
+    private router = inject(Router);
 
     user: UserProfile | null = null;
+    profileLoading = true;
+    profileLoadError = "";
+    initials = "";
+    memberSinceLabel = "";
     editing = false;
     saving = false;
     saveError = "";
@@ -86,6 +98,9 @@ export class ProfileComponent implements OnInit {
     cvUploadLoading = false;
     cvUploadError = "";
     selectedCvFileName = "";
+    cvLink = "";
+    cvFileName = "";
+    preferredLanguageLabel = "";
     completionScore = 0;
     completionSections: CompletionSection[] = [];
     avatarInputMode: "upload" | "url" = "upload";
@@ -135,40 +150,77 @@ export class ProfileComponent implements OnInit {
 
     preferences = [
         { label: "Interview format", value: "Video call" },
-        { label: "Preferred language", value: "English" },
+        { label: "Preferred language", value: "Not set" },
         { label: "Session length", value: "45 min" },
         { label: "Availability", value: "Weekday evenings" },
-        { label: "Timezone", value: "GMT+1 (Tunisia)" },
+        { label: "City", value: "Not set" },
     ];
 
     ngOnInit(): void {
         this.loadProfile();
     }
 
-    private router = inject(Router);
-
     loadProfile(): void {
+        this.profileLoading = true;
+        this.profileLoadError = "";
         this.userApi.getCurrentUser().subscribe({
             next: (user) => {
-                user.skills = user.skills || [];
-                this.user = user;
-                this.currentUserStore.setCurrentUser(user);
-                this.avatarPreviewUrl = user.avatarUrl || "";
-                this.selectedSkills = [...user.skills];
-                this.experiences = this.parseExperiences(user.experiencesJson);
-                this.educations = this.parseEducations(user.educationsJson);
-                this.selectedCvFileName = this.extractFileNameFromUrl(
-                    user.cvUrl || null,
-                );
-                this.refreshCompletion();
-                this.syncPreferences();
-                this.cdr.markForCheck();
+                this.profileLoading = false;
+
+                if (!user || typeof user !== "object") {
+                    this.profileLoadError = "Unexpected profile response.";
+                    this.cdr.detectChanges();
+                    return;
+                }
+
+                const normalized: UserProfile = {
+                    ...(user as UserProfile),
+                    skills: Array.isArray((user as UserProfile).skills)
+                        ? (user as UserProfile).skills
+                        : [],
+                };
+
+                this.user = normalized;
+
+                try {
+                    this.initials = this.computeInitials(
+                        normalized.firstName,
+                        normalized.lastName,
+                    );
+                    this.currentUserStore.setCurrentUser(normalized);
+                    this.avatarPreviewUrl = normalized.avatarUrl || "";
+                    this.selectedSkills = [...normalized.skills];
+                    this.experiences = this.parseExperiences(normalized.experiencesJson);
+          this.educations = this.parseEducations(normalized.educationsJson);
+                    this.selectedCvFileName = this.extractFileNameFromUrl(
+                        normalized.cvUrl || null,
+                    );
+                    this.refreshDerivedFields();
+                    this.refreshCompletion();
+                    this.syncPreferences();
+                    this.cdr.detectChanges();
+                } catch (e) {
+                    console.error("Profile initialization error:", e);
+                    this.cdr.detectChanges();
+                }
             },
             error: (err) => {
+                this.profileLoading = false;
                 console.error("Profile load error:", err);
                 if (err.status === 404) {
                     this.router.navigate(["/complete-profile"]);
+                    return;
                 }
+
+                if (err.status === 0) {
+                    this.profileLoadError =
+                        "Failed to load profile (network/CORS).";
+                } else if (err.status) {
+                    this.profileLoadError = `Failed to load profile (HTTP ${err.status}).`;
+                } else {
+                    this.profileLoadError = "Failed to load profile.";
+                }
+                this.cdr.detectChanges();
             },
         });
     }
@@ -281,6 +333,7 @@ export class ProfileComponent implements OnInit {
             next: (updated) => {
                 updated.skills = updated.skills || [];
                 this.user = updated;
+                this.initials = this.computeInitials(updated.firstName, updated.lastName);
                 this.currentUserStore.setCurrentUser(updated);
                 this.avatarPreviewUrl = updated.avatarUrl || "";
                 this.avatarUploadLoading = false;
@@ -296,6 +349,7 @@ export class ProfileComponent implements OnInit {
                 this.selectedCvFileName = this.extractFileNameFromUrl(
                     updated.cvUrl || null,
                 );
+                this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.editing = false;
                 this.localDraftNotice = "";
@@ -305,16 +359,13 @@ export class ProfileComponent implements OnInit {
                 this.saving = false;
                 this.saveSuccess = true;
                 this.syncPreferences();
-                this.cdr.markForCheck();
                 setTimeout(() => {
                     this.saveSuccess = false;
-                    this.cdr.markForCheck();
                 }, 3000);
             },
             error: () => {
                 this.saving = false;
                 this.saveError = "Failed to save. Please try again.";
-                this.cdr.markForCheck();
             },
         });
     }
@@ -342,6 +393,7 @@ export class ProfileComponent implements OnInit {
             this.clearAvatarObjectUrl();
             this.experiences = this.parseExperiences(this.user.experiencesJson);
             this.educations = this.parseEducations(this.user.educationsJson);
+            this.refreshDerivedFields();
             this.refreshCompletion();
         }
     }
@@ -602,10 +654,13 @@ export class ProfileComponent implements OnInit {
     }
 
     getInitials(): string {
-        if (!this.user) return "";
-        return (
-            (this.user.firstName?.[0] || "") + (this.user.lastName?.[0] || "")
-        ).toUpperCase();
+        return this.initials;
+    }
+
+    private computeInitials(firstName?: string | null, lastName?: string | null): string {
+        const first = firstName?.trim()?.[0] || "";
+        const last = lastName?.trim()?.[0] || "";
+        return (first + last).toUpperCase();
     }
 
     getLanguageLabel(lang: string): string {
@@ -796,14 +851,13 @@ export class ProfileComponent implements OnInit {
                     this.avatarUploadLoading = false;
                     this.avatarUploadError = "";
                     this.clearAvatarObjectUrl();
+                    this.refreshDerivedFields();
                     this.refreshCompletion();
-                    this.cdr.markForCheck();
                 },
                 error: () => {
                     this.avatarUploadLoading = false;
                     this.avatarUploadError =
                         "Avatar upload failed. Please try again.";
-                    this.cdr.markForCheck();
                 },
             });
     }
@@ -910,41 +964,64 @@ export class ProfileComponent implements OnInit {
 
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
+                this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();
-                this.cdr.markForCheck();
             },
             error: (err) => {
                 this.cvUploadLoading = false;
                 this.cvUploadError =
                     err?.error?.message ||
                     "CV upload failed. Please try again.";
-                this.cdr.markForCheck();
             },
         });
     }
 
     getCvFileName(): string {
-        if (this.selectedCvFileName) {
-            return this.selectedCvFileName;
-        }
-
-        return this.extractFileNameFromUrl(this.user?.cvUrl || null);
+        return this.cvFileName;
     }
 
     getCvLink(): string {
-        const cvUrl = this.user?.cvUrl;
-        if (!cvUrl) return "";
+        return this.cvLink;
+    }
 
-        if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
-            return cvUrl;
+    private refreshDerivedFields(): void {
+        if (!this.user) {
+            this.memberSinceLabel = "";
+            this.cvLink = "";
+            this.cvFileName = "";
+            this.preferredLanguageLabel = "";
+            return;
         }
 
-        if (cvUrl.startsWith("/uploads/")) {
-            return `${environment.apiUrl}${cvUrl}`;
+        this.memberSinceLabel = this.formatMonthYear(this.user.createdAt);
+
+        const cvUrl = this.user.cvUrl || "";
+        this.cvFileName =
+            this.selectedCvFileName || this.extractFileNameFromUrl(cvUrl || null);
+
+        if (!cvUrl) {
+            this.cvLink = "";
+        } else if (cvUrl.startsWith("http://") || cvUrl.startsWith("https://")) {
+            this.cvLink = cvUrl;
+        } else if (cvUrl.startsWith("/uploads/")) {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
+        } else if (cvUrl.startsWith("/")) {
+            this.cvLink = `${environment.apiUrl}${cvUrl}`;
+        } else {
+            this.cvLink = `${environment.apiUrl}/uploads/${cvUrl}`;
         }
 
-        return `${environment.apiUrl}/uploads/${cvUrl}`;
+        this.preferredLanguageLabel = this.getLanguageLabel(
+            this.user.preferredLanguage,
+        );
+    }
+
+    private formatMonthYear(value: string | null | undefined): string {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleString(undefined, { month: "short", year: "numeric" });
     }
 
     private extractFileNameFromUrl(cvUrl: string | null): string {
@@ -993,6 +1070,7 @@ export class ProfileComponent implements OnInit {
 
             return parsed
                 .filter((item) => item && typeof item === "object")
+                .slice(0, 100)
                 .map((item) => ({
                     id: item.id || crypto.randomUUID(),
                     title: item.title || "",
@@ -1022,6 +1100,7 @@ export class ProfileComponent implements OnInit {
 
             return parsed
                 .filter((item) => item && typeof item === "object")
+                .slice(0, 100)
                 .map((item) => ({
                     id: item.id || crypto.randomUUID(),
                     school: item.school || "",

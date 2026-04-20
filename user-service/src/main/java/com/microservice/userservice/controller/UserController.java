@@ -24,6 +24,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
@@ -54,15 +55,15 @@ public class UserController {
     // ── CURRENT USER ──────────────────────────────────────────────────────────
 
     @GetMapping("/me")
-public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
-}
+    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
+    }
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateCurrentUser(
             @Valid @RequestBody UpdateUserRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        UserResponse current = userService.findByKeycloakId(jwt.getSubject());
+        UserResponse current = userService.findOrProvisionFromJwt(jwt);
         return ResponseEntity.ok(
             userService.update(current.getId(), request));
     }
@@ -92,6 +93,12 @@ public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
         return ResponseEntity.ok(userService.findAll(pageable));
+    }
+
+    @GetMapping("/identities")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Page<UserIdentityResponse>> getAllUserIdentities(Pageable pageable) {
+        return ResponseEntity.ok(userService.findAllIdentities(pageable));
     }
 
     @GetMapping("/search")

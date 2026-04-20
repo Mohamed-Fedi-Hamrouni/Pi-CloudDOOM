@@ -21,7 +21,7 @@
                             box-shadow: var(--shadow-md);
                         "
                     >
-                        {{ getInitials() }}
+                        {{ initials }}
                     </div>
                 </ng-template>
                 <div class="ph-online-dot"></div>
@@ -76,9 +76,7 @@
                         <span class="ph-stat-label">Role</span>
                     </div>
                     <div class="ph-stat">
-                        <span class="ph-stat-val">{{
-                            user.createdAt | date: "MMM y"
-                        }}</span>
+                        <span class="ph-stat-val">{{ memberSinceLabel }}</span>
                         <span class="ph-stat-label">Member since</span>
                     </div>
                 </div>
@@ -103,12 +101,12 @@
                     recommendations.
                 </div>
             </div>
-            <div class="cc-pct">{{ getCompleteness() }}%</div>
+            <div class="cc-pct">{{ completionScore }}%</div>
         </div>
         <div class="progress-bar" style="height: 8px">
             <div
                 class="progress-fill"
-                [style.width]="getCompleteness() + '%'"
+                [style.width]="completionScore + '%'"
             ></div>
         </div>
         <div class="cc-sections">
@@ -947,7 +945,7 @@
                     <div class="cva-sub">
                         {{
                             user.cvUrl
-                                ? getCvFileName() || "CV ready"
+                                ? cvFileName || "CV ready"
                                 : "PDF only - Max 5MB"
                         }}
                     </div>
@@ -955,7 +953,7 @@
                     <a
                         *ngIf="user.cvUrl"
                         class="btn btn-ghost btn-sm"
-                        [href]="getCvLink()"
+                        [href]="cvLink"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -1007,7 +1005,7 @@
                     </div>
                     <div class="sub-row">
                         <span>Member since</span>
-                        <span>{{ user.createdAt | date: "MMM y" }}</span>
+                        <span>{{ memberSinceLabel }}</span>
                     </div>
                 </div>
                 <button
@@ -1045,9 +1043,7 @@
                     </div>
                     <div class="pref-item">
                         <span class="pref-label">Language</span>
-                        <span class="pref-value">{{
-                            getLanguageLabel(user.preferredLanguage)
-                        }}</span>
+                        <span class="pref-value">{{ preferredLanguageLabel }}</span>
                     </div>
                 </div>
             </div>
@@ -1055,4 +1051,11 @@
     </div>
 </div>
 
-<div *ngIf="!user" class="loading-profile">Loading your profile...</div>
+<div *ngIf="!user" class="loading-profile">
+    <ng-container *ngIf="profileLoading; else loadResult">
+        Loading your profile...
+    </ng-container>
+    <ng-template #loadResult>
+        {{ profileLoadError || "Unable to load your profile." }}
+    </ng-template>
+</div>

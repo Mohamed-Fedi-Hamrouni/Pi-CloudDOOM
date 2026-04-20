@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"^\\\\  \\\\`\\\\]$\" /Users/azizbna/Documents/4 ArcTic13/S2/PICloud/PICloudDOOM/Pi-CloudDOOM/frontend/src/app/pages/community/community.component.ts)"
+    ]
+  }
+}

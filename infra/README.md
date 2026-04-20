@@ -28,6 +28,15 @@ cd infra/
 cp .env.example .env
 ```
 
+**AI Coach (chatbot Training) — optionnel**
+
+Pour activer le chatbot (coach CV/profil) dans la page Training, renseigner dans `infra/.env` :
+
+```
+GOOGLE_AI_API_KEY=...   # ne jamais committer
+GOOGLE_AI_MODEL=gemini-flash-latest
+```
+
 ### 2. Ajouter le realm Keycloak
 
 Récupérer `realm-export.json` auprès de **Membre 1** et le placer dans :
@@ -55,6 +64,14 @@ docker compose up -d --build user-service
 
 ```bash
 docker compose up -d --build
+```
+
+## Smoke test M4 (one-command)
+
+Script automatique pour valider M4 Training & Gamification (sécurité, création de path, update module, activité XP/streak, leaderboard, simulation badges QA):
+
+```bash
+./scripts/m4_smoke.sh
 ```
 
 ## Topics Kafka créés automatiquement

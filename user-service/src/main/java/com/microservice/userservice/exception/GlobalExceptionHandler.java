@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -85,6 +86,18 @@ public class GlobalExceptionHandler {
             "status", 401,
             "error", "Unauthorized",
             "message", "Authentication required"
+        ));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(
+            ResponseStatusException ex) {
+        int status = ex.getStatusCode().value();
+        return ResponseEntity.status(status).body(Map.of(
+            "timestamp", LocalDateTime.now().toString(),
+            "status", status,
+            "error", ex.getStatusCode().toString(),
+            "message", ex.getReason() == null ? "" : ex.getReason()
         ));
     }
 
