@@ -2,6 +2,7 @@ import {
     Component,
     inject,
     OnInit,
+    ChangeDetectorRef
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -78,6 +79,8 @@ export class ProfileComponent implements OnInit {
     private http = inject(HttpClient);
     private userApi = inject(UserApiService);
     private currentUserStore = inject(CurrentUserStoreService);
+    private authService = inject(AuthService);
+    private cdr = inject(ChangeDetectorRef);
     private router = inject(Router);
 
     user: UserProfile | null = null;
@@ -165,6 +168,7 @@ export class ProfileComponent implements OnInit {
 
                 if (!user || typeof user !== "object") {
                     this.profileLoadError = "Unexpected profile response.";
+                    this.cdr.detectChanges();
                     return;
                 }
 
@@ -193,8 +197,10 @@ export class ProfileComponent implements OnInit {
                     this.refreshDerivedFields();
                     this.refreshCompletion();
                     this.syncPreferences();
+                    this.cdr.detectChanges();
                 } catch (e) {
                     console.error("Profile initialization error:", e);
+                    this.cdr.detectChanges();
                 }
             },
             error: (err) => {
@@ -213,6 +219,7 @@ export class ProfileComponent implements OnInit {
                 } else {
                     this.profileLoadError = "Failed to load profile.";
                 }
+                this.cdr.detectChanges();
             },
         });
     }
