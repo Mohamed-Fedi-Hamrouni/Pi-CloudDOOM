@@ -42,6 +42,22 @@ public class TrainingUserSignal {
     @Column(name = "event_generated_at", length = 80)
     private String eventGeneratedAt;
 
+    // ── User profile snapshot (populated by Kafka user.* events) ─────────────
+    // Cached here so path generation does not need to call user-service at runtime.
+
+    @Column(name = "preferred_language", length = 10)
+    private String preferredLanguage;
+
+    @Column(name = "preferred_industry", length = 60)
+    private String preferredIndustry;
+
+    @Column(name = "user_plan", length = 20)
+    private String userPlan;
+
+    /** Comma-separated skills list mirrored from user-service skillsJson. */
+    @Column(name = "skills_snapshot", length = 1000)
+    private String skillsSnapshot;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
