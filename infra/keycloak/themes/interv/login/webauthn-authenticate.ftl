@@ -46,7 +46,7 @@
             }
 
             function base64urlDecode(str) {
-                str = str.replace(/-/g, '+').replace(/\//g, '/');
+                str = str.replace(/-/g, '+').replace(/_/g, '/');
                 while (str.length % 4) str += '=';
                 const bin = atob(str);
                 const buf = new Uint8Array(bin.length);
