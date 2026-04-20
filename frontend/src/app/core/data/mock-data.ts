@@ -37,11 +37,11 @@ export const MOCK_DASHBOARD = {
   totalQuizzes: 14,
   hoursStudied: 36,
   recentActivity: [
-    { icon: '🎯', text: 'Completed Behavioral Interview Practice', time: '2h ago', type: 'interview' },
-    { icon: '📝', text: 'Scored 85% on Data Structures Quiz', time: '5h ago', type: 'quiz' },
-    { icon: '🏅', text: 'Earned "Consistent Learner" badge', time: '1d ago', type: 'badge' },
-    { icon: '📚', text: 'Saved "STAR Method Guide" to library', time: '1d ago', type: 'resource' },
-    { icon: '🤝', text: 'Booked session with Dr. Priya Kapoor', time: '2d ago', type: 'mentor' },
+    { icon: '<i class="bi bi-bullseye"></i>', text: 'Completed Behavioral Interview Practice', time: '2h ago', type: 'interview' },
+    { icon: '<i class="bi bi-pencil-square"></i>', text: 'Scored 85% on Data Structures Quiz', time: '5h ago', type: 'quiz' },
+    { icon: '<i class="bi bi-award-fill"></i>', text: 'Earned "Consistent Learner" badge', time: '1d ago', type: 'badge' },
+    { icon: '<i class="bi bi-book-fill"></i>', text: 'Saved "STAR Method Guide" to library', time: '1d ago', type: 'resource' },
+    { icon: '<i class="bi bi-people-fill"></i>', text: 'Booked session with Dr. Priya Kapoor', time: '2d ago', type: 'mentor' },
   ]
 };
 
@@ -390,7 +390,7 @@ export const MOCK_POSTS: Post[] = [
     author: 'Kenji Nakamura',
     authorInitials: 'KN',
     authorTitle: 'CS Graduate → Google SWE',
-    content: 'Just got my Google offer! 🎉 After 3 months on interV — 42 mock sessions, 200+ questions — I finally cracked it. The AI feedback on filler words alone changed my game. To anyone doubting: keep going. It\'s genuinely worth it.',
+    content: 'Just got my Google offer! 🎉 After 3 months on InterviewPrepTN — 42 mock sessions, 200+ questions — I finally cracked it. The AI feedback on filler words alone changed my game. To anyone doubting: keep going. It\'s genuinely worth it.',
     likes: 284,
     comments: 47,
     timeAgo: '2h ago',
@@ -557,25 +557,25 @@ export const MOCK_RESOURCES: Resource[] = [
 
 // ── Mock Badges ──
 export const MOCK_BADGES: Badge[] = [
-  { id: 'b001', name: 'First Interview', description: 'Completed your first mock session', icon: '🎯', color: 'teal', earned: true, earnedDate: 'Oct 2024', xpReward: 100 },
-  { id: 'b002', name: 'Consistent Learner', description: '7-day study streak', icon: '🔥', color: 'peach', earned: true, earnedDate: 'Jan 2025', xpReward: 200 },
-  { id: 'b003', name: 'Quiz Champion', description: 'Scored 90%+ on 3 quizzes', icon: '🏆', color: 'sand', earned: true, earnedDate: 'Dec 2024', xpReward: 300 },
-  { id: 'b004', name: 'Community Voice', description: 'First 10 community likes', icon: '💬', color: 'cyan', earned: true, earnedDate: 'Nov 2024', xpReward: 150 },
-  { id: 'b005', name: 'Speed Reader', description: 'Completed 5 library resources', icon: '📚', color: 'mint', earned: true, earnedDate: 'Dec 2024', xpReward: 200 },
-  { id: 'b006', name: 'Perfect Score', description: 'Score 100% on any quiz', icon: '⭐', color: 'purple', earned: false, xpReward: 500 },
-  { id: 'b007', name: 'Mentor Graduate', description: 'Complete 3 mentoring sessions', icon: '🤝', color: 'sky', earned: false, xpReward: 400 },
-  { id: 'b008', name: 'Interview Master', description: 'Complete 25 mock interviews', icon: '🎓', color: 'teal', earned: false, xpReward: 1000 }
+  { id: 'b001', name: 'First Interview', description: 'Completed your first mock session', icon: '<i class="bi bi-bullseye"></i>', color: 'teal', earned: true, earnedDate: 'Oct 2024', xpReward: 100 },
+  { id: 'b002', name: 'Consistent Learner', description: '7-day study streak', icon: '<i class="bi bi-fire"></i>', color: 'peach', earned: true, earnedDate: 'Jan 2025', xpReward: 200 },
+  { id: 'b003', name: 'Quiz Champion', description: 'Scored 90%+ on 3 quizzes', icon: '<i class="bi bi-trophy-fill"></i>', color: 'sand', earned: true, earnedDate: 'Dec 2024', xpReward: 300 },
+  { id: 'b004', name: 'Community Voice', description: 'First 10 community likes', icon: '<i class="bi bi-chat-fill"></i>', color: 'cyan', earned: true, earnedDate: 'Nov 2024', xpReward: 150 },
+  { id: 'b005', name: 'Speed Reader', description: 'Completed 5 library resources', icon: '<i class="bi bi-book-fill"></i>', color: 'mint', earned: true, earnedDate: 'Dec 2024', xpReward: 200 },
+  { id: 'b006', name: 'Perfect Score', description: 'Score 100% on any quiz', icon: '<i class="bi bi-star-fill"></i>', color: 'purple', earned: false, xpReward: 500 },
+  { id: 'b007', name: 'Mentor Graduate', description: 'Complete 3 mentoring sessions', icon: '<i class="bi bi-people-fill"></i>', color: 'sky', earned: false, xpReward: 400 },
+  { id: 'b008', name: 'Interview Master', description: 'Complete 25 mock interviews', icon: '<i class="bi bi-mortarboard-fill"></i>', color: 'teal', earned: false, xpReward: 1000 }
 ];
 
 // ── Mock Training Modules ──
 export const MOCK_TRAINING: TrainingModule[] = [
-  { id: 't001', title: 'Behavioral Interview Foundations', category: 'Behavioral', progress: 100, xp: 300, lessons: 8, completedLessons: 8, status: 'completed', icon: '🗣️' },
-  { id: 't002', title: 'STAR Method Advanced Practice', category: 'Behavioral', progress: 75, xp: 250, lessons: 6, completedLessons: 4, status: 'in-progress', icon: '⭐' },
-  { id: 't003', title: 'Technical Communication Skills', category: 'Technical', progress: 40, xp: 200, lessons: 10, completedLessons: 4, status: 'in-progress', icon: '💻' },
-  { id: 't004', title: 'System Design Fundamentals', category: 'Technical', progress: 0, xp: 400, lessons: 12, completedLessons: 0, status: 'locked', icon: '🏗️' },
-  { id: 't005', title: 'Product Thinking & Strategy', category: 'Product', progress: 20, xp: 300, lessons: 8, completedLessons: 2, status: 'in-progress', icon: '📊' },
-  { id: 't006', title: 'Confidence & Delivery Mastery', category: 'Soft Skills', progress: 60, xp: 150, lessons: 5, completedLessons: 3, status: 'in-progress', icon: '🎤' },
-  { id: 't007', title: 'Salary Negotiation Playbook', category: 'Career', progress: 0, xp: 200, lessons: 4, completedLessons: 0, status: 'locked', icon: '💰' }
+  { id: 't001', title: 'Behavioral Interview Foundations', category: 'Behavioral', progress: 100, xp: 300, lessons: 8, completedLessons: 8, status: 'completed', icon: '<i class="bi bi-chat-fill"></i>' },
+  { id: 't002', title: 'STAR Method Advanced Practice', category: 'Behavioral', progress: 75, xp: 250, lessons: 6, completedLessons: 4, status: 'in-progress', icon: '<i class="bi bi-star-fill"></i>' },
+  { id: 't003', title: 'Technical Communication Skills', category: 'Technical', progress: 40, xp: 200, lessons: 10, completedLessons: 4, status: 'in-progress', icon: '<i class="bi bi-laptop"></i>' },
+  { id: 't004', title: 'System Design Fundamentals', category: 'Technical', progress: 0, xp: 400, lessons: 12, completedLessons: 0, status: 'locked', icon: '<i class="bi bi-diagram-3-fill"></i>' },
+  { id: 't005', title: 'Product Thinking & Strategy', category: 'Product', progress: 20, xp: 300, lessons: 8, completedLessons: 2, status: 'in-progress', icon: '<i class="bi bi-bar-chart-fill"></i>' },
+  { id: 't006', title: 'Confidence & Delivery Mastery', category: 'Soft Skills', progress: 60, xp: 150, lessons: 5, completedLessons: 3, status: 'in-progress', icon: '<i class="bi bi-mic-fill"></i>' },
+  { id: 't007', title: 'Salary Negotiation Playbook', category: 'Career', progress: 0, xp: 200, lessons: 4, completedLessons: 0, status: 'locked', icon: '<i class="bi bi-cash-coin"></i>' }
 ];
 
 // ── Mock Pricing ──
@@ -654,7 +654,7 @@ export const MOCK_TESTIMONIALS = [
     name: 'Kenji Nakamura',
     initials: 'KN',
     role: 'Software Engineer @ Google',
-    text: 'interV completely transformed how I prepare for interviews. The AI feedback caught habits I never knew I had — like rushing through answers when nervous. Landed Google after 3 months.',
+    text: 'InterviewPrepTN completely transformed how I prepare for interviews. The AI feedback caught habits I never knew I had — like rushing through answers when nervous. Landed Google after 3 months.',
     rating: 5
   },
   {
@@ -668,7 +668,7 @@ export const MOCK_TESTIMONIALS = [
     name: 'Carlos Silva',
     initials: 'CS',
     role: 'Data Analyst @ Revolut',
-    text: 'I was applying for jobs for 8 months with no offers. Two months on interV later, I had three offers to choose from. The quiz assessments helped me identify my weak spots.',
+    text: 'I was applying for jobs for 8 months with no offers. Two months on InterviewPrepTN later, I had three offers to choose from. The quiz assessments helped me identify my weak spots.',
     rating: 5
   }
 ];

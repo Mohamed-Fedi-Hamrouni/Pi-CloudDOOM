@@ -16,13 +16,19 @@ export class AuthService {
 
     async init(): Promise<boolean> {
         try {
-            const authenticated = await this.keycloak.init({
-                onLoad: "check-sso",
-                silentCheckSsoRedirectUri:
-                    window.location.origin + "/assets/silent-check-sso.html",
-                pkceMethod: "S256",
-                checkLoginIframe: false,
-            });
+            const authenticated = await Promise.race([
+                this.keycloak.init({
+                    onLoad: "check-sso",
+                    silentCheckSsoRedirectUri:
+                        window.location.origin + "/assets/silent-check-sso.html",
+                    silentCheckSsoFallback: false,
+                    pkceMethod: "S256",
+                    checkLoginIframe: false,
+                }),
+                new Promise<boolean>((resolve) =>
+                    setTimeout(() => resolve(false), 5000)
+                ),
+            ]);
             return authenticated;
         } catch (error) {
             console.error("Keycloak init error:", error);

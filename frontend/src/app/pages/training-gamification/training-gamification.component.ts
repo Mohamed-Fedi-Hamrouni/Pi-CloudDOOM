@@ -16,7 +16,7 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
           <p>Your personalized learning journey with XP, badges, and daily challenges.</p>
         </div>
         <div class="level-badge">
-          <span>⚡</span>
+          <span><i class="bi bi-lightning-fill"></i></span>
           <span>Level {{ user.level }}</span>
         </div>
       </div>
@@ -42,15 +42,15 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
         <div class="xp-right">
           <div class="xp-stat-group">
             <div class="xp-stat">
-              <div class="xp-stat-val">🔥 {{ user.streak }}</div>
+              <div class="xp-stat-val"><i class="bi bi-fire"></i> {{ user.streak }}</div>
               <div class="xp-stat-label">Day Streak</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">🏅 {{ earnedCount }}</div>
+              <div class="xp-stat-val"><i class="bi bi-award-fill"></i> {{ earnedCount }}</div>
               <div class="xp-stat-label">Badges</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">📅 Day 7</div>
+              <div class="xp-stat-val"><i class="bi bi-calendar-fill"></i> Day 7</div>
               <div class="xp-stat-label">Best Streak</div>
             </div>
           </div>
@@ -65,10 +65,12 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
 
           <!-- Daily Goals -->
           <div class="card daily-goals">
-            <app-section-header title="Today's Goals" icon="🎯" subtitle="Complete all goals to maintain your streak"></app-section-header>
+            <app-section-header title="Today's Goals" icon='<i class="bi bi-bullseye"></i>' subtitle="Complete all goals to maintain your streak"></app-section-header>
             <div class="goals-list">
               <div class="goal-item" *ngFor="let g of dailyGoals" [class.completed]="g.done">
-                <div class="goal-checkbox" [class.checked]="g.done">{{ g.done ? '✓' : '' }}</div>
+                <div class="goal-checkbox" [class.checked]="g.done">
+                  <i *ngIf="g.done" class="bi bi-check-lg"></i>
+                </div>
                 <div class="goal-body">
                   <div class="goal-title">{{ g.title }}</div>
                   <div class="goal-xp">+{{ g.xp }} XP</div>
@@ -91,12 +93,16 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
               <div class="path-item" *ngFor="let m of modules; let i = index" [class]="'path-' + m.status">
                 <div class="pi-connector" *ngIf="i > 0" [class.done]="modules[i-1].status === 'completed'"></div>
                 <div class="pi-node">
-                  <div class="pi-icon">{{ m.icon }}</div>
+                  <div class="pi-icon" [innerHTML]="m.icon"></div>
                 </div>
                 <div class="pi-body">
                   <div class="pi-header">
                     <div class="pi-title">{{ m.title }}</div>
-                    <span class="chip" [class]="statusChip(m.status)">{{ m.status === 'completed' ? '✓ Done' : m.status === 'in-progress' ? 'In Progress' : '🔒 Locked' }}</span>
+                    <span class="chip" [class]="statusChip(m.status)">
+                      <ng-container *ngIf="m.status === 'completed'"><i class="bi bi-check-lg"></i> Done</ng-container>
+                      <ng-container *ngIf="m.status === 'in-progress'">In Progress</ng-container>
+                      <ng-container *ngIf="m.status === 'locked'">Locked</ng-container>
+                    </span>
                   </div>
                   <div class="pi-meta">{{ m.category }} · {{ m.completedLessons }}/{{ m.lessons }} lessons</div>
                   <div class="pi-progress" *ngIf="m.status !== 'locked'">
@@ -113,10 +119,10 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
 
           <!-- Challenges -->
           <div class="card challenges-card">
-            <app-section-header title="Weekly Challenges" icon="⚡" subtitle="Earn bonus XP this week"></app-section-header>
+            <app-section-header title="Weekly Challenges" icon='<i class="bi bi-lightning-fill"></i>' subtitle="Earn bonus XP this week"></app-section-header>
             <div class="challenges-list">
               <div class="challenge-item" *ngFor="let c of challenges">
-                <div class="ch-icon">{{ c.icon }}</div>
+                <div class="ch-icon" [innerHTML]="c.icon"></div>
                 <div class="ch-body">
                   <div class="ch-title">{{ c.title }}</div>
                   <div class="progress-bar" style="height:5px; margin-top:6px;">
@@ -136,7 +142,7 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
 
           <!-- Motivation Banner -->
           <div class="motivation-banner">
-            <div class="mb-icon">🔥</div>
+            <div class="mb-icon"><i class="bi bi-fire"></i></div>
             <div class="mb-text">
               <strong>{{ user.streak }}-day streak!</strong><br>
               <span>You're on a roll. Don't break the chain.</span>
@@ -145,14 +151,14 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
 
           <!-- Leaderboard -->
           <div class="card leaderboard-card">
-            <app-section-header title="Leaderboard" icon="🏆" subtitle="This week's top learners"></app-section-header>
+            <app-section-header title="Leaderboard" icon='<i class="bi bi-trophy-fill"></i>' subtitle="This week's top learners"></app-section-header>
             <div class="leaderboard-list">
               <div class="lb-row" *ngFor="let entry of leaderboard" [class.you]="entry.name.includes('You')">
                 <span class="lb-rank" [class]="rankClass(entry.rank)">{{ entry.rank }}</span>
                 <div class="avatar-placeholder" style="width:32px;height:32px;font-size:0.7rem;">{{ entry.initials }}</div>
                 <div class="lb-info">
                   <div class="lb-name">{{ entry.name }}</div>
-                  <div class="lb-streak">🔥 {{ entry.streak }}d streak</div>
+                  <div class="lb-streak"><i class="bi bi-fire"></i> {{ entry.streak }}d streak</div>
                 </div>
                 <div class="lb-xp">{{ entry.xp.toLocaleString() }} XP</div>
               </div>
@@ -161,7 +167,7 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
 
           <!-- Badges -->
           <div class="card">
-            <app-section-header title="Badges" icon="🏅" subtitle="{{ earnedCount }}/{{ allBadges.length }} earned" actionLabel="All Badges"></app-section-header>
+            <app-section-header title="Badges" icon='<i class="bi bi-award-fill"></i>' subtitle="{{ earnedCount }}/{{ allBadges.length }} earned" actionLabel="All Badges"></app-section-header>
             <div class="badges-grid-2">
               <app-badge-card *ngFor="let badge of allBadges.slice(0,6)" [badge]="badge"></app-badge-card>
             </div>
@@ -347,10 +353,10 @@ export class TrainingGamificationComponent {
   get completedGoals() { return this.dailyGoals.filter(g => g.done).length; }
 
   challenges = [
-    { icon: '🎙️', title: '5-Session Sprint',     current: 4, total: 5,  xp: 500, desc: 'Complete 5 sessions this week' },
-    { icon: '📝', title: 'Quiz Champion',         current: 2, total: 3,  xp: 300, desc: 'Score 80%+ on 3 quizzes' },
-    { icon: '🔥', title: 'Streak Master',         current: 7, total: 10, xp: 750, desc: '10-day study streak' },
-    { icon: '📚', title: 'Resource Explorer',     current: 3, total: 5,  xp: 200, desc: 'Save 5 library resources' },
+    { icon: '<i class="bi bi-mic-fill"></i>', title: '5-Session Sprint',     current: 4, total: 5,  xp: 500, desc: 'Complete 5 sessions this week' },
+    { icon: '<i class="bi bi-pencil-square"></i>', title: 'Quiz Champion',         current: 2, total: 3,  xp: 300, desc: 'Score 80%+ on 3 quizzes' },
+    { icon: '<i class="bi bi-fire"></i>', title: 'Streak Master',         current: 7, total: 10, xp: 750, desc: '10-day study streak' },
+    { icon: '<i class="bi bi-book-fill"></i>', title: 'Resource Explorer',     current: 3, total: 5,  xp: 200, desc: 'Save 5 library resources' },
   ];
 
   statusChip(s: string): string {

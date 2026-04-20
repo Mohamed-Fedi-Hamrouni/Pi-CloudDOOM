@@ -65,7 +65,7 @@ interface PageResponse {
             <!-- Search and Filters -->
             <div class="admin-toolbar">
                 <div class="search-wrap">
-                    <span class="search-icon">🔍</span>
+                    <span class="search-icon"><i class="bi bi-search"></i></span>
                     <input
                         class="input search-input"
                         type="search"
@@ -167,7 +167,7 @@ interface PageResponse {
                                         class="action-btn action-btn-green"
                                         (click)="verifyUser(user)"
                                     >
-                                        ✓ Verify
+                                        <i class="bi bi-check-lg"></i> Verify
                                     </button>
 
                                     <select
@@ -203,7 +203,7 @@ interface PageResponse {
                                         class="action-btn action-btn-red"
                                         (click)="deleteUser(user)"
                                     >
-                                        🗑
+                                        <i class="bi bi-trash-fill"></i>
                                     </button>
                                     <button
                                         *ngIf="user.status === 'DELETED'"
@@ -229,7 +229,7 @@ interface PageResponse {
                     [disabled]="currentPage === 0"
                     (click)="goToPage(currentPage - 1)"
                 >
-                    ← Prev
+                    <i class="bi bi-arrow-left"></i> Prev
                 </button>
                 <span class="page-info"
                     >Page {{ currentPage + 1 }} of {{ totalPages }}</span
@@ -239,7 +239,7 @@ interface PageResponse {
                     [disabled]="currentPage >= totalPages - 1"
                     (click)="goToPage(currentPage + 1)"
                 >
-                    Next →
+                    Next <i class="bi bi-arrow-right"></i>
                 </button>
             </div>
         </div>
@@ -261,7 +261,7 @@ interface PageResponse {
                         </div>
                     </div>
                     <button class="modal-close" (click)="closeDetail()">
-                        ✕
+                        <i class="bi bi-x-lg"></i>
                     </button>
                 </div>
 
@@ -371,7 +371,7 @@ interface PageResponse {
                         class="btn-action btn-green"
                         (click)="verifyUser(selectedUser); closeDetail()"
                     >
-                        ✓ Verify Account
+                        <i class="bi bi-check-lg"></i> Verify Account
                     </button>
                     <button
                         *ngIf="selectedUser.status === 'ACTIVE'"
@@ -396,7 +396,7 @@ interface PageResponse {
                         class="btn-action btn-red"
                         (click)="deleteUser(selectedUser); closeDetail()"
                     >
-                        🗑 Delete User
+                        <i class="bi bi-trash-fill"></i> Delete User
                     </button>
                     <button
                         *ngIf="selectedUser.status === 'DELETED'"

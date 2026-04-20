@@ -16,7 +16,7 @@ import { FormsModule } from '@angular/forms';
         <button class="btn btn-primary" (click)="saved = true">Save Changes</button>
       </div>
 
-      <div class="saved-toast" *ngIf="saved">✓ Changes saved!</div>
+      <div class="saved-toast" *ngIf="saved"><i class="bi bi-check-lg"></i> Changes saved!</div>
 
       <div class="settings-layout">
 
@@ -28,7 +28,7 @@ import { FormsModule } from '@angular/forms';
             [class.active]="activeTab() === tab.key"
             (click)="setTab(tab.key)"
           >
-            <span>{{ tab.icon }}</span>
+            <span [innerHTML]="tab.icon"></span>
             <span>{{ tab.label }}</span>
           </button>
         </div>
@@ -115,7 +115,7 @@ import { FormsModule } from '@angular/forms';
           <!-- Appearance -->
           <div *ngIf="activeTab() === 'appearance'" class="settings-panel">
             <div class="sp-title">Appearance</div>
-            <div class="sp-desc">Customize how interV looks and feels.</div>
+            <div class="sp-desc">Customize how InterviewPrepTN looks and feels.</div>
 
             <div class="setting-row">
               <div class="sr-info">
@@ -123,9 +123,9 @@ import { FormsModule } from '@angular/forms';
                 <div class="sr-desc">Choose between light and dark mode.</div>
               </div>
               <div class="theme-options">
-                <button class="theme-btn" [class.active]="theme === 'light'" (click)="theme = 'light'">☀️ Light</button>
-                <button class="theme-btn" [class.active]="theme === 'dark'" (click)="theme = 'dark'">🌙 Dark</button>
-                <button class="theme-btn" [class.active]="theme === 'system'" (click)="theme = 'system'">💻 System</button>
+                <button class="theme-btn" [class.active]="theme === 'light'" (click)="theme = 'light'"><i class="bi bi-sun-fill"></i> Light</button>
+                <button class="theme-btn" [class.active]="theme === 'dark'" (click)="theme = 'dark'"><i class="bi bi-moon-fill"></i> Dark</button>
+                <button class="theme-btn" [class.active]="theme === 'system'" (click)="theme = 'system'"><i class="bi bi-laptop"></i> System</button>
               </div>
             </div>
 
@@ -166,12 +166,12 @@ import { FormsModule } from '@angular/forms';
                   <div class="da-label">Download Your Data</div>
                   <div class="da-desc">Export all your sessions, reports, and progress data.</div>
                 </div>
-                <button class="btn btn-secondary btn-sm">⬇ Export</button>
+                <button class="btn btn-secondary btn-sm"><i class="bi bi-download"></i> Export</button>
               </div>
               <div class="da-item">
                 <div class="da-info">
                   <div class="da-label">Delete All Data</div>
-                  <div class="da-desc">Permanently remove all your data from interV.</div>
+                  <div class="da-desc">Permanently remove all your data from InterviewPrepTN.</div>
                 </div>
                 <button class="btn btn-sm" style="background:var(--error-50);color:var(--error-600);border:1px solid var(--error-200);">Delete</button>
               </div>
@@ -185,7 +185,7 @@ import { FormsModule } from '@angular/forms';
 
             <div class="current-plan">
               <div class="cp-left">
-                <div class="cp-plan-name">⭐ Premium Plan</div>
+                <div class="cp-plan-name"><i class="bi bi-star-fill"></i> Premium Plan</div>
                 <div class="cp-plan-price">$19 / month</div>
                 <div class="cp-plan-renewal">Renews on January 24, 2026</div>
               </div>
@@ -200,7 +200,7 @@ import { FormsModule } from '@angular/forms';
 
             <div class="payment-method">
               <div class="pm-card">
-                <span>💳</span>
+                <i class="bi bi-credit-card-fill"></i>
                 <div>
                   <div class="pm-card-num">Visa ending in 4242</div>
                   <div class="pm-card-exp">Expires 12/2027</div>
@@ -389,11 +389,11 @@ export class SettingsComponent {
   theme = 'light';
 
   tabs = [
-    { key: 'account',      icon: '👤', label: 'Account' },
-    { key: 'notifications',icon: '🔔', label: 'Notifications' },
-    { key: 'appearance',   icon: '🎨', label: 'Appearance' },
-    { key: 'privacy',      icon: '🔒', label: 'Privacy' },
-    { key: 'subscription', icon: '⭐', label: 'Subscription' },
+    { key: 'account',      icon: '<i class="bi bi-person-fill"></i>', label: 'Account' },
+    { key: 'notifications',icon: '<i class="bi bi-bell-fill"></i>', label: 'Notifications' },
+    { key: 'appearance',   icon: '<i class="bi bi-palette-fill"></i>', label: 'Appearance' },
+    { key: 'privacy',      icon: '<i class="bi bi-lock-fill"></i>', label: 'Privacy' },
+    { key: 'subscription', icon: '<i class="bi bi-star-fill"></i>', label: 'Subscription' },
   ];
 
   channels = ['Email', 'Push'];

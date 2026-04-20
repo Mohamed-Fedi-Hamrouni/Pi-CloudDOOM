@@ -24,11 +24,11 @@ import { AuthService } from "../../core/auth/auth.service";
                     (click)="toggleSidebar.emit()"
                     aria-label="Toggle menu"
                 >
-                    <span class="menu-icon">☰</span>
+                    <i class="bi bi-list menu-icon"></i>
                 </button>
 
                 <div class="search-wrap">
-                    <span class="search-icon">🔍</span>
+                    <i class="bi bi-search search-icon"></i>
                     <input
                         class="input search-input"
                         type="search"
@@ -42,19 +42,19 @@ import { AuthService } from "../../core/auth/auth.service";
             <div class="topbar-right">
                 <!-- Streak badge -->
                 <div class="streak-badge" *ngIf="user.streak > 0">
-                    <span>🔥</span>
+                    <i class="bi bi-fire"></i>
                     <span>{{ user.streak }} day streak</span>
                 </div>
 
                 <!-- XP / Karma -->
                 <div class="xp-badge" *ngIf="user.xp > 0">
-                    <span>⚡</span>
+                    <i class="bi bi-lightning-fill"></i>
                     <span>{{ user.xp.toLocaleString() }} XP</span>
                 </div>
 
                 <!-- Notifications -->
                 <button class="icon-btn notif-btn" title="Notifications">
-                    <span>🔔</span>
+                    <i class="bi bi-bell-fill"></i>
                     <span class="notif-dot"></span>
                 </button>
 
@@ -296,7 +296,7 @@ export class TopbarComponent implements OnInit {
                     title:
                         profile.preferredIndustry ||
                         profile.role ||
-                        "InterV Member",
+                        "InterviewPrepTN Member",
                     streak: 0,
                     xp: profile.karmaPoints || 0,
                 };

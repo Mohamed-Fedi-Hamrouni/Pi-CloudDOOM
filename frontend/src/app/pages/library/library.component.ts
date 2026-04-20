@@ -16,24 +16,24 @@ import { MOCK_RESOURCES } from '../../core/data/mock-data';
           <p>Curated articles, videos, podcasts, templates, and exercises for every stage of your journey.</p>
         </div>
         <div class="lib-stats">
-          <span class="chip chip-teal">📚 500+ Resources</span>
-          <span class="chip chip-mint">🔖 3 Saved</span>
+          <span class="chip chip-teal"><i class="bi bi-book-fill"></i> 500+ Resources</span>
+          <span class="chip chip-mint">3 Saved</span>
         </div>
       </div>
 
       <!-- Featured Banner -->
       <div class="featured-banner">
         <div class="fb-content">
-          <span class="chip chip-teal">🌟 Editor's Pick</span>
+          <span class="chip chip-teal"><i class="bi bi-stars"></i> Editor's Pick</span>
           <h2 class="fb-title">System Design Interview Masterclass</h2>
           <p class="fb-desc">End-to-end walkthrough of designing scalable systems. Covers URL shorteners, ride-sharing apps, and social networks. Trusted by 8,900+ learners.</p>
           <div class="fb-meta">
-            <span class="chip chip-purple">🎬 Video</span>
+            <span class="chip chip-purple"><i class="bi bi-play-circle-fill"></i> Video</span>
             <span>52 min</span>
-            <span>⭐ 4.9 rating</span>
+            <span><i class="bi bi-star-fill"></i> 4.9 rating</span>
             <span class="chip chip-cyan">Advanced</span>
           </div>
-          <button class="btn btn-primary">Watch Now →</button>
+          <button class="btn btn-primary">Watch Now <i class="bi bi-arrow-right"></i></button>
         </div>
         <div class="fb-visual">
           <div class="fb-play-wrap">
@@ -60,7 +60,7 @@ import { MOCK_RESOURCES } from '../../core/data/mock-data';
       <!-- Filters -->
       <div class="lib-filters">
         <div class="input-icon-wrap" style="flex:1;max-width:380px;">
-          <span class="icon">🔍</span>
+          <span class="icon"><i class="bi bi-search"></i></span>
           <input class="input" placeholder="Search resources...">
         </div>
         <div class="filter-row">
@@ -79,7 +79,7 @@ import { MOCK_RESOURCES } from '../../core/data/mock-data';
 
       <!-- Saved section -->
       <div *ngIf="savedResources.length > 0">
-        <app-section-header title="Saved Resources" icon="🔖" subtitle="{{ savedResources.length }} saved" actionLabel="Clear All"></app-section-header>
+        <app-section-header title="Saved Resources" subtitle="{{ savedResources.length }} saved" actionLabel="Clear All"></app-section-header>
         <div class="saved-strip">
           <div class="saved-card" *ngFor="let r of savedResources">
             <div class="sc-type-icon">{{ typeIcon(r.type) }}</div>
@@ -87,7 +87,7 @@ import { MOCK_RESOURCES } from '../../core/data/mock-data';
               <div class="sc-title">{{ r.title }}</div>
               <div class="sc-meta">{{ r.duration }} · {{ r.category }}</div>
             </div>
-            <button class="btn btn-ghost btn-sm">🔖</button>
+            <button class="btn btn-ghost btn-sm">Save</button>
           </div>
         </div>
       </div>
@@ -179,11 +179,11 @@ export class LibraryComponent {
 
   tabs = [
     { key: 'all',      label: 'All Resources' },
-    { key: 'article',  label: '📄 Articles' },
-    { key: 'video',    label: '🎬 Videos' },
-    { key: 'podcast',  label: '🎙️ Podcasts' },
-    { key: 'exercise', label: '💪 Exercises' },
-    { key: 'template', label: '📋 Templates' },
+    { key: 'article',  label: 'Articles' },
+    { key: 'video',    label: 'Videos' },
+    { key: 'podcast',  label: 'Podcasts' },
+    { key: 'exercise', label: 'Exercises' },
+    { key: 'template', label: 'Templates' },
   ];
 
   get activeTabLabel(): string {
@@ -205,8 +205,8 @@ export class LibraryComponent {
 
   typeIcon(type: string): string {
     const icons: Record<string, string> = {
-      article: '📄', video: '🎬', podcast: '🎙️', exercise: '💪', template: '📋'
+      article: 'Article', video: 'Video', podcast: 'Podcast', exercise: 'Exercise', template: 'Template'
     };
-    return icons[type] || '📄';
+    return icons[type] || 'Article';
   }
 }

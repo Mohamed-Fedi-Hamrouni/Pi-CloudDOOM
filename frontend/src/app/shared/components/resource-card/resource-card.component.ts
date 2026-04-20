@@ -8,7 +8,7 @@ import { Resource } from '../../../core/models/models';
   imports: [CommonModule],
   template: `
     <div class="resource-card">
-      <div class="resource-type-icon">{{ typeIcon }}</div>
+      <div class="resource-type-icon" [innerHTML]="typeIcon"></div>
       <div class="resource-body">
         <div class="resource-top">
           <span class="chip" [ngClass]="typeChipClass">{{ resource.type }}</span>
@@ -21,12 +21,12 @@ import { Resource } from '../../../core/models/models';
         </div>
         <div class="resource-footer">
           <div class="resource-meta">
-            <span>⏱️ {{ resource.duration }}</span>
-            <span>⭐ {{ resource.rating }}</span>
-            <span>👁️ {{ resource.views.toLocaleString() }}</span>
+            <span><i class="bi bi-stopwatch-fill"></i> {{ resource.duration }}</span>
+            <span><i class="bi bi-star-fill"></i> {{ resource.rating }}</span>
+            <span><i class="bi bi-eye-fill"></i> {{ resource.views.toLocaleString() }}</span>
           </div>
           <button class="btn btn-ghost btn-sm save-btn" [class.saved]="resource.saved">
-            {{ resource.saved ? '🔖' : '＋' }} {{ resource.saved ? 'Saved' : 'Save' }}
+            <i class="bi" [class.bi-bookmark-fill]="resource.saved" [class.bi-plus]="!resource.saved"></i> {{ resource.saved ? 'Saved' : 'Save' }}
           </button>
         </div>
       </div>
@@ -119,9 +119,13 @@ export class ResourceCardComponent {
 
   get typeIcon(): string {
     const icons: Record<string, string> = {
-      article: '📄', video: '🎬', podcast: '🎙️', exercise: '💪', template: '📋'
+      article: '<i class="bi bi-file-text-fill"></i>',
+      video: '<i class="bi bi-play-circle-fill"></i>',
+      podcast: '<i class="bi bi-mic-fill"></i>',
+      exercise: '<i class="bi bi-lightning-charge-fill"></i>',
+      template: '<i class="bi bi-clipboard-fill"></i>'
     };
-    return icons[this.resource?.type] || '📄';
+    return icons[this.resource?.type] || '<i class="bi bi-file-text-fill"></i>';
   }
 
   get typeChipClass(): string {

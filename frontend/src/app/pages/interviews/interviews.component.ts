@@ -1,6 +1,5 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MOCK_INTERVIEWS, MOCK_QUIZ_QUESTIONS } from '../../core/data/mock-data';
 import { InterviewSession } from '../../core/models/models';
@@ -8,7 +7,7 @@ import { InterviewSession } from '../../core/models/models';
 @Component({
   selector: 'app-interviews',
   standalone: true,
-  imports: [CommonModule, RouterLink, SectionHeaderComponent],
+  imports: [CommonModule, SectionHeaderComponent],
   template: `
     <div class="interviews-page animate-fade">
 
@@ -49,8 +48,8 @@ import { InterviewSession } from '../../core/models/models';
                   <span>{{ s.role }}</span>
                 </div>
                 <div class="sc-footer">
-                  <span class="sc-date">🗓️ {{ s.date }}</span>
-                  <span class="sc-duration">⏱️ {{ s.duration }}</span>
+                  <span class="sc-date"><i class="bi bi-calendar3"></i> {{ s.date }}</span>
+                  <span class="sc-duration"><i class="bi bi-stopwatch-fill"></i> {{ s.duration }}</span>
                   <span *ngIf="s.questions" class="chip chip-neutral" style="font-size:0.65rem;">{{ s.questions }} Questions</span>
                 </div>
               </div>
@@ -59,7 +58,7 @@ import { InterviewSession } from '../../core/models/models';
                   <div class="score-number">{{ s.score }}</div>
                   <div class="score-label">score</div>
                 </div>
-                <div class="sc-upcoming-icon" *ngIf="s.score === null">🗓️</div>
+                <div class="sc-upcoming-icon" *ngIf="s.score === null"><i class="bi bi-calendar3"></i></div>
               </div>
             </div>
           </div>
@@ -102,7 +101,7 @@ import { InterviewSession } from '../../core/models/models';
               </div>
 
               <div class="dc-notes" *ngIf="selectedSession()!.notes">
-                <div class="dc-notes-label">📝 Prep Notes</div>
+                <div class="dc-notes-label"><i class="bi bi-pencil-square"></i> Prep Notes</div>
                 <p>{{ selectedSession()!.notes }}</p>
               </div>
 
@@ -119,10 +118,10 @@ import { InterviewSession } from '../../core/models/models';
 
             <!-- Tips card -->
             <div class="card tips-card">
-              <app-section-header title="Preparation Tips" icon="💡"></app-section-header>
+              <app-section-header title="Preparation Tips" icon='<i class="bi bi-lightbulb-fill"></i>'></app-section-header>
               <div class="tips-list">
                 <div class="tip-item" *ngFor="let tip of prepTips">
-                  <span class="tip-icon">{{ tip.icon }}</span>
+                  <span class="tip-icon" [innerHTML]="tip.icon"></span>
                   <span class="tip-text">{{ tip.text }}</span>
                 </div>
               </div>
@@ -139,8 +138,8 @@ import { InterviewSession } from '../../core/models/models';
                     <div class="progress-fill" [style.width]="((currentQ() + 1) / 3 * 100) + '%'"></div>
                   </div>
                 </div>
-                <div class="pp-timer">⏱ {{ timerDisplay }}</div>
-                <button class="btn btn-ghost btn-sm" (click)="endPractice()">✕ End</button>
+                <div class="pp-timer"><i class="bi bi-stopwatch-fill"></i> {{ timerDisplay }}</div>
+                <button class="btn btn-ghost btn-sm" (click)="endPractice()"><i class="bi bi-x-lg"></i> End</button>
               </div>
 
               <div class="pp-question">
@@ -149,7 +148,7 @@ import { InterviewSession } from '../../core/models/models';
               </div>
 
               <div class="pp-tips-bar">
-                <span class="pp-tip">💡 Use the STAR structure: <strong>S</strong>ituation → <strong>T</strong>ask → <strong>A</strong>ction → <strong>R</strong>esult</span>
+                <span class="pp-tip"><i class="bi bi-lightbulb-fill"></i> Use the STAR structure: <strong>S</strong>ituation <i class="bi bi-arrow-right"></i> <strong>T</strong>ask <i class="bi bi-arrow-right"></i> <strong>A</strong>ction <i class="bi bi-arrow-right"></i> <strong>R</strong>esult</span>
               </div>
 
               <div class="pp-answer-area">
@@ -167,19 +166,19 @@ import { InterviewSession } from '../../core/models/models';
               </div>
 
               <div class="pp-controls">
-                <button class="btn btn-secondary btn-sm" (click)="prevQ()" [disabled]="currentQ() === 0">← Prev</button>
+                <button class="btn btn-secondary btn-sm" (click)="prevQ()" [disabled]="currentQ() === 0"><i class="bi bi-arrow-left"></i> Prev</button>
                 <div class="pp-dots">
                   <span *ngFor="let d of [0,1,2]" class="pp-dot" [class.active]="currentQ() === d"></span>
                 </div>
-                <button class="btn btn-primary btn-sm" (click)="nextQ()" *ngIf="currentQ() < 2">Next →</button>
-                <button class="btn btn-primary btn-sm" (click)="endPractice()" *ngIf="currentQ() === 2">Submit ✓</button>
+                <button class="btn btn-primary btn-sm" (click)="nextQ()" *ngIf="currentQ() < 2">Next <i class="bi bi-arrow-right"></i></button>
+                <button class="btn btn-primary btn-sm" (click)="endPractice()" *ngIf="currentQ() === 2">Submit <i class="bi bi-check-lg"></i></button>
               </div>
             </div>
           </ng-container>
 
           <!-- No selection -->
           <div class="empty-state" *ngIf="!selectedSession() && !practiceMode()">
-            <div class="empty-state-icon">🎙️</div>
+            <div class="empty-state-icon"><i class="bi bi-mic-fill"></i></div>
             <h3>Select a session</h3>
             <p>Choose an interview from the list, or start a new mock session to begin practicing.</p>
             <button class="btn btn-primary" style="margin-top:var(--space-4);" (click)="startNewSession()">+ Start New Session</button>
@@ -493,10 +492,10 @@ export class InterviewsComponent {
   ];
 
   prepTips = [
-    { icon: '⭐', text: 'Structure your answers using the STAR method: Situation, Task, Action, Result.' },
-    { icon: '⏱️', text: 'Aim for 2-3 minute answers. Practice timing with a stopwatch.' },
-    { icon: '🎯', text: 'Prepare 3-5 strong stories from your experience that you can adapt to multiple questions.' },
-    { icon: '🔢', text: 'Quantify your results wherever possible — numbers make your impact concrete and memorable.' },
+    { icon: '<i class="bi bi-star-fill"></i>', text: 'Structure your answers using the STAR method: Situation, Task, Action, Result.' },
+    { icon: '<i class="bi bi-stopwatch-fill"></i>', text: 'Aim for 2-3 minute answers. Practice timing with a stopwatch.' },
+    { icon: '<i class="bi bi-bullseye"></i>', text: 'Prepare 3-5 strong stories from your experience that you can adapt to multiple questions.' },
+    { icon: '<i class="bi bi-hash"></i>', text: 'Quantify your results wherever possible — numbers make your impact concrete and memorable.' },
   ];
 
   get upcoming() { return this.sessions.filter(s => s.status === 'upcoming'); }

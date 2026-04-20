@@ -47,8 +47,8 @@ import { MOCK_PRICING } from '../../core/data/mock-data';
               <div class="comp-feat-desc" *ngIf="row.desc">{{ row.desc }}</div>
             </div>
             <div class="comp-plan-col" *ngFor="let val of row.values">
-              <span *ngIf="$any(val) === true" class="comp-check">✓</span>
-              <span *ngIf="$any(val) === false" class="comp-cross">–</span>
+              <span *ngIf="$any(val) === true" class="comp-check"><i class="bi bi-check-lg"></i></span>
+              <span *ngIf="$any(val) === false" class="comp-cross"><i class="bi bi-dash"></i></span>
               <span *ngIf="isString(val)" class="comp-text">{{ val }}</span>
             </div>
           </div>
@@ -69,9 +69,9 @@ import { MOCK_PRICING } from '../../core/data/mock-data';
       <!-- CTA -->
       <div class="pricing-cta">
         <h2>Ready to start?</h2>
-        <p>Join 50,000+ candidates already preparing smarter with interV.</p>
+        <p>Join 50,000+ candidates already preparing smarter with InterviewPrepTN.</p>
         <div class="cta-btns">
-          <a routerLink="/dashboard" class="btn btn-primary btn-lg">Create Free Account →</a>
+          <a routerLink="/dashboard" class="btn btn-primary btn-lg">Create Free Account <i class="bi bi-arrow-right"></i></a>
           <a routerLink="/dashboard" class="btn btn-secondary btn-lg">Try the Platform</a>
         </div>
         <p class="cta-note">No credit card required · Free forever to get started</p>

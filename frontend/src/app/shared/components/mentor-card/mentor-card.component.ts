@@ -27,12 +27,12 @@ import { Mentor } from '../../../core/models/models';
       <div class="mentor-stats">
         <div class="mentor-stat">
           <div class="stars">
-            <span *ngFor="let s of [1,2,3,4,5]">{{ s <= mentor.rating ? '★' : '☆' }}</span>
+            <i class="bi" [class.bi-star-fill]="s <= mentor.rating" [class.bi-star]="s > mentor.rating" *ngFor="let s of [1,2,3,4,5]"></i>
           </div>
           <span class="mentor-stat-val">{{ mentor.rating }} ({{ mentor.reviews }})</span>
         </div>
         <div class="mentor-stat">
-          <span>🎓</span>
+          <i class="bi bi-mortarboard-fill"></i>
           <span class="mentor-stat-val">{{ mentor.sessions }} sessions</span>
         </div>
       </div>
@@ -50,7 +50,7 @@ import { Mentor } from '../../../core/models/models';
       </div>
 
       <div class="mentor-next" *ngIf="mentor.available">
-        <span>🗓️</span>
+        <i class="bi bi-calendar3"></i>
         <span>Next: {{ mentor.nextAvailable }}</span>
       </div>
     </div>

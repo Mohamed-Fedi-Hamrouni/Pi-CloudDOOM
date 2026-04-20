@@ -31,25 +31,25 @@
                     <span
                         class="plan-badge plan-premium"
                         *ngIf="user.plan === 'PREMIUM'"
-                        >⭐ Premium</span
+                        ><i class="bi bi-star-fill"></i> Premium</span
                     >
                     <span
                         class="plan-badge plan-student"
                         *ngIf="user.plan === 'STUDENT'"
-                        >🎓 Student</span
+                        ><i class="bi bi-mortarboard-fill"></i> Student</span
                     >
                     <span class="badge-verified" *ngIf="user.isVerified"
-                        >✓ Verified</span
+                        ><i class="bi bi-check-lg"></i> Verified</span
                     >
                     <span class="badge-unverified" *ngIf="!user.isVerified"
-                        >⚠ Unverified</span
+                        ><i class="bi bi-exclamation-triangle-fill"></i> Unverified</span
                     >
                 </div>
                 <div class="ph-role">
                     {{ user.preferredIndustry || "Job Seeker" }}
                 </div>
                 <div class="ph-location" *ngIf="user.city">
-                    📍 {{ user.city }}
+                    <i class="bi bi-geo-alt-fill"></i> {{ user.city }}
                 </div>
                 <div class="ph-stats">
                     <div class="ph-stat">
@@ -77,7 +77,8 @@
             </div>
             <div class="ph-actions">
                 <button class="btn btn-primary" (click)="toggleEdit()">
-                    {{ editing ? "✓ Save Profile" : "✏️ Edit Profile" }}
+                    <ng-container *ngIf="editing"><i class="bi bi-check-lg"></i> Save Profile</ng-container>
+                    <ng-container *ngIf="!editing"><i class="bi bi-pencil"></i> Edit Profile</ng-container>
                 </button>
                 <button class="btn btn-secondary">Share Profile</button>
             </div>
@@ -108,44 +109,41 @@
                 [class.done]="user.firstName && user.lastName"
                 [class.pending]="!user.firstName || !user.lastName"
             >
-                {{
-                    user.firstName && user.lastName
-                        ? "✓ Set target role"
-                        : "+ Set target role"
-                }}
+                <ng-container *ngIf="user.firstName && user.lastName"><i class="bi bi-check-lg"></i> Set target role</ng-container>
+                <ng-container *ngIf="!user.firstName || !user.lastName"><i class="bi bi-plus"></i> Set target role</ng-container>
             </div>
             <div
                 class="cc-todo"
                 [class.done]="user.simulationsUsedThisMonth > 0"
                 [class.pending]="user.simulationsUsedThisMonth === 0"
             >
-                {{
-                    user.simulationsUsedThisMonth > 0
-                        ? "✓ Complete first session"
-                        : "+ Complete first session"
-                }}
+                <ng-container *ngIf="user.simulationsUsedThisMonth > 0"><i class="bi bi-check-lg"></i> Complete first session</ng-container>
+                <ng-container *ngIf="user.simulationsUsedThisMonth === 0"><i class="bi bi-plus"></i> Complete first session</ng-container>
             </div>
-            <div class="cc-todo done">✓ Add skills</div>
+            <div class="cc-todo done"><i class="bi bi-check-lg"></i> Add skills</div>
             <div
                 class="cc-todo"
                 [class.done]="!!user.bio"
                 [class.pending]="!user.bio"
             >
-                {{ user.bio ? "✓ Bio added" : "+ Add bio" }}
+                <ng-container *ngIf="user.bio"><i class="bi bi-check-lg"></i> Bio added</ng-container>
+                <ng-container *ngIf="!user.bio"><i class="bi bi-plus"></i> Add bio</ng-container>
             </div>
             <div
                 class="cc-todo"
                 [class.done]="!!user.city"
                 [class.pending]="!user.city"
             >
-                {{ user.city ? "✓ City added" : "+ Add city" }}
+                <ng-container *ngIf="user.city"><i class="bi bi-check-lg"></i> City added</ng-container>
+                <ng-container *ngIf="!user.city"><i class="bi bi-plus"></i> Add city</ng-container>
             </div>
             <div
                 class="cc-todo"
                 [class.done]="user.isVerified"
                 [class.pending]="!user.isVerified"
             >
-                {{ user.isVerified ? "✓ Email verified" : "+ Verify email" }}
+                <ng-container *ngIf="user.isVerified"><i class="bi bi-check-lg"></i> Email verified</ng-container>
+                <ng-container *ngIf="!user.isVerified"><i class="bi bi-plus"></i> Verify email</ng-container>
             </div>
         </div>
     </div>
@@ -154,7 +152,7 @@
     <div class="card" *ngIf="editing">
         <app-section-header
             title="Edit Profile"
-            icon="✏️"
+            icon='<i class="bi bi-pencil"></i>'
             actionLabel=""
         ></app-section-header>
         <div class="edit-section">
@@ -261,7 +259,8 @@
                 (click)="saveProfile()"
                 [disabled]="saving"
             >
-                {{ saving ? "Saving..." : "✓ Save Changes" }}
+                <ng-container *ngIf="saving">Saving...</ng-container>
+                <ng-container *ngIf="!saving"><i class="bi bi-check-lg"></i> Save Changes</ng-container>
             </button>
             <button class="btn btn-secondary" (click)="cancelEdit()">
                 Cancel
@@ -269,7 +268,7 @@
         </div>
         <div *ngIf="saveError" class="save-error">{{ saveError }}</div>
         <div *ngIf="saveSuccess" class="save-success">
-            ✓ Profile updated successfully!
+            <i class="bi bi-check-lg"></i> Profile updated successfully!
         </div>
     </div>
 
@@ -280,7 +279,7 @@
             <div class="card">
                 <app-section-header
                     title="About"
-                    icon="👤"
+                    icon='<i class="bi bi-person-fill"></i>'
                     actionLabel="Edit"
                 ></app-section-header>
                 <div class="about-text">
@@ -295,11 +294,11 @@
             <div class="card">
                 <app-section-header
                     title="Skills and Strengths"
-                    icon="💪"
+                    icon='<i class="bi bi-lightning-charge-fill"></i>'
                     actionLabel="Add"
                 ></app-section-header>
                 <div class="empty-mini">
-                    <span style="font-size: 2rem">💪</span>
+                    <span style="font-size: 2rem"><i class="bi bi-lightning-charge-fill"></i></span>
                     <p>
                         Upload your CV to automatically extract your skills, or
                         add them manually.
@@ -312,11 +311,11 @@
             <div class="card">
                 <app-section-header
                     title="Work Experience"
-                    icon="💼"
+                    icon='<i class="bi bi-briefcase-fill"></i>'
                     actionLabel="Add"
                 ></app-section-header>
                 <div class="empty-mini">
-                    <span style="font-size: 2rem">💼</span>
+                    <span style="font-size: 2rem"><i class="bi bi-briefcase-fill"></i></span>
                     <p>Add your work experience to strengthen your profile</p>
                     <button class="btn btn-ghost btn-sm">
                         + Add Experience
@@ -328,7 +327,7 @@
             <div class="card">
                 <app-section-header
                     title="Interview Preferences"
-                    icon="⚙️"
+                    icon='<i class="bi bi-gear-fill"></i>'
                     actionLabel="Edit"
                 ></app-section-header>
                 <div class="pref-list">
@@ -346,7 +345,7 @@
             <div class="card">
                 <app-section-header
                     title="CV / Resume"
-                    icon="📄"
+                    icon='<i class="bi bi-file-text-fill"></i>'
                     actionLabel=""
                 ></app-section-header>
                 <div
@@ -354,7 +353,10 @@
                     [class.has-file]="cvUploaded"
                     (click)="triggerCvUpload()"
                 >
-                    <div class="cva-icon">{{ cvUploaded ? "📄" : "⬆️" }}</div>
+                    <div class="cva-icon">
+                        <i class="bi bi-file-text-fill" *ngIf="cvUploaded"></i>
+                        <i class="bi bi-upload" *ngIf="!cvUploaded"></i>
+                    </div>
                     <div class="cva-title">
                         {{ cvUploaded ? "CV Uploaded" : "Upload your CV" }}
                     </div>
@@ -369,7 +371,7 @@
             <div class="card">
                 <app-section-header
                     title="Subscription"
-                    icon="⭐"
+                    icon='<i class="bi bi-star-fill"></i>'
                     actionLabel=""
                 ></app-section-header>
                 <div class="sub-plan-badge">
@@ -406,7 +408,7 @@
             <div class="card">
                 <app-section-header
                     title="Preferences"
-                    icon="⚙️"
+                    icon='<i class="bi bi-gear-fill"></i>'
                     actionLabel=""
                 ></app-section-header>
                 <div class="pref-list">
