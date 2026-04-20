@@ -32,7 +32,7 @@ public class AiMissingLessonGenerationService {
 
     private static final Logger log = LoggerFactory.getLogger(AiMissingLessonGenerationService.class);
 
-    private final GeminiGenerateContentClient gemini;
+    private final OllamaGenerateContentClient aiClient;
     private final ObjectMapper objectMapper;
     private final TrainingLessonRepository lessonRepository;
 
@@ -44,8 +44,8 @@ public class AiMissingLessonGenerationService {
         if (!generationEnabled) {
             throw new IllegalStateException("AI lesson generation is disabled (training.ai.generation-enabled=false)");
         }
-        if (!gemini.isConfigured()) {
-            throw new IllegalStateException("Gemini is not configured (GOOGLE_AI_API_KEY missing)");
+        if (!aiClient.isConfigured()) {
+            throw new IllegalStateException("Ollama is not configured");
         }
 
         String lang = normalizeLang(request.getLanguage());
@@ -126,7 +126,7 @@ public class AiMissingLessonGenerationService {
         String prompt = buildPrompt(request, lang, count, avoidTitleNorm, focusTopic);
 
         // Use higher temperature here for variety; keep reranker deterministic.
-        String raw = gemini.generateJson(system, List.of(
+        String raw = aiClient.generateJson(system, List.of(
             new GeminiGenerateContentClient.Content("user", List.of(new GeminiGenerateContentClient.Part(prompt)))
         ), 0.8);
 

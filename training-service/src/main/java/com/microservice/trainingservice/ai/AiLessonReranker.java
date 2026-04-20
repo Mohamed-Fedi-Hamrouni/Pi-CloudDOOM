@@ -18,7 +18,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AiLessonReranker {
 
-    private final GeminiGenerateContentClient gemini;
+    private final OllamaGenerateContentClient aiClient;
     private final ObjectMapper objectMapper;
 
     @Value("${training.ai.lesson-rerank-enabled:true}")
@@ -53,7 +53,7 @@ public class AiLessonReranker {
         if (desiredCount <= 0 || candidates == null || candidates.isEmpty()) {
             return List.of();
         }
-        if (!rerankEnabled || !gemini.isConfigured()) {
+        if (!rerankEnabled || !aiClient.isConfigured()) {
             return candidates.stream().map(CandidateLesson::id).toList();
         }
 
@@ -63,7 +63,7 @@ public class AiLessonReranker {
         String system = "You are a ranking engine. Output ONLY valid JSON. No markdown, no extra text.";
         String prompt = buildPrompt(category, desiredCount, user, capped);
 
-        String raw = gemini.generate(system, List.of(new GeminiGenerateContentClient.Content(
+        String raw = aiClient.generateJson(system, List.of(new GeminiGenerateContentClient.Content(
             "user",
             List.of(new GeminiGenerateContentClient.Part(prompt))
         )));

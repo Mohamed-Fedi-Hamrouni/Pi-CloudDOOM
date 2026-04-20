@@ -967,12 +967,14 @@ export class ProfileComponent implements OnInit {
                 this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();
+                this.cdr.detectChanges();
             },
             error: (err) => {
                 this.cvUploadLoading = false;
                 this.cvUploadError =
                     err?.error?.message ||
                     "CV upload failed. Please try again.";
+                this.cdr.detectChanges();
             },
         });
     }
