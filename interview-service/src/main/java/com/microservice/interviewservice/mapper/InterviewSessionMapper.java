@@ -2,6 +2,7 @@ package com.microservice.interviewservice.mapper;
 
 import com.microservice.interviewservice.dto.request.CreateInterviewSessionRequest;
 import com.microservice.interviewservice.dto.response.InterviewSessionResponse;
+import com.microservice.interviewservice.ennum.InterviewLanguage;
 import com.microservice.interviewservice.ennum.SessionStatusEnum;
 import com.microservice.interviewservice.model.InterviewSession;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,8 @@ public class InterviewSessionMapper {
                 .industry(request.getIndustry())
                 .targetLevel(request.getTargetLevel())
                 .status(SessionStatusEnum.IN_PROGRESS)
+                // Default to English if the client didn't supply a language
+                .language(request.getLanguage() != null ? request.getLanguage() : InterviewLanguage.EN)
                 .durationMinutes(request.getDurationMinutes())
                 .difficultyLevel(request.getDifficultyLevel())
                 .isRecorded(request.getIsRecorded())
@@ -31,6 +34,7 @@ public class InterviewSessionMapper {
                 .industry(session.getIndustry())
                 .targetLevel(session.getTargetLevel())
                 .status(session.getStatus())
+                .language(session.getLanguage())
                 .durationMinutes(session.getDurationMinutes())
                 .difficultyLevel(session.getDifficultyLevel())
                 .isRecorded(session.getIsRecorded())

@@ -2,25 +2,16 @@ package com.microservice.interviewservice.model;
 
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "responses")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Response {
 
     @Id
@@ -43,8 +34,61 @@ public class Response {
     private Integer durationSeconds;
     private Integer wordCount;
 
-    // null until scored server-side
     private Double overallScore;
+
+    @Column(name = "ai_feedback", columnDefinition = "TEXT")
+    private String aiFeedback;
+
+    @Column(name = "turn_index")
+    private Integer turnIndex;
+
+    @Column(name = "communication_score")
+    private Double communicationScore;
+
+    @Column(name = "hesitation_score")
+    private Double hesitationScore;
+
+    @Column(name = "stress_proxy_score")
+    private Double stressProxyScore;
+
+    @Column(name = "confidence_proxy_score")
+    private Double confidenceProxyScore;
+
+    @Column(name = "avg_volume")
+    private Double avgVolume;
+
+    @Column(name = "max_volume")
+    private Double maxVolume;
+
+    @Column(name = "silence_ratio")
+    private Double silenceRatio;
+
+    @Column(name = "blink_rate")
+    private Double blinkRate;
+
+    @Column(name = "gaze_stability_score")
+    private Double gazeStabilityScore;
+
+    @Column(name = "head_motion_score")
+    private Double headMotionScore;
+
+    @Column(name = "brow_tension_score")
+    private Double browTensionScore;
+
+    @Column(name = "mouth_tension_score")
+    private Double mouthTensionScore;
+
+    @Column(name = "reaction_type", length = 40)
+    private String reactionType;
+
+    @Column(name = "agent_message", columnDefinition = "TEXT")
+    private String agentMessage;
+
+    @Column(name = "encouragement", columnDefinition = "TEXT")
+    private String encouragement;
+
+    @Column(name = "stress_timeline_json", columnDefinition = "TEXT")
+    private String stressTimelineJson;
 
     @Column(nullable = false)
     private LocalDateTime recordedAt;
@@ -54,11 +98,9 @@ public class Response {
         if (recordedAt == null) recordedAt = LocalDateTime.now();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
     public Double getWordsPerMinute() {
         if (wordCount == null || durationSeconds == null || durationSeconds == 0) return null;
-        return (wordCount / (durationSeconds / 60.0));
+        return wordCount / (durationSeconds / 60.0);
     }
 
     public boolean isComplete() {

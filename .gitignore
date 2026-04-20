@@ -41,3 +41,23 @@ dist/
 # Coverage / temp
 coverage/
 .mtj.tmp/
+# Binary / media files
+*.zip
+*.wav
+*.mp3
+*.mp4
+
+# Node / build artifacts
+node_modules/
+dist/
+target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local env
+.env
+.env.local
+target/

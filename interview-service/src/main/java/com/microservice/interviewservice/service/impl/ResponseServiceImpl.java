@@ -1,4 +1,3 @@
-// service/impl/ResponseServiceImpl.java
 package com.microservice.interviewservice.service.impl;
 
 import java.util.List;
@@ -6,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.microservice.interviewservice.dto.ai.AiEvaluationResult;
 import com.microservice.interviewservice.dto.request.SubmitResponseRequest;
 import com.microservice.interviewservice.dto.response.SubmitResponseResult;
 import com.microservice.interviewservice.ennum.SessionStatusEnum;
@@ -17,8 +17,10 @@ import com.microservice.interviewservice.model.Response;
 import com.microservice.interviewservice.repository.InterviewSessionRepository;
 import com.microservice.interviewservice.repository.QuestionRepository;
 import com.microservice.interviewservice.repository.ResponseRepository;
-import com.microservice.interviewservice.service.QuestionSelectionService;
+import com.microservice.interviewservice.service.AiEvaluationService;   // NEW
+import com.microservice.interviewservice.service.AiQuestionService;      // NEW
 import com.microservice.interviewservice.service.ResponseService;
+import com.microservice.interviewservice.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +34,8 @@ public class ResponseServiceImpl implements ResponseService {
     private final InterviewSessionRepository sessionRepository;
     private final QuestionRepository         questionRepository;
     private final ResponseRepository         responseRepository;
-    private final QuestionSelectionService   questionSelectionService;
+    private final AiQuestionService          aiQuestionService;    // replaces QuestionSelectionService
+    private final AiEvaluationService        aiEvaluationService;  // replaces computeScore()
 
     @Override
     public SubmitResponseResult submitResponse(Long sessionId,
@@ -54,10 +57,10 @@ public class ResponseServiceImpl implements ResponseService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Question not found [id=" + req.getQuestionId() + "]"));
 
-        // 4. Compute placeholder score
-        double score = computeScore(req);
+        // 4. AI evaluation — replaces the old placeholder computeScore()
+        AiEvaluationResult eval = aiEvaluationService.evaluate(question, req.getTranscription());
 
-        // 5. Build and save Response
+        // 5. Build and save Response (now includes aiFeedback)
         Response response = Response.builder()
                 .session(session)
                 .question(question)
@@ -66,35 +69,27 @@ public class ResponseServiceImpl implements ResponseService {
                 .videoFileUrl(req.getVideoFileUrl())
                 .durationSeconds(req.getDurationSeconds())
                 .wordCount(req.getWordCount())
-                .overallScore(score)
+                .overallScore(eval.overallScore())
+                .aiFeedback(eval.feedback())          // NEW
                 .build();
 
         Response saved = responseRepository.save(response);
-        log.info("Response saved [id={}, sessionId={}, score={}]",
-                saved.getId(), sessionId, score);
+        log.info("Response saved [id={}, sessionId={}, score={}, hasAiFeedback={}]",
+                saved.getId(), sessionId, eval.overallScore(), eval.feedback() != null);
 
         // 6. Update question usage stats
         questionRepository.incrementTimesUsed(question.getId());
 
-        // 7. Select next question (exclude all already-answered IDs)
-        List<Long> askedIds = responseRepository.findQuestionIdsBySessionId(sessionId);
-        Question nextQuestion = questionSelectionService.selectNextQuestion(session, askedIds);
+        // 7. AI selects next question (exclude all already-answered IDs)
+      List<Long> askedIds = responseRepository.findQuestionIdsBySessionId(sessionId);
+Question nextQuestion = aiQuestionService.generateQuestion(session, askedIds);
 
-        return SubmitResponseResult.builder()
-                .responseId(saved.getId())
-                .sessionId(sessionId)
-                .questionId(question.getId())
-                .overallScore(score)
-                .nextQuestion(nextQuestion)  // null = candidate should call complete
-                .build();
-    }
-
-    // ── Placeholder scoring formula (replaced in P5 with real AI scoring) ───
-
-    private double computeScore(SubmitResponseRequest req) {
-        if (req.getTranscription() == null || req.getTranscription().isBlank()) return 0.2;
-        int words = req.getWordCount() != null ? req.getWordCount()
-                  : req.getTranscription().split("\\s+").length;
-        return words > 50 ? 0.6 : 0.3;
+return SubmitResponseResult.builder()
+        .responseId(saved.getId())
+        .sessionId(sessionId)
+        .questionId(question.getId())
+        .overallScore(eval.overallScore())
+        .nextQuestion(nextQuestion)
+        .build();
     }
 }

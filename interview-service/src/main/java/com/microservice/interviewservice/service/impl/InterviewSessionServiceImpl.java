@@ -21,11 +21,10 @@ import com.microservice.interviewservice.model.Question;
 import com.microservice.interviewservice.repository.InterviewSessionRepository;
 import com.microservice.interviewservice.repository.PerformanceReportRepository;
 import com.microservice.interviewservice.repository.ResponseRepository;
+import com.microservice.interviewservice.service.AiQuestionService;
 import com.microservice.interviewservice.service.InterviewSessionService;
 import com.microservice.interviewservice.service.ProgressTrackerService;
-import com.microservice.interviewservice.service.QuestionSelectionService;
 import com.microservice.interviewservice.service.ReportGenerationService;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,7 +36,7 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
 
     private final InterviewSessionRepository  repository;
     private final InterviewSessionMapper      mapper;
-    private final QuestionSelectionService    questionSelectionService;
+    private final AiQuestionService           aiQuestionService;
     private final ResponseRepository          responseRepository;
     private final ReportGenerationService     reportGenerationService;
     private final ProgressTrackerService      progressTrackerService;
@@ -47,8 +46,7 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
     // ── Create ────────────────────────────────────────────────────────────────
 
     @Override
-    public InterviewSessionResponse createSession(CreateInterviewSessionRequest request,
-                                                  String userId) {
+    public InterviewSessionResponse createSession(CreateInterviewSessionRequest request, String userId) {
         validateConsent(request.getIsRecorded(), request.getConsentGiven());
         InterviewSession saved = repository.save(mapper.toEntity(request, userId));
         log.info("Session created [id={}, userId={}, type={}]", saved.getId(), userId, saved.getType());
@@ -70,8 +68,6 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
                 .stream().map(mapper::toResponse).toList();
     }
 
-    // ── Admin reads ───────────────────────────────────────────────────────────
-
     @Override
     @Transactional(readOnly = true)
     public List<InterviewSessionResponse> getSessionsByUser(String targetUserId) {
@@ -82,13 +78,10 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
     // ── Update ────────────────────────────────────────────────────────────────
 
     @Override
-    public InterviewSessionResponse updateSession(Long id,
-                                                  UpdateInterviewSessionRequest request,
-                                                  String userId) {
+    public InterviewSessionResponse updateSession(Long id, UpdateInterviewSessionRequest request, String userId) {
         InterviewSession session = findOwned(id, userId);
         if (session.isTerminal()) {
-            throw new BusinessException(
-                    "Session [id=" + id + "] is read-only. Status: " + session.getStatus());
+            throw new BusinessException("Session [id=" + id + "] is read-only. Status: " + session.getStatus());
         }
         if (request.getType()            != null) session.setType(request.getType());
         if (request.getIndustry()        != null) session.setIndustry(request.getIndustry());
@@ -157,7 +150,6 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
     @Override
     public void deleteSession(Long id, String userId) {
         InterviewSession session = findOwned(id, userId);
-        // Cascade: delete the associated report first (FK constraint)
         reportRepository.findBySessionId(id).ifPresent(reportRepository::delete);
         responseRepository.deleteBySessionId(id);
         repository.delete(session);
@@ -175,22 +167,42 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
         log.info("Session deleted by admin [id={}]", id);
     }
 
-    // ── Questions ─────────────────────────────────────────────────────────────
+    // ── Next question — NO @Transactional ────────────────────────────────────
+    //
+    // This method must NOT be @Transactional.
+    // Reason: aiQuestionService.generateQuestion() calls Groq (1-5 seconds) and
+    // then saves the question in its own REQUIRES_NEW transaction via
+    // QuestionPersistenceService. If this method held a transaction open,
+    // any save failure in a previous retry would mark that outer transaction
+    // as "aborted", causing all subsequent retries to fail with
+    // "current transaction is aborted, commands ignored until end of transaction block"
+    // even if the AI call itself succeeded.
 
     @Override
-    @Transactional(readOnly = true)
+    // ⚠️ NO @Transactional — intentional, see comment above
     public Question getNextQuestion(Long sessionId, String userId) {
-        InterviewSession session = findOwned(sessionId, userId);
-        if (session.getStatus() != SessionStatusEnum.IN_PROGRESS
-                && session.getStatus() != SessionStatusEnum.PAUSED) {
-            throw new BusinessException("Session is not active.");
-        }
-        List<Long> askedIds = responseRepository.findQuestionIdsBySessionId(sessionId);
-        if (askedIds.isEmpty()) return questionSelectionService.selectFirstQuestion(session);
+        // Load the session in a short read-only transaction
+        InterviewSession session = loadSessionReadOnly(sessionId, userId);
 
-        Question next = questionSelectionService.selectNextQuestion(session, askedIds);
-        if (next == null) throw new BusinessException("No more questions available for this session.");
-        return next;
+        if (session.getStatus() != SessionStatusEnum.IN_PROGRESS) {
+            throw new BusinessException(
+                    "Session is not active. Current status: " + session.getStatus());
+        }
+
+        List<Long> askedIds = loadAskedIds(sessionId);
+        return aiQuestionService.generateQuestion(session, askedIds);
+    }
+
+    // ─── Private read helpers (each opens+closes its own short transaction) ───
+
+    @Transactional(readOnly = true)
+    protected InterviewSession loadSessionReadOnly(Long sessionId, String userId) {
+        return findOwned(sessionId, userId);
+    }
+
+    @Transactional(readOnly = true)
+    protected List<Long> loadAskedIds(Long sessionId) {
+        return responseRepository.findQuestionIdsBySessionId(sessionId);
     }
 
     // ── Kafka helper ──────────────────────────────────────────────────────────
@@ -200,13 +212,16 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
             kafkaTemplate.send("interview.session.completed", event.getUserId(), event)
                     .whenComplete((result, ex) -> {
                         if (ex != null) {
-                            log.warn("Kafka delivery failed [sessionId={}]: {}", event.getSessionId(), ex.getMessage());
+                            log.warn("Kafka delivery failed [sessionId={}]: {}",
+                                    event.getSessionId(), ex.getMessage());
                         } else {
-                            log.info("SessionCompletedEvent published [sessionId={}]", event.getSessionId());
+                            log.info("SessionCompletedEvent published [sessionId={}]",
+                                    event.getSessionId());
                         }
                     });
         } catch (Exception ex) {
-            log.warn("Could not submit Kafka send [sessionId={}]: {}", event.getSessionId(), ex.getMessage());
+            log.warn("Could not submit Kafka send [sessionId={}]: {}",
+                    event.getSessionId(), ex.getMessage());
         }
     }
 

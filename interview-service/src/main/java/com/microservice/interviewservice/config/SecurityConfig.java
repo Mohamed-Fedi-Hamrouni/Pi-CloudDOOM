@@ -35,7 +35,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
-
+                .requestMatchers(HttpMethod.POST, "/api/live-voice/speak").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/live-voice/available").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/live-voice/**").permitAll()
                 // ── Questions ─────────────────────────────────────────────
                 .requestMatchers(HttpMethod.GET,    "/api/questions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.POST,   "/api/questions/**").hasRole("ADMIN")
@@ -59,7 +61,8 @@ public class SecurityConfig {
 
                 // ── Progress (own) ────────────────────────────────────────
                 .requestMatchers("/api/progress/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-
+                .requestMatchers(HttpMethod.POST, "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.GET,  "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 ->

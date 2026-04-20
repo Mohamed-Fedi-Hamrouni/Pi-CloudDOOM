@@ -15,6 +15,8 @@ public interface ResponseRepository extends JpaRepository<Response, Long> {
 
     List<Response> findBySessionId(Long sessionId);
 
+    List<Response> findBySessionIdOrderByRecordedAtAsc(Long sessionId);
+
     @Query("SELECT r.question.id FROM Response r WHERE r.session.id = :sessionId")
     List<Long> findQuestionIdsBySessionId(@Param("sessionId") Long sessionId);
 

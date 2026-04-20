@@ -43,8 +43,12 @@ public class Question {
     @Column(nullable = false)
     private CareerLevelEnum difficulty;   // CareerLevelEnum per class diagram
 
-    private String expectedMethod;
-    private String sampleAnswer;
+    @Column(name = "expected_method", columnDefinition = "TEXT")  // Groq returns > 255 chars — was crashing on every first attempt
+private String expectedMethod;
+
+@Column(columnDefinition = "TEXT")
+private String sampleAnswer;
+
 
     private Integer avgAnswerTimeSeconds;
     private Double avgScoreOnPlatform;
