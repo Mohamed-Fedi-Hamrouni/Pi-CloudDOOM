@@ -411,16 +411,19 @@ private List<String> deserializeSkills(String skillsJson) {
     @CacheEvict(value = "users-by-keycloak", key = "#jwt.subject"),
     @CacheEvict(value = "users-by-email", allEntries = true)
 })
+// ── Replace findOrProvisionFromJwt in UserService.java with this version ──
+
 public UserResponse findOrProvisionFromJwt(Jwt jwt) {
     String keycloakId = jwt.getSubject();
     String email      = jwt.getClaimAsString("email");
 
-    // 1. Already exists → update lastLogin and return
+    // 1. Already exists → update lastLogin, sync passkey status, and return
     Optional<User> existing = userRepository.findByKeycloakId(keycloakId)
             .filter(u -> u.getDeletedAt() == null);
     if (existing.isPresent()) {
         User u = existing.get();
         u.setLastLoginAt(LocalDateTime.now());
+        syncPasskeyStatus(u, jwt);                          // ← NEW
         return toResponseWithSkills(userRepository.save(u));
     }
 
@@ -431,8 +434,9 @@ public UserResponse findOrProvisionFromJwt(Jwt jwt) {
                 .filter(u -> u.getDeletedAt() == null);
         if (byEmail.isPresent()) {
             User u = byEmail.get();
-            u.setKeycloakId(keycloakId);   // re-link
+            u.setKeycloakId(keycloakId);
             u.setLastLoginAt(LocalDateTime.now());
+            syncPasskeyStatus(u, jwt);                      // ← NEW
             log.info("Re-linked existing user {} to new keycloakId {}", u.getId(), keycloakId);
             return toResponseWithSkills(userRepository.save(u));
         }
@@ -453,5 +457,20 @@ public UserResponse findOrProvisionFromJwt(Jwt jwt) {
     eventProducer.publishUserCreated(saved);
     log.info("Auto-provisioned social user {} from keycloakId {}", saved.getId(), keycloakId);
     return toResponseWithSkills(saved);
+}
+
+// ── NEW: sync passkey flag from JWT ACR claim ──────────────────────────────
+// Keycloak sets acr = "webauthn-passwordless" when user authenticates via passkey.
+// We record this as a UI hint only — Keycloak remains the auth source of truth.
+private void syncPasskeyStatus(User user, Jwt jwt) {
+    String acr = jwt.getClaimAsString("acr");
+    boolean authenticatedViaPasskey = acr != null &&
+            (acr.equals("webauthn-passwordless") || acr.contains("webauthn"));
+
+    if (authenticatedViaPasskey && !Boolean.TRUE.equals(user.getPasskeyRegistered())) {
+        user.setPasskeyRegistered(true);
+        user.setPasskeyRegisteredAt(LocalDateTime.now());
+        log.info("Passkey registered recorded for user {}", user.getId());
+    }
 }
 }
