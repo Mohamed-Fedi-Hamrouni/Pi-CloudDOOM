@@ -187,7 +187,7 @@ export class ProfileComponent implements OnInit {
                         normalized.firstName,
                         normalized.lastName,
                     );
-                    this.currentUserStore.setCurrentUser(normalized);
+                    setTimeout(() => this.currentUserStore.setCurrentUser(normalized));
                     this.avatarPreviewUrl = normalized.avatarUrl || "";
                     this.selectedSkills = [...normalized.skills];
                     this.experiences = this.parseExperiences(normalized.experiencesJson);
