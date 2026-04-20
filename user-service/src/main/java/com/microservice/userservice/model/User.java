@@ -126,6 +126,13 @@ public class User {
 
     private LocalDateTime lastLoginAt;
 
+    // ── Passkey (informational only — auth truth lives in Keycloak) ──
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean passkeyRegistered = false;
+
+    private LocalDateTime passkeyRegisteredAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

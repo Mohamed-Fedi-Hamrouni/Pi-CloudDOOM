@@ -41,6 +41,8 @@ public interface UserMapper {
     @Mapping(target = "profileVisible", ignore = true)
     @Mapping(target = "experiencesJson", ignore = true)
     @Mapping(target = "educationsJson", ignore = true)
+    @Mapping(target = "passkeyRegistered", ignore = true)
+    @Mapping(target = "passkeyRegisteredAt", ignore = true)
     User toEntity(CreateUserRequest request);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
@@ -62,6 +64,8 @@ public interface UserMapper {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deletedAt", ignore = true)
     @Mapping(target = "skillsJson", ignore = true)
-@Mapping(target = "cvUrl", ignore = true)
+    @Mapping(target = "cvUrl", ignore = true)
+    @Mapping(target = "passkeyRegistered", ignore = true)
+    @Mapping(target = "passkeyRegisteredAt", ignore = true)
     void updateEntity(UpdateUserRequest request, @MappingTarget User user);
 }

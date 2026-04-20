@@ -44,4 +44,8 @@ public class UserResponse {
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // ── Passkey (informational only — auth truth lives in Keycloak) ──
+    private Boolean passkeyRegistered;
+    private LocalDateTime passkeyRegisteredAt;
 }

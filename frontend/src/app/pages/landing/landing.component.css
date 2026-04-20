@@ -1175,3 +1175,44 @@
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ── Add these styles to landing.component.css ── */
+
+.passkey-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    width: 100%;
+}
+.passkey-divider::before,
+.passkey-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+.btn-passkey {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    border: 1.5px solid #0d9488;
+    border-radius: 8px;
+    background: white;
+    color: #0d9488;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        box-shadow 0.2s;
+    width: 100%;
+    font-family: inherit;
+}
+.btn-passkey:hover {
+    background: #f0fdfa;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
