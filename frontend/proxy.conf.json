@@ -1,0 +1,9 @@
+{
+  "/kokoro": {
+    "target": "http://127.0.0.1:8880",
+    "secure": false,
+    "pathRewrite": { "^/kokoro": "" },
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

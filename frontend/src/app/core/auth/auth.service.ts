@@ -62,9 +62,20 @@ export class AuthService {
     }
 
     getToken(): Promise<string> {
-        return this.keycloak.updateToken(30).then(() => {
-            return this.keycloak.token || "";
-        });
+        const currentToken = this.keycloak.token || "";
+
+        const refreshPromise = this.keycloak
+            .updateToken(30)
+            .then(() => this.keycloak.token || "")
+            .catch(() => currentToken); // refresh failed — use the existing token
+
+        // If updateToken hangs (Keycloak session uncertain), resolve after 4 s
+        // with whatever token we have rather than blocking the request forever.
+        const timeoutPromise = new Promise<string>((resolve) =>
+            setTimeout(() => resolve(currentToken), 4000),
+        );
+
+        return Promise.race([refreshPromise, timeoutPromise]);
     }
 
     getTokenParsed(): any {

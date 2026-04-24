@@ -22,7 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity          // enables @PreAuthorize on controller methods
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -35,9 +35,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+
+                // ── Live voice / TTS public endpoints ─────────────────────
                 .requestMatchers(HttpMethod.POST, "/api/live-voice/speak").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/live-voice/available").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/api/live-voice/**").permitAll()
+
+                // ── D-ID Avatar public test endpoint ──────────────────────
+                .requestMatchers(HttpMethod.POST, "/api/avatar/talk").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/avatar/**").permitAll()
+
                 // ── Questions ─────────────────────────────────────────────
                 .requestMatchers(HttpMethod.GET,    "/api/questions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.POST,   "/api/questions/**").hasRole("ADMIN")
@@ -46,23 +53,23 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH,  "/api/questions/**").hasRole("ADMIN")
 
                 // ── Admin-only interview + progress routes ────────────────
-                // These come BEFORE the broader /api/interview-sessions/** rule
-                // so that Spring picks the more specific match first.
                 .requestMatchers("/api/interview-sessions/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/progress/admin/**").hasRole("ADMIN")
 
-                // ── Interview sessions (authenticated users) ──────────────
+                // ── Interview sessions ────────────────────────────────────
                 .requestMatchers(HttpMethod.POST,   "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.GET,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.PUT,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.PATCH,  "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-                // DELETE on own session — ownership enforced in service layer
                 .requestMatchers(HttpMethod.DELETE, "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
 
-                // ── Progress (own) ────────────────────────────────────────
+                // ── Progress ──────────────────────────────────────────────
                 .requestMatchers("/api/progress/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+
+                // ── Live interviews ───────────────────────────────────────
                 .requestMatchers(HttpMethod.POST, "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.GET,  "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 ->

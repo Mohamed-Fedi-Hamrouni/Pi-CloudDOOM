@@ -69,7 +69,15 @@ app:
       # Any faster-whisper-compatible Hugging Face model ID.
       # small=460 MB, base=140 MB, medium=1.5 GB.  small is the sweet spot.
       model: ${WHISPER_MODEL:Systran/faster-whisper-small}
-
+  did:
+    enabled: false
+  simli:
+    enabled: true
+    api-url: https://api.simli.ai
+    api-key: ${SIMLI_API_KEY:137oepkxxr7ofk6mi69alo}
+    face-id: ${SIMLI_FACE_ID:cace3ef7-a4c4-425d-a8cf-a5358eb0c427}
+    tts-provider: ElevenLabs
+    tts-voice-id: ${SIMLI_TTS_VOICE_ID:21m00Tcm4TlvDq8ikWAM}
 logging:
   level:
     org.springframework.security: INFO

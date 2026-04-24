@@ -11,6 +11,13 @@ export const routes: Routes = [
       ),
   },
   {
+  path: "quick-interview/:sessionId",
+  loadComponent: () =>
+    import("./pages/quick-interview/quick-interview.component").then(
+      (m) => m.QuickInterviewComponent,
+    ),
+},
+  {
     path: "",
     loadComponent: () =>
       import("./layout/shell/shell.component").then((m) => m.ShellComponent),

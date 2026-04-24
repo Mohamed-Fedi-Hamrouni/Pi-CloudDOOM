@@ -16,6 +16,8 @@ export interface AgentSpeakOptions {
   preferRemote?: boolean;
   /** Defaults to true — always fall back to browser TTS when remote fails. */
   allowBrowserFallback?: boolean;
+  /** Called with normalized volume [0–1] on each audio frame during remote TTS playback. */
+  onVolume?: (v: number) => void;
 }
 
 @Injectable({ providedIn: "root" })
@@ -25,6 +27,10 @@ export class AgentTtsService {
   private readonly base = environment.interviewApiUrl;
 
   private remoteAvailable: boolean | null = null;
+
+  private activeAudioCtx: AudioContext | null = null;
+  private activeRafId: number | null = null;
+  private activeStopResolve: (() => void) | null = null;
 
   private async checkRemoteAvailable(): Promise<boolean> {
     if (this.remoteAvailable !== null) return this.remoteAvailable;
@@ -80,7 +86,7 @@ export class AgentTtsService {
           blob.size,
           blob.type || "unknown",
         );
-        await this.playBlob(blob);
+        await this.playBlob(blob, options.onVolume);
         return;
       } catch (error: any) {
         const status: number = error?.status ?? 0;
@@ -104,11 +110,57 @@ export class AgentTtsService {
 
   stop(): void {
     this.browserTts.stop();
+    if (this.activeRafId !== null) cancelAnimationFrame(this.activeRafId);
+    this.activeAudioCtx?.close().catch(() => {});
+    this.activeStopResolve?.();
+    this.activeRafId = null;
+    this.activeAudioCtx = null;
+    this.activeStopResolve = null;
   }
 
-  private async playBlob(blob: Blob): Promise<void> {
+  private async playBlob(blob: Blob, onVolume?: (v: number) => void): Promise<void> {
     if (!blob || blob.size === 0) {
       throw new Error("Empty audio blob returned from remote TTS");
+    }
+
+    if (onVolume) {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new AudioContext();
+      this.activeAudioCtx = audioCtx;
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+
+      const tick = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        onVolume(Math.min(avg / 80, 1.0));
+        this.activeRafId = requestAnimationFrame(tick);
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        this.activeStopResolve = resolve;
+        source.onended = () => {
+          cancelAnimationFrame(this.activeRafId!);
+          onVolume(0);
+          audioCtx.close();
+          this.activeRafId = null;
+          this.activeAudioCtx = null;
+          this.activeStopResolve = null;
+          resolve();
+        };
+        source.addEventListener('error', () => reject(new Error("Audio playback failed")));
+        source.start();
+        tick();
+      });
+      return;
     }
 
     const objectUrl = URL.createObjectURL(blob);

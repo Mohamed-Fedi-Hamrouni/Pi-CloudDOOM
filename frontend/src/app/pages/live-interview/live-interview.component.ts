@@ -15,12 +15,15 @@ import { LiveInterviewApiService } from "../../core/services/live-interview-api.
 import { AudioPcmService } from "../../core/services/audio-pcm.service";
 import { FaceMetricsService } from "../../core/services/face-metrics.service";
 import { AgentTtsService } from "../../core/services/agent-tts.service";
-
+import { KokoroTtsService } from "../../core/services/kokoro-tts.service";
 import {
   LiveActionResponse,
   LiveStartResponse,
 } from "../../core/models/live-interview.models";
 import { Question } from "../../core/models/interview.models";
+import { environment } from "../../../environments/environment";
+import { SimliAvatarComponent } from "./simli-avatar/simli-avatar.component";
+import { SimliRecruiterAudioService } from "../../core/services/simli-recruiter-audio.service";
 
 type LivePhase =
   | "ready"
@@ -37,7 +40,7 @@ type LivePhase =
 @Component({
   selector: "app-live-interview",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, SimliAvatarComponent],
   template: `
     <div class="page">
       <div class="header">
@@ -54,9 +57,23 @@ type LivePhase =
 
       <div class="layout">
         <div class="left card">
-          <video #video autoplay muted playsinline class="video"></video>
-          <div class="small">
-            Camera is used only for local face metrics extraction.
+          <div class="video-call">
+            <div class="video-tile">
+              <div class="video-label">AI Recruiter</div>
+              <div class="avatar-wrapper">
+                <app-simli-avatar #simliAvatar></app-simli-avatar>
+              </div>
+            </div>
+            <div class="video-tile">
+              <div class="video-label">You</div>
+              <video
+                #video
+                autoplay
+                muted
+                playsinline
+                class="user-camera"
+              ></video>
+            </div>
           </div>
         </div>
 
@@ -264,7 +281,7 @@ type LivePhase =
       }
       .layout {
         display: grid;
-        grid-template-columns: 360px 1fr;
+        grid-template-columns: 580px 1fr;
         gap: 16px;
       }
       .card {
@@ -273,12 +290,42 @@ type LivePhase =
         border-radius: 16px;
         padding: 16px;
       }
-      .video {
-        width: 100%;
+      .video-call {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        height: 420px;
+      }
+      .video-tile {
+        position: relative;
         border-radius: 12px;
-        background: #111827;
-        min-height: 260px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #1e1b4b 0%, #0f172a 100%);
+      }
+      .avatar-wrapper {
+        width: 100%;
+        height: 100%;
+      }
+      .video-tile app-simli-avatar,
+      .avatar-wrapper,
+      .video-tile .user-camera {
+        width: 100%;
+        height: 100%;
         object-fit: cover;
+        display: block;
+      }
+      .video-label {
+        position: absolute;
+        bottom: 10px;
+        left: 12px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+        backdrop-filter: blur(4px);
       }
       .top-row {
         display: flex;
@@ -478,6 +525,7 @@ type LivePhase =
 })
 export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
   @ViewChild("video") videoRef!: ElementRef<HTMLVideoElement>;
+  @ViewChild("simliAvatar") simliAvatar?: SimliAvatarComponent;
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -485,6 +533,8 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
   private audio = inject(AudioPcmService);
   private face = inject(FaceMetricsService);
   private tts = inject(AgentTtsService);
+  private kokoro = inject(KokoroTtsService);
+  private simliAudio = inject(SimliRecruiterAudioService);
   private cdr = inject(ChangeDetectorRef);
 
   sessionId = Number(this.route.snapshot.paramMap.get("sessionId"));
@@ -503,9 +553,7 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
   currentQuestion: Question | null = null;
   agentMessage = "";
   isSelfIntroPhase = false;
-  /** Mirrors useNeuralTts from the LiveStartResponse. False = skip remote TTS entirely. */
-  useNeuralTts = false;
-
+  useSimliAvatar = environment.simli?.enabled ?? true;
   lastTranscript = "";
   lastFeedback = "";
   lastMetrics: LiveActionResponse | null = null;
@@ -525,6 +573,8 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.simliAvatar?.disconnect();
+    this.kokoro.stop();
     this.tts.stop();
     this.audio.stopMedia();
     this.cameraStream?.getTracks().forEach((t) => t.stop());
@@ -559,7 +609,7 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
   }
 
   async startInterview() {
-    if (this.busy) return; // guard against double-click before Angular disables the button
+    if (this.busy) return;
     this.busy = true;
     this.error = "";
     this.cdr.detectChanges();
@@ -606,7 +656,6 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
       backendPhase === "INTRO" ||
       !res.currentQuestion;
 
-    this.useNeuralTts = res.useNeuralTts ?? false;
     this.agentMessage = greeting;
     this.busy = false;
     this.cdr.detectChanges();
@@ -616,10 +665,6 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // The backend's greeting/agentMessage already includes a natural bridge
-    // to the first question. Speaking `currentQuestion.text` on top of it
-    // produced a duplicate ("...so tell me about X. Tell me about X.").
-    // Prefer the agent's composed message; fall back to raw question text.
     await this.speakAgent(
       greeting || this.currentQuestion?.text || "",
       "WAITING_ANSWER",
@@ -724,9 +769,6 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
         (res.nextQuestion ? "WAITING_ANSWER" : "SELF_INTRO_CAPTURE");
 
       const nextUiPhase = this.resolveUiPhase(backendPhase);
-      // Speak the backend's composed recruiter message only.  It already
-      // contains a natural bridge to the next question — concatenating the
-      // raw question text afterwards produced an audible duplicate.
       const nextSpeech = (
         res.agentMessage ??
         res.nextQuestion?.text ??
@@ -768,6 +810,8 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
 
   async endInterview() {
     this.busy = true;
+    await this.simliAvatar?.disconnect();
+    this.kokoro.stop();
     this.tts.stop();
 
     try {
@@ -820,23 +864,29 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
 
     this.phase = speakingPhase;
     this.agentSpeaking = true;
+    this.error = "";
     this.cdr.detectChanges();
 
     try {
-      console.log("[LiveInterview] speaking via remote TTS:", cleanText);
+      if (!this.useSimliAvatar) {
+        throw new Error(
+          "Simli avatar is disabled in environment configuration.",
+        );
+      }
 
-      await this.tts.speak(cleanText, {
-        // Only attempt remote TTS when the backend confirmed it is configured.
-        preferRemote: this.useNeuralTts,
-        allowBrowserFallback: true,
-        lang: "en-US",
-        // No voice override — let the backend use its configured voice.
-      });
-    } catch (error: any) {
-      const readable = await this.readTtsError(error);
-      console.error("[LiveInterview] Remote TTS failed:", readable, error);
+      if (!this.simliAvatar) {
+        throw new Error("Simli avatar component is not ready.");
+      }
 
-      this.error = `AI voice unavailable: ${readable}`;
+      const speechBlob = await this.simliAudio.createSpeechBlob(cleanText);
+      await this.simliAvatar.speakFromAudioBlob(speechBlob);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      console.error("[LiveInterview] Simli avatar speech failed:", err);
+
+      this.error =
+        error?.message ??
+        "AI recruiter avatar failed. Please check Simli configuration.";
     } finally {
       this.agentSpeaking = false;
 
@@ -845,27 +895,6 @@ export class LiveInterviewComponent implements AfterViewInit, OnDestroy {
       }
 
       this.cdr.detectChanges();
-    }
-  }
-
-  private async readTtsError(error: any): Promise<string> {
-    try {
-      if (error?.error instanceof Blob) {
-        const text = await error.error.text();
-
-        if (text) {
-          try {
-            const json = JSON.parse(text);
-            return json?.message ?? text;
-          } catch {
-            return text;
-          }
-        }
-      }
-
-      return error?.error?.message ?? error?.message ?? "Remote TTS failed";
-    } catch {
-      return error?.message ?? "Remote TTS failed";
     }
   }
 

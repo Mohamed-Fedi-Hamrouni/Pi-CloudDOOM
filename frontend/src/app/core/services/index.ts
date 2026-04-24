@@ -1,4 +1,5 @@
 export * from "./user-api.service";
+export * from "./kokoro-tts.service";
 export * from "./current-user-store.service";
 export * from "./browser-tts.service";
 export * from "./agent-tts.service";

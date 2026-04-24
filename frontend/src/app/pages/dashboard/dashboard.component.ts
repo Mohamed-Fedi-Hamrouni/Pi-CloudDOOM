@@ -13,7 +13,6 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { StatCardComponent } from "../../shared/components/stat-card/stat-card.component";
 import { SectionHeaderComponent } from "../../shared/components/section-header/section-header.component";
 import { BadgeCardComponent } from "../../shared/components/badge-card/badge-card.component";
-import { ActivityItemComponent } from "../../shared/components/activity-item/activity-item.component";
 import { ChartPlaceholderComponent } from "../../shared/components/chart-placeholder/chart-placeholder.component";
 
 import { MOCK_BADGES } from "../../core/data/mock-data";
@@ -21,7 +20,7 @@ import { AuthService } from "../../core/auth/auth.service";
 import { AdminDashboardComponent } from "../admin/admin-dashboard.component";
 import { CurrentUserStoreService } from "../../core/services/current-user-store.service";
 import { UserProfile } from "../../core/services/user-api.service";
-
+import { ActivityItemComponent } from "./activity-item.component";
 @Component({
     selector: "app-dashboard",
     standalone: true,
@@ -32,9 +31,9 @@ import { UserProfile } from "../../core/services/user-api.service";
         StatCardComponent,
         SectionHeaderComponent,
         BadgeCardComponent,
-        ActivityItemComponent,
         ChartPlaceholderComponent,
         AdminDashboardComponent,
+        ActivityItemComponent,
     ],
     templateUrl: "./dashboard.component.html",
     styleUrls: ["./dashboard.component.css"],
