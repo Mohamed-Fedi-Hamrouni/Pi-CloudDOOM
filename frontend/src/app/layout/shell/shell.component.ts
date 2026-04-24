@@ -12,6 +12,8 @@ import { CommonModule } from "@angular/common";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { CurrentUserStoreService } from "../../core/services/current-user-store.service";
 import { UserProfile } from "../../core/services/user-api.service";
+import { Observable, asyncScheduler } from "rxjs";
+import { observeOn, shareReplay } from "rxjs/operators";
 
 @Component({
     selector: "app-shell",
@@ -21,14 +23,14 @@ import { UserProfile } from "../../core/services/user-api.service";
         <div class="shell" [class.sidebar-collapsed]="sidebarCollapsed()">
             <app-sidebar
                 [collapsed]="sidebarCollapsed()"
-                [currentUser]="currentUser"
+                [currentUser]="currentUser$ | async"
                 (toggleSidebar)="toggleSidebar()"
             ></app-sidebar>
 
             <div class="shell-content">
                 <app-topbar
                     [sidebarCollapsed]="sidebarCollapsed()"
-                    [currentUser]="currentUser"
+                    [currentUser]="currentUser$ | async"
                     (toggleSidebar)="toggleSidebar()"
                 ></app-topbar>
 
@@ -103,15 +105,18 @@ export class ShellComponent implements OnInit {
     private currentUserStore = inject(CurrentUserStoreService);
     private destroyRef = inject(DestroyRef);
 
-    currentUser: UserProfile | null = null;
+    readonly currentUser$: Observable<UserProfile | null>;
+
+    constructor() {
+        // Schedule emissions to avoid ExpressionChangedAfterItHasBeenCheckedError
+        // when Keycloak/fetch-based HTTP resolves very quickly during initial render.
+        this.currentUser$ = this.currentUserStore.currentUser$.pipe(
+            observeOn(asyncScheduler),
+            shareReplay({ bufferSize: 1, refCount: true }),
+        );
+    }
 
     ngOnInit(): void {
-        this.currentUserStore.currentUser$
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((user) => {
-                this.currentUser = user;
-            });
-
         this.currentUserStore
             .loadCurrentUser()
             .pipe(takeUntilDestroyed(this.destroyRef))
