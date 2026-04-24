@@ -1,16 +1,36 @@
 import pickle
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 class PathPredictor:
     def __init__(self, model_path="model.pkl"):
+        self._ensure_model_exists(model_path)
         with open(model_path, "rb") as f:
             data = pickle.load(f)
-            self.encoder = data["encoder"]
-            self.model_rank = data["model_rank"]
-            self.model_lessons = data["model_lessons"]
-            self.model_xp = data["model_xp"]
-            self.categories = data["categories"]
+
+        self.encoder = data["encoder"]
+        self.model_rank = data["model_rank"]
+        self.model_lessons = data["model_lessons"]
+        self.model_xp = data["model_xp"]
+        self.categories = data["categories"]
+
+    def _ensure_model_exists(self, model_path: str) -> None:
+        if Path(model_path).exists():
+            return
+
+        try:
+            from dataset_generator import generate_user_data
+            from train import train_model
+
+            if not Path("training_data.csv").exists():
+                generate_user_data()
+            train_model()
+        except Exception as exc:
+            raise RuntimeError(
+                f"AI Training Path model file '{model_path}' is missing and auto-training failed. "
+                "Run dataset_generator.py and train.py to generate model.pkl."
+            ) from exc
 
     def category_title(self, category):
         mapping = {
