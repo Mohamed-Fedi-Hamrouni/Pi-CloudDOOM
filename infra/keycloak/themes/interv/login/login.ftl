@@ -57,6 +57,20 @@
 
         </form>
 
+        <#-- ── Passkey: submit tryAnotherWay to trigger WebAuthn Passwordless execution ── -->
+        <div class="passkey-divider">or</div>
+        <div class="passkey-section">
+            <form id="kc-select-webauthn-form" action="${url.loginAction}" method="post">
+                <input type="hidden" name="tryAnotherWay" value="on"/>
+                <button type="submit" class="btn-passkey">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                    Sign in with Passkey
+                </button>
+            </form>
+        </div>
+
         <#if social?? && social.providers?has_content>
             <div class="social-divider">or continue with</div>
             <div class="social-buttons">
@@ -89,5 +103,50 @@
                 </#list>
             </div>
         </#if>
+
+        <style>
+            .passkey-divider {
+                text-align: center;
+                color: #94a3b8;
+                font-size: 0.85rem;
+                margin: 16px 0;
+                position: relative;
+            }
+            .passkey-divider::before,
+            .passkey-divider::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                width: 44%;
+                height: 1px;
+                background: #e2e8f0;
+            }
+            .passkey-divider::before { left: 0; }
+            .passkey-divider::after { right: 0; }
+
+            .passkey-section form { margin: 0; }
+
+            .btn-passkey {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 11px 16px;
+                border: 1.5px solid #0d9488;
+                border-radius: 10px;
+                background: white;
+                color: #0d9488;
+                font-size: 0.95rem;
+                font-weight: 500;
+                cursor: pointer;
+                text-decoration: none;
+                transition: background 0.2s, color 0.2s;
+                box-sizing: border-box;
+            }
+            .btn-passkey:hover {
+                background: #f0fdfa;
+            }
+        </style>
     </#if>
 </@layout.registrationLayout>

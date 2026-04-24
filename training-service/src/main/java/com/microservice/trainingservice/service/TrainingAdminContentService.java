@@ -1,9 +1,12 @@
 package com.microservice.trainingservice.service;
 
+import com.microservice.trainingservice.ai.AiMissingLessonGenerationService;
 import com.microservice.trainingservice.dto.BadgeResponse;
 import com.microservice.trainingservice.dto.BadgeUpsertRequest;
 import com.microservice.trainingservice.dto.DailyActivityResponse;
 import com.microservice.trainingservice.dto.DailyActivityUpsertRequest;
+import com.microservice.trainingservice.dto.GenerateMissingLessonsRequest;
+import com.microservice.trainingservice.dto.GenerateMissingLessonsResponse;
 import com.microservice.trainingservice.dto.TrainingModuleResponse;
 import com.microservice.trainingservice.dto.TrainingModuleUpsertRequest;
 import com.microservice.trainingservice.dto.TrainingPathResponse;
@@ -53,6 +56,7 @@ public class TrainingAdminContentService {
     private final UserXPTrackerRepository userXPTrackerRepository;
     private final DailyActivityRepository dailyActivityRepository;
     private final TrainingMapper trainingMapper;
+    private final AiMissingLessonGenerationService aiMissingLessonGenerationService;
 
     @Transactional(readOnly = true)
     public List<TrainingLessonResponse> getAllLessons(Boolean active) {
@@ -87,6 +91,10 @@ public class TrainingAdminContentService {
             .orElseThrow(() -> new ResourceNotFoundException("Training lesson not found: " + id));
         lesson.setActive(false);
         trainingLessonRepository.save(lesson);
+    }
+
+    public GenerateMissingLessonsResponse generateMissingDraftLessons(GenerateMissingLessonsRequest request) {
+        return aiMissingLessonGenerationService.generateMissingDraftLessons(request);
     }
 
     @Transactional(readOnly = true)

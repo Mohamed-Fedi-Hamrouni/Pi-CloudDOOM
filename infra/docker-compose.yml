@@ -144,9 +144,11 @@ services:
             KC_HOSTNAME_STRICT: "false"
             KC_HOSTNAME_STRICT_HTTPS: "false"
             KC_HTTP_ENABLED: "true"
-            KC_HOSTNAME: "localhost"
-            KC_HOSTNAME_PORT: "8080"
             KC_FRONTEND_URL: "http://localhost:8080"
+            KC_THEME_CACHE: "false"
+            KC_TEMPLATE_CACHE: "false"
+            KC_PROXY: edge
+            KC_HOSTNAME_URL: "http://localhost:8080"
         volumes:
             - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
             - ./keycloak/themes/interv:/opt/keycloak/themes/interv
@@ -163,6 +165,29 @@ services:
             timeout: 15s
             retries: 10
             start_period: 90s
+
+    ollama:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama
+        restart: unless-stopped
+        volumes:
+            - ollamadata:/root/.ollama
+        healthcheck:
+            test: ["CMD", "ollama", "list"]
+            interval: 30s
+            timeout: 10s
+            retries: 10
+            start_period: 20s
+
+    ollama-init:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama-init
+        depends_on:
+            ollama:
+                condition: service_started
+        entrypoint: ["/bin/sh", "-c"]
+        command: >
+            "sleep 5 && OLLAMA_HOST=http://ollama:11434 ollama pull llama3.2:3b"
 
     user-service:
         build:
@@ -181,6 +206,8 @@ services:
                 condition: service_started
         ports:
             - "${USER_SERVICE_PORT:-8081}:8081"
+        volumes:
+            - uploadsdata:/app/uploads
         environment:
             SERVER_PORT: 8081
             SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
@@ -196,10 +223,14 @@ services:
             KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
+            APP_OLLAMA_BASE_URL: http://ollama:11434
+            APP_OLLAMA_MODEL: llama3.2:3b
+            APP_OLLAMA_TIMEOUT_SECONDS: 300
 
             # AI (Google AI Studio / Gemini) — set these in your shell or an uncommitted infra/.env file
             GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
             GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-flash-latest}
+            GOOGLE_AI_FALLBACK_MODELS: ${GOOGLE_AI_FALLBACK_MODELS:-gemini-flash-lite-latest}
             GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
             GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
             GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
@@ -274,6 +305,21 @@ services:
             KEYCLOAK_CLIENT_ID: training-service
             KEYCLOAK_CLIENT_SECRET: training-service-secret-change-in-prod
             TRAINING_DEBUG_BADGE_SIMULATION_ENABLED: "true"
+            AI_MODEL_URL: http://ai-training-path:8000/predict-path
+
+            # AI (Ollama) — drafts + reranking in training-service
+            APP_OLLAMA_BASE_URL: http://ollama:11434
+            APP_OLLAMA_MODEL: llama3.2:3b
+            APP_OLLAMA_TIMEOUT_SECONDS: 300
+
+    ai-training-path:
+        build:
+            context: ../ai-training-path
+            dockerfile: Dockerfile
+        container_name: userservice-ai-training-path
+        restart: unless-stopped
+        ports:
+            - "8000:8000"
 
     mentorship-service:
         build:
@@ -321,6 +367,8 @@ volumes:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    ollamadata:
+    uploadsdata:
 
 networks:
     default:

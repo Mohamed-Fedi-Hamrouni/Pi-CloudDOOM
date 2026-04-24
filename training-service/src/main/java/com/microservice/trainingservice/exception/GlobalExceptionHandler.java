@@ -1,11 +1,15 @@
 package com.microservice.trainingservice.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
@@ -14,6 +18,20 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+
+        String reason = ex.getReason();
+        log.warn("{} {} -> {} {}", request.getMethod(), request.getRequestURI(), status.value(), reason, ex);
+        return buildResponse(status, reason != null ? reason : status.getReasonPhrase());
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
@@ -46,7 +64,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
+    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex, HttpServletRequest request) {
         Throwable root = ex;
         while (root.getCause() != null && root.getCause() != root) {
             root = root.getCause();
@@ -55,6 +73,8 @@ public class GlobalExceptionHandler {
         if (root instanceof NoResourceFoundException) {
             return buildResponse(HttpStatus.NOT_FOUND, root.getMessage());
         }
+
+        log.error("{} {} -> 500 {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
 
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
             "An unexpected error occurred: " + ex.getMessage());

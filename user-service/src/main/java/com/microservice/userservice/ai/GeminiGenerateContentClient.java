@@ -1,5 +1,6 @@
 package com.microservice.userservice.ai;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -7,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,38 +36,90 @@ public class GeminiGenerateContentClient {
                 contents,
                 new GenerationConfig(props.getTemperature(), props.getMaxOutputTokens()));
 
-        GenerateContentResponse response;
-        try {
-            response = restClient
-                .post()
-                .uri("/v1beta/models/{model}:generateContent", props.getModel())
-                .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .header("X-goog-api-key", props.getApiKey())
-                .body(request)
-                .retrieve()
-                .body(GenerateContentResponse.class);
-        } catch (RestClientResponseException ex) {
-            int status = ex.getStatusCode().value();
-            String body = ex.getResponseBodyAsString();
-
-            if (status == 400 && body != null && body.contains("API_KEY_INVALID")) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_GATEWAY,
-                "Gemini rejected the API key (API_KEY_INVALID). Verify GOOGLE_AI_API_KEY in infra/.env is the full key (usually starts with 'AIza' and is much longer than 10 chars). " +
-                "If it is full, check key restrictions / enabled APIs in Google AI Studio / Google Cloud.");
+        List<String> modelsToTry = new ArrayList<>();
+        modelsToTry.add(props.getModel());
+        if (props.getFallbackModels() != null) {
+            for (String m : props.getFallbackModels()) {
+                if (!StringUtils.hasText(m)) continue;
+                if (m.equals(props.getModel())) continue;
+                modelsToTry.add(m);
             }
+        }
 
-            if (status == 429) {
-            throw new ResponseStatusException(
-                HttpStatus.TOO_MANY_REQUESTS,
-                "Gemini rate-limited the request (429). Try again later.");
+        GenerateContentResponse response = null;
+        Exception lastException = null;
+
+        for (int i = 0; i < modelsToTry.size(); i++) {
+            String model = modelsToTry.get(i);
+            boolean hasAnotherModel = (i + 1) < modelsToTry.size();
+            try {
+                response = restClient
+                    .post()
+                    .uri("/v1beta/models/{model}:generateContent", model)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .header("X-goog-api-key", props.getApiKey())
+                    .body(request)
+                    .retrieve()
+                    .body(GenerateContentResponse.class);
+                break;
+            } catch (RestClientResponseException ex) {
+                lastException = ex;
+                int status = ex.getStatusCode().value();
+                String body = ex.getResponseBodyAsString();
+
+                if (status == 400 && body != null && body.contains("API_KEY_INVALID")) {
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Gemini rejected the API key (API_KEY_INVALID). Verify GOOGLE_AI_API_KEY in infra/.env is the full key (usually starts with 'AIza' and is much longer than 10 chars). " +
+                            "If it is full, check key restrictions / enabled APIs in Google AI Studio / Google Cloud.");
+                }
+
+                if (status == 429) {
+                    if (hasAnotherModel) {
+                        continue;
+                    }
+                    boolean quotaExceeded = body != null && body.contains("exceeded your current quota");
+                    throw new ResponseStatusException(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        quotaExceeded
+                            ? "Gemini quota exceeded (429). Check plan/billing or switch to a lighter model (e.g. gemini-flash-lite-latest)."
+                            : "Gemini rate-limited the request (429). Try again later.");
+                }
+
+                boolean modelUnavailable = (status == 404) || (status >= 500 && status <= 599);
+                if (modelUnavailable && hasAnotherModel) {
+                    continue;
+                }
+
+                if (status >= 500 && status <= 599) {
+                    throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Gemini is temporarily unavailable (provider HTTP " + status + "). Try again later.",
+                        ex);
+                }
+
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Gemini request failed (provider HTTP " + status + ")",
+                    ex);
+            } catch (ResourceAccessException ex) {
+                lastException = ex;
+                if (hasAnotherModel) {
+                    continue;
+                }
+                throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Gemini request timed out or could not be reached. Try again later.",
+                    ex);
             }
+        }
 
+        if (response == null) {
             throw new ResponseStatusException(
-                HttpStatus.BAD_GATEWAY,
-                "Gemini request failed (provider HTTP " + status + ")",
-                ex);
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Gemini request failed. Try again later.",
+                lastException);
         }
 
         if (response == null || response.candidates == null || response.candidates.isEmpty()) {

@@ -16,6 +16,11 @@ public interface TrainingLessonRepository extends JpaRepository<TrainingLesson, 
         "where l.active = true and l.category = :category order by l.id asc")
     List<TrainingLesson> findActiveByCategoryWithTags(@Param("category") TrainingCategory category);
 
+    @Query("select l.title from TrainingLesson l where l.category = :category and l.language = :language")
+    List<String> findTitlesByCategoryAndLanguage(@Param("category") TrainingCategory category, @Param("language") String language);
+
+    long countByActiveTrueAndCategoryAndLanguage(TrainingCategory category, String language);
+
     List<TrainingLesson> findByActiveTrueAndCategoryOrderByIdAsc(TrainingCategory category);
 
     List<TrainingLesson> findByActiveTrueOrderByIdAsc();

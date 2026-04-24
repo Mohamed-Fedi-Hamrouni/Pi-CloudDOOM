@@ -24,6 +24,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
@@ -92,6 +93,12 @@ public class UserController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
         return ResponseEntity.ok(userService.findAll(pageable));
+    }
+
+    @GetMapping("/identities")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Page<UserIdentityResponse>> getAllUserIdentities(Pageable pageable) {
+        return ResponseEntity.ok(userService.findAllIdentities(pageable));
     }
 
     @GetMapping("/search")

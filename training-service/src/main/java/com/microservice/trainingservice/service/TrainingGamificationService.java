@@ -19,6 +19,7 @@ import com.microservice.trainingservice.event.TrainingPathUpdatedEvent;
 import com.microservice.trainingservice.event.UserBadgeEarnedEvent;
 import com.microservice.trainingservice.exception.BusinessException;
 import com.microservice.trainingservice.exception.ResourceNotFoundException;
+import com.microservice.trainingservice.ai.AiLessonReranker;
 import com.microservice.trainingservice.mapper.TrainingMapper;
 import com.microservice.trainingservice.model.Badge;
 import com.microservice.trainingservice.model.DailyActivity;
@@ -88,6 +89,7 @@ public class TrainingGamificationService {
 	private final TrainingMapper trainingMapper;
 	private final TrainingEventPublisher eventPublisher;
 	private final TrainingPersonalizationRuleEngine personalizationRuleEngine;
+	private final AiLessonReranker aiLessonReranker;
 
 	@Transactional(readOnly = true)
 	public com.microservice.trainingservice.dto.TrainingPreferencesResponse getPreferencesForUser(String userId) {
@@ -126,6 +128,17 @@ public class TrainingGamificationService {
 			.totalSessionsCompleted(signal.getTotalSessionsCompleted())
 			.generatedAt(signal.getEventGeneratedAt())
 			.build();
+
+		AiLessonReranker.UserContext userCtx = new AiLessonReranker.UserContext(
+			preferences == null ? null : preferences.getGoal(),
+			preferences == null ? null : preferences.getTargetRole(),
+			preferences == null ? null : preferences.getSeniority(),
+			preferences == null ? null : preferences.getMinutesPerDay(),
+			pseudoEvent == null ? null : pseudoEvent.getGlobalScore(),
+			pseudoEvent == null ? null : pseudoEvent.getPreparationLevel(),
+			pseudoEvent == null ? null : pseudoEvent.getTotalSessionsCompleted(),
+			preferredLanguage
+		);
 
 		List<TrainingPersonalizationRuleEngine.PersonalizedModulePlan> basePlans = pseudoEvent == null
 			? personalizationRuleEngine.buildDefaultPlan()
@@ -190,7 +203,7 @@ public class TrainingGamificationService {
 					.status(status)
 					.unlockedAt(unlockedAt)
 					.build();
-				populateModuleLessonsIfMissing(newModule, plan.lessons(), preferences, usedLessonIds, preferredLanguage);
+				populateModuleLessonsIfMissing(newModule, plan.lessons(), preferences, usedLessonIds, preferredLanguage, userCtx);
 				path.addModule(newModule);
 				continue;
 			}
@@ -200,7 +213,7 @@ public class TrainingGamificationService {
 				module.setDescription(plan.description());
 				module.setXpReward(plan.xpReward());
 				// Keep existing snapshot to avoid DB constraint issues; only populate if missing.
-				populateModuleLessonsIfMissing(module, plan.lessons(), preferences, usedLessonIds, preferredLanguage);
+				populateModuleLessonsIfMissing(module, plan.lessons(), preferences, usedLessonIds, preferredLanguage, userCtx);
 				normalizeModuleLessonCounts(module);
 				module.updateProgress();
 				if (categoryToUnlock != null && categoryToUnlock == plan.category()) {
@@ -309,7 +322,7 @@ public class TrainingGamificationService {
 		if (desiredLessonCount <= 0 && module.getCompletedLessons() != null && module.getCompletedLessons() > 0) {
 			desiredLessonCount = module.getCompletedLessons();
 		}
-		populateModuleLessonsIfMissing(module, desiredLessonCount, null, null, resolvePreferredLanguage());
+		populateModuleLessonsIfMissing(module, desiredLessonCount, null, null, resolvePreferredLanguage(), null);
 		syncModuleLessonCompletionFromCounter(module);
 
 		normalizeModuleLessonCounts(module);
@@ -360,7 +373,8 @@ public class TrainingGamificationService {
 		int desiredCount,
 		TrainingPreferences preferences,
 		Set<Long> usedLessonIds,
-		String preferredLanguage
+		String preferredLanguage,
+		AiLessonReranker.UserContext userCtx
 	) {
 		if (module == null) {
 			return;
@@ -398,7 +412,8 @@ public class TrainingGamificationService {
 				desiredCount,
 				preferences,
 				preferredLanguage,
-				usedLessonIds
+				usedLessonIds,
+				userCtx
 			);
 			int count = selected.size();
 			for (int i = 0; i < count; i++) {
@@ -470,7 +485,8 @@ public class TrainingGamificationService {
 		int desiredCount,
 		TrainingPreferences preferences,
 		String preferredLanguage,
-		Set<Long> usedLessonIds
+		Set<Long> usedLessonIds,
+		AiLessonReranker.UserContext userCtx
 	) {
 		if (candidates == null || candidates.isEmpty() || desiredCount <= 0) {
 			return List.of();
@@ -502,10 +518,74 @@ public class TrainingGamificationService {
 			return Long.compare(aId, bId);
 		});
 
-		List<TrainingLesson> selected = scored.stream()
-			.limit(desiredCount)
-			.map(Scored::lesson)
-			.toList();
+		java.util.function.Function<List<Scored>, List<TrainingLesson>> pick = (ranked) -> {
+			if (ranked == null || ranked.isEmpty()) return List.of();
+			int cap = Math.min(ranked.size(), 20);
+			List<Scored> top = ranked.subList(0, cap);
+			java.util.Map<Long, TrainingLesson> byId = new java.util.HashMap<>();
+			List<Long> fallbackOrder = new ArrayList<>(cap);
+			java.util.Set<Long> fallbackSeen = new java.util.HashSet<>();
+			List<AiLessonReranker.CandidateLesson> aiCandidates = new ArrayList<>(cap);
+			for (Scored s : top) {
+				TrainingLesson l = s.lesson();
+				if (l == null || l.getId() == null) continue;
+				byId.put(l.getId(), l);
+				if (fallbackSeen.add(l.getId())) {
+					fallbackOrder.add(l.getId());
+				}
+				aiCandidates.add(new AiLessonReranker.CandidateLesson(
+					l.getId(),
+					l.getTitle(),
+					l.getSummary(),
+					l.getDifficulty() == null ? null : l.getDifficulty().name(),
+					l.getEstimatedMinutes(),
+					l.getTags() == null ? List.of() : new ArrayList<>(l.getTags())
+				));
+			}
+
+			List<Long> orderedIds;
+			try {
+				orderedIds = (userCtx == null || aiCandidates.isEmpty())
+					? fallbackOrder
+					: aiLessonReranker.rerank(category, desiredCount, userCtx, aiCandidates);
+			} catch (Exception ignored) {
+				orderedIds = fallbackOrder;
+			}
+
+			List<TrainingLesson> out = new ArrayList<>();
+			java.util.Set<Long> usedIds = new java.util.HashSet<>();
+			java.util.Set<String> usedTitles = new java.util.HashSet<>();
+			for (Long id : orderedIds) {
+				if (id == null) continue;
+				if (!usedIds.add(id)) continue;
+				TrainingLesson l = byId.get(id);
+				if (l == null) continue;
+				String nt = normalizeTitleKey(l.getTitle());
+				if (nt != null && !usedTitles.add(nt)) continue;
+				out.add(l);
+				if (out.size() >= desiredCount) break;
+			}
+
+			// If we still need more, fill from the heuristic order (includes items after the top cap).
+			if (out.size() < desiredCount) {
+				java.util.Set<Long> used = new java.util.HashSet<>(out.stream().map(TrainingLesson::getId).toList());
+				java.util.Set<String> usedT = new java.util.HashSet<>(out.stream().map(x -> normalizeTitleKey(x == null ? null : x.getTitle())).filter(java.util.Objects::nonNull).toList());
+				for (Scored s : ranked) {
+					TrainingLesson l = s.lesson();
+					if (l == null || l.getId() == null) continue;
+					if (used.contains(l.getId())) continue;
+					String nt = normalizeTitleKey(l.getTitle());
+					if (nt != null && usedT.contains(nt)) continue;
+					out.add(l);
+					usedT.add(nt);
+					if (out.size() >= desiredCount) break;
+				}
+			}
+
+			return out;
+		};
+
+		List<TrainingLesson> selected = pick.apply(scored);
 
 		// If we filtered everything out due to usedLessonIds, allow repeats as a fallback.
 		if (selected.size() < desiredCount && usedLessonIds != null && !usedLessonIds.isEmpty()) {
@@ -524,10 +604,7 @@ public class TrainingGamificationService {
 				if (bId == null) return -1;
 				return Long.compare(aId, bId);
 			});
-			selected = rescored.stream()
-				.limit(desiredCount)
-				.map(Scored::lesson)
-				.toList();
+			selected = pick.apply(rescored);
 		}
 
 		if (usedLessonIds != null) {
@@ -539,6 +616,15 @@ public class TrainingGamificationService {
 		}
 
 		return selected;
+	}
+
+	private String normalizeTitleKey(String title) {
+		if (title == null) return null;
+		String t = title.trim().toLowerCase(java.util.Locale.ROOT);
+		if (t.isBlank()) return null;
+		t = t.replaceAll("\\s+", " ");
+		if (t.length() > 200) t = t.substring(0, 200);
+		return t;
 	}
 
 	private Set<String> buildPreferenceTokens(TrainingPreferences preferences, TrainingCategory category) {
@@ -1192,6 +1278,16 @@ public class TrainingGamificationService {
 		TrainingPreferences preferences = trainingPreferencesRepository.findById(userId).orElse(null);
 		String preferredLanguage = resolvePreferredLanguage();
 		Set<Long> usedLessonIds = new HashSet<>();
+		AiLessonReranker.UserContext userCtx = new AiLessonReranker.UserContext(
+			preferences == null ? null : preferences.getGoal(),
+			preferences == null ? null : preferences.getTargetRole(),
+			preferences == null ? null : preferences.getSeniority(),
+			preferences == null ? null : preferences.getMinutesPerDay(),
+			null,
+			null,
+			null,
+			preferredLanguage
+		);
 
 		TrainingPath path = TrainingPath.builder()
 			.userId(userId)
@@ -1207,7 +1303,8 @@ public class TrainingGamificationService {
 			m.getLessons() == null ? 0 : m.getLessons(),
 			preferences,
 			usedLessonIds,
-			preferredLanguage
+			preferredLanguage,
+			userCtx
 		));
 
 		TrainingPath savedPath = trainingPathRepository.save(path);

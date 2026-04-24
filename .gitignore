@@ -44,3 +44,10 @@ coverage/
 # Postman (environments often include local credentials/tokens)
 *.postman_environment.json
 .mtj.tmp/
+
+# Python / ML
+venv/
+__pycache__/
+*.pyc
+*.pkl
+*.csv

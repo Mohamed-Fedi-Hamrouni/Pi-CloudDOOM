@@ -31,7 +31,6 @@ export class AuthService {
             return authenticated;
         } catch (error) {
             console.error("Keycloak init error:", error);
-
             this.initialized = true;
             return false;
         }
@@ -56,6 +55,30 @@ export class AuthService {
     logout(): void {
         this.keycloak.logout({
             redirectUri: window.location.origin,
+        });
+    }
+
+    // ── Passkey: trigger Keycloak's WebAuthn registration for logged-in user ──
+    registerPasskey(): void {
+        const accountUrl = `${environment.keycloak.url}/realms/${environment.keycloak.realm}/account`;
+        // Redirect to Keycloak account console → Security → Signing In
+        // where the user can register a passkey under "Passwordless"
+        window.location.href = accountUrl + "/#/security/signing-in";
+    }
+
+    // ── Passkey: trigger via Application Initiated Action (AIA) ──
+    registerPasskeyViaAIA(): void {
+        this.keycloak.login({
+            action: "webauthn-register-passwordless",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    // ── Passkey login entry point ──
+    loginWithPasskey(): void {
+        // Keycloak's browser-passkey flow handles routing to WebAuthn authenticator
+        this.keycloak.login({
+            redirectUri: window.location.origin + "/dashboard",
         });
     }
 
@@ -167,6 +190,13 @@ export class AuthService {
     getLastName(): string {
         return this.keycloak.tokenParsed?.["family_name"] || "";
     }
+
+    // ── Check if user authenticated via passkey (acr claim) ──
+    isPasskeyAuthenticated(): boolean {
+        const acr = this.keycloak.tokenParsed?.["acr"];
+        return acr === "webauthn-passwordless" || acr === "webauthn";
+    }
+
     loginWithGoogle(): void {
         this.keycloak.login({
             idpHint: "google",

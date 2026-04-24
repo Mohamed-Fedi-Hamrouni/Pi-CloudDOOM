@@ -4,7 +4,6 @@ import {
     inject,
     OnInit,
     DestroyRef,
-    ChangeDetectorRef,
 } from "@angular/core";
 import { RouterOutlet } from "@angular/router";
 import { SidebarComponent } from "../sidebar/sidebar.component";
@@ -103,7 +102,6 @@ export class ShellComponent implements OnInit {
 
     private currentUserStore = inject(CurrentUserStoreService);
     private destroyRef = inject(DestroyRef);
-    private cdr = inject(ChangeDetectorRef);
 
     currentUser: UserProfile | null = null;
 
@@ -112,7 +110,6 @@ export class ShellComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((user) => {
                 this.currentUser = user;
-                this.cdr.markForCheck();
             });
 
         this.currentUserStore

@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @ConfigurationProperties(prefix = "googleai")
 public class GoogleAiProperties {
@@ -16,6 +19,9 @@ public class GoogleAiProperties {
 
     /** Model id, e.g. "gemini-flash-latest". */
     private String model = "gemini-flash-latest";
+
+    /** Optional fallback model ids (comma-separated in env var), tried when primary is overloaded/unavailable. */
+    private List<String> fallbackModels = new ArrayList<>();
 
     private double temperature = 0.4;
 

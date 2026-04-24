@@ -53,3 +53,15 @@ logging:
 training:
     debug:
         badge-simulation-enabled: ${TRAINING_DEBUG_BADGE_SIMULATION_ENABLED:false}
+
+    ai:
+        generation-enabled: ${TRAINING_AI_GENERATION_ENABLED:true}
+        lesson-rerank-enabled: ${TRAINING_AI_LESSON_RERANK_ENABLED:true}
+
+googleai:
+    base-url: ${GOOGLE_AI_BASE_URL:https://generativelanguage.googleapis.com}
+    api-key: ${GOOGLE_AI_API_KEY:}
+    model: ${GOOGLE_AI_MODEL:gemini-2.5-flash}
+    fallback-models: ${GOOGLE_AI_FALLBACK_MODELS:gemini-flash-lite-latest}
+    temperature: ${GOOGLE_AI_TEMPERATURE:0.4}
+    max-output-tokens: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:900}

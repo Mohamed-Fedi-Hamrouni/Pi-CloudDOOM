@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
@@ -46,6 +47,11 @@ public class UserService {
     private final UserEventProducer eventProducer;
     private final ObjectMapper objectMapper;
     private final CvStorageService cvStorageService;
+
+    private final PdfTextExtractorService pdfTextExtractorService;
+private final CvAiParsingService cvAiParsingService;
+private final CvNormalizationService cvNormalizationService;
+private final CvProfileEnrichmentService cvProfileEnrichmentService;
 
     // ── CREATE ────────────────────────────────────────────────────────────────
 
@@ -113,6 +119,11 @@ public class UserService {
             .map(this::toResponseWithSkills);
     }
 
+    public Page<UserIdentityResponse> findAllIdentities(Pageable pageable) {
+        return userRepository.findByDeletedAtIsNull(pageable)
+            .map(userMapper::toIdentityResponse);
+    }
+
     public Page<UserResponse> search(String query, Pageable pageable) {
         return userRepository.searchUsers(query, pageable)
             .map(this::toResponseWithSkills);
@@ -157,30 +168,62 @@ public class UserService {
         return toResponseWithSkills(saved);
     }
 
-    @Transactional
-    @Caching(evict = {
-        @CacheEvict(value = "users", allEntries = true),
-        @CacheEvict(value = "users-by-keycloak", allEntries = true),
-        @CacheEvict(value = "users-by-email", allEntries = true)
-    })
-    public UserResponse uploadCv(String keycloakId, MultipartFile file) {
-        log.info("Uploading CV for user with keycloakId: {}", keycloakId);
+   @Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users", allEntries = true),
+    @CacheEvict(value = "users-by-keycloak", allEntries = true),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+public UserResponse uploadCv(String keycloakId, MultipartFile file) {
+    log.info("Uploading CV for user with keycloakId: {}", keycloakId);
 
-        User user = userRepository.findByKeycloakId(keycloakId)
-            .filter(u -> u.getDeletedAt() == null)
-            .orElseThrow(() -> new UserNotFoundException(
-                "User not found with keycloakId: " + keycloakId));
+    User user = userRepository.findByKeycloakId(keycloakId)
+        .filter(u -> u.getDeletedAt() == null)
+        .orElseThrow(() -> new UserNotFoundException(
+            "User not found with keycloakId: " + keycloakId));
 
-        String previousCvUrl = user.getCvUrl();
-        String currentCvUrl = cvStorageService.storeCv(file, user.getId());
+    String previousCvUrl = user.getCvUrl();
+    String currentCvUrl = cvStorageService.storeCv(file, user.getId());
 
-        user.setCvUrl(currentCvUrl);
-        User saved = userRepository.save(user);
-        cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
-        eventProducer.publishUserUpdated(saved);
+    user.setCvUrl(currentCvUrl);
 
-        return toResponseWithSkills(saved);
+    try {
+        // ── Step 1: Extract text from PDF
+        var extraction = pdfTextExtractorService.extractText(currentCvUrl);
+
+        if (!extraction.isUsable()) {
+            log.warn("CV extraction is low quality, skipping AI parsing for user {}", user.getId());
+        } else {
+            String text = extraction.text();
+
+            // ── Step 2: AI parsing
+            var parsed = cvAiParsingService.parse(text);
+
+            // ── Step 3: Normalize
+            var normalized = cvNormalizationService.normalize(parsed);
+
+            // ── Step 4: Apply to user
+            cvProfileEnrichmentService.applyToUser(user, normalized);
+
+            log.info("CV successfully parsed and applied for user {}", user.getId());
+        }
+
+    } catch (Exception ex) {
+        // IMPORTANT: CV upload must NOT fail if AI fails
+        log.error("CV parsing failed for user {}: {}", user.getId(), ex.getMessage());
     }
+
+    // ── Step 5: Save user
+    User saved = userRepository.save(user);
+
+    // ── Step 6: Cleanup old file
+    cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
+
+    // ── Step 7: Emit event
+    eventProducer.publishUserUpdated(saved);
+
+    return toResponseWithSkills(saved);
+}
 
     @Transactional
     @Caching(evict = {
@@ -374,16 +417,19 @@ private List<String> deserializeSkills(String skillsJson) {
     @CacheEvict(value = "users-by-keycloak", key = "#jwt.subject"),
     @CacheEvict(value = "users-by-email", allEntries = true)
 })
+// ── Replace findOrProvisionFromJwt in UserService.java with this version ──
+
 public UserResponse findOrProvisionFromJwt(Jwt jwt) {
     String keycloakId = jwt.getSubject();
     String email      = jwt.getClaimAsString("email");
 
-    // 1. Already exists → update lastLogin and return
+    // 1. Already exists → update lastLogin, sync passkey status, and return
     Optional<User> existing = userRepository.findByKeycloakId(keycloakId)
             .filter(u -> u.getDeletedAt() == null);
     if (existing.isPresent()) {
         User u = existing.get();
         u.setLastLoginAt(LocalDateTime.now());
+        syncPasskeyStatus(u, jwt);                          // ← NEW
         return toResponseWithSkills(userRepository.save(u));
     }
 
@@ -394,8 +440,9 @@ public UserResponse findOrProvisionFromJwt(Jwt jwt) {
                 .filter(u -> u.getDeletedAt() == null);
         if (byEmail.isPresent()) {
             User u = byEmail.get();
-            u.setKeycloakId(keycloakId);   // re-link
+            u.setKeycloakId(keycloakId);
             u.setLastLoginAt(LocalDateTime.now());
+            syncPasskeyStatus(u, jwt);                      // ← NEW
             log.info("Re-linked existing user {} to new keycloakId {}", u.getId(), keycloakId);
             return toResponseWithSkills(userRepository.save(u));
         }
@@ -416,5 +463,20 @@ public UserResponse findOrProvisionFromJwt(Jwt jwt) {
     eventProducer.publishUserCreated(saved);
     log.info("Auto-provisioned social user {} from keycloakId {}", saved.getId(), keycloakId);
     return toResponseWithSkills(saved);
+}
+
+// ── NEW: sync passkey flag from JWT ACR claim ──────────────────────────────
+// Keycloak sets acr = "webauthn-passwordless" when user authenticates via passkey.
+// We record this as a UI hint only — Keycloak remains the auth source of truth.
+private void syncPasskeyStatus(User user, Jwt jwt) {
+    String acr = jwt.getClaimAsString("acr");
+    boolean authenticatedViaPasskey = acr != null &&
+            (acr.equals("webauthn-passwordless") || acr.contains("webauthn"));
+
+    if (authenticatedViaPasskey && !Boolean.TRUE.equals(user.getPasskeyRegistered())) {
+        user.setPasskeyRegistered(true);
+        user.setPasskeyRegisteredAt(LocalDateTime.now());
+        log.info("Passkey registered recorded for user {}", user.getId());
+    }
 }
 }
