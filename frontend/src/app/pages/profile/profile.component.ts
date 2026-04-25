@@ -6,6 +6,7 @@ import { SectionHeaderComponent } from "../../shared/components/section-header/s
 import { AuthService } from "../../core/auth/auth.service";
 import { environment } from "../../../environments/environment";
 import { Router } from "@angular/router";
+import { timeout } from "rxjs";
 
 interface UserProfile {
     id: string;
@@ -48,6 +49,10 @@ export class ProfileComponent implements OnInit {
     private cdr = inject(ChangeDetectorRef);
 
     user: UserProfile | null = null;
+    isLoading = true;
+    loadError = "";
+    canRelogin = false;
+    private attemptedAutoRelogin = false;
     editing = false;
     saving = false;
     saveError = "";
@@ -82,21 +87,47 @@ export class ProfileComponent implements OnInit {
     private router = inject(Router);
 
     loadProfile(): void {
+        this.isLoading = true;
+        this.loadError = "";
+        this.canRelogin = false;
         this.http
             .get<UserProfile>(`${environment.apiUrl}/api/users/me`)
+            .pipe(timeout(10000))
             .subscribe({
                 next: (user) => {
                     this.user = user;
                     this.syncPreferences();
+                    this.isLoading = false;
+                    this.attemptedAutoRelogin = false;
                     this.cdr.detectChanges();
                 },
                 error: (err) => {
                     console.error("Profile load error:", err);
+                    this.isLoading = false;
                     if (err.status === 404) {
                         this.router.navigate(["/complete-profile"]);
+                        return;
                     }
+                    if (err.status === 401 || err.status === 403) {
+                        if (!this.attemptedAutoRelogin) {
+                            this.attemptedAutoRelogin = true;
+                            this.relogin();
+                            return;
+                        }
+                        this.loadError = "Session expired. Please sign in again.";
+                        this.canRelogin = true;
+                    } else if (err.name === "TimeoutError") {
+                        this.loadError = "Profile request timed out. Please retry.";
+                    } else {
+                        this.loadError = "Unable to load profile right now.";
+                    }
+                    this.cdr.detectChanges();
                 },
             });
+    }
+
+    relogin(): void {
+        this.authService.login("/profile");
     }
 
     syncPreferences(): void {

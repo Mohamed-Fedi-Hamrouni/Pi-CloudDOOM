@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MentorCardComponent } from '../../shared/components/mentor-card/mentor-card.component';
 import { MOCK_MENTORS } from '../../core/data/mock-data';
@@ -8,7 +9,7 @@ import { Mentor } from '../../core/models/models';
 @Component({
   selector: 'app-mentorship',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent, MentorCardComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent, MentorCardComponent],
   template: `
     <div class="mentorship-page animate-fade">
 
@@ -50,7 +51,7 @@ import { Mentor } from '../../core/models/models';
       <div class="mentors-controls">
         <div class="input-icon-wrap" style="flex:1;max-width:380px;">
           <span class="icon">🔍</span>
-          <input class="input" placeholder="Search by name, expertise, company...">
+          <input class="input" [(ngModel)]="searchQuery" placeholder="Search by name, expertise, company...">
         </div>
         <div class="mentor-filters">
           <button class="chip" [class]="activeFilter() === 'all' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('all')">All Mentors</button>
@@ -59,11 +60,11 @@ import { Mentor } from '../../core/models/models';
           <button class="chip" [class]="activeFilter() === 'technical' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('technical')">Technical</button>
           <button class="chip" [class]="activeFilter() === 'pm' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('pm')">Product</button>
         </div>
-        <select class="input" style="width:auto;padding:0.5rem 1rem;">
-          <option>Sort: Top Rated</option>
-          <option>Sort: Most Sessions</option>
-          <option>Sort: Price: Low</option>
-          <option>Sort: Availability</option>
+        <select class="input" [(ngModel)]="sortBy" style="width:auto;padding:0.5rem 1rem;">
+          <option value="rating">Sort: Top Rated</option>
+          <option value="sessions">Sort: Most Sessions</option>
+          <option value="price">Sort: Price: Low</option>
+          <option value="available">Sort: Availability</option>
         </select>
       </div>
 
@@ -121,10 +122,31 @@ import { Mentor } from '../../core/models/models';
 export class MentorshipComponent {
   mentors = MOCK_MENTORS;
   activeFilter = signal('all');
+  searchQuery = '';
+  sortBy = 'rating';
 
   get displayedMentors(): Mentor[] {
-    if (this.activeFilter() === 'available') return this.mentors.filter(m => m.available);
-    return this.mentors;
+    const q = this.searchQuery.toLowerCase();
+    const f = this.activeFilter();
+
+    let result = this.mentors.filter(m => {
+      const matchesSearch = !q ||
+        m.name?.toLowerCase().includes(q) ||
+        m.company?.toLowerCase().includes(q) ||
+        m.expertise?.some((e: string) => e.toLowerCase().includes(q));
+      const matchesFilter =
+        f === 'all' ? true :
+        f === 'available' ? m.available :
+        m.expertise?.some((e: string) => e.toLowerCase().includes(f));
+      return matchesSearch && matchesFilter;
+    });
+
+    if (this.sortBy === 'rating') result = [...result].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    else if (this.sortBy === 'sessions') result = [...result].sort((a, b) => (b.sessions ?? 0) - (a.sessions ?? 0));
+    else if (this.sortBy === 'price') result = [...result].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    else if (this.sortBy === 'available') result = [...result].sort((a, b) => (b.available ? 1 : 0) - (a.available ? 1 : 0));
+
+    return result;
   }
 
   setFilter(f: string) { this.activeFilter.set(f); }

@@ -14,11 +14,26 @@
     <!-- Welcome Banner -->
     <div class="welcome-banner">
       <div class="welcome-left">
-        <h1 class="welcome-title">Welcome back, {{ currentUser ? (currentUser.firstName + ' ' + currentUser.lastName) : (authService.getFullName() || 'there') }}! 👋</h1>
-        <p class="welcome-sub">You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! 🚀</p>
+        <div class="welcome-greeting">
+          <span class="welcome-wave">👋</span>
+          <h1 class="welcome-title">
+            Welcome back,
+            <span class="welcome-name">{{ currentUser ? (currentUser.firstName || currentUser.email) : (authService.getFirstName() || 'there') }}</span>!
+          </h1>
+        </div>
+        <p class="welcome-sub">
+          You've practiced <strong>{{ dashboard.sessionsThisWeek }} sessions</strong> this week. Keep it up — your interview is getting closer! 🚀
+        </p>
         <div class="welcome-ctas">
           <a routerLink="/interviews" class="btn btn-primary">Start Mock Session →</a>
-          <a routerLink="/reports" class="btn btn-secondary">View My Reports</a>
+          <a routerLink="/library" class="btn btn-secondary">Browse Library</a>
+        </div>
+        <div class="welcome-chips" *ngIf="currentUser">
+          <span class="chip chip-teal" *ngIf="currentUser.plan === 'PREMIUM'">⭐ Premium</span>
+          <span class="chip chip-neutral" *ngIf="currentUser.plan === 'FREE'">Free Plan</span>
+          <span class="chip chip-cyan" *ngIf="currentUser.plan === 'STUDENT'">🎓 Student</span>
+          <span class="chip chip-success" *ngIf="currentUser.isVerified">✓ Verified</span>
+          <span class="chip chip-teal" *ngIf="currentUser.preferredIndustry">{{ currentUser.preferredIndustry }}</span>
         </div>
       </div>
       <div class="welcome-right">
@@ -36,19 +51,24 @@
             </defs>
           </svg>
           <div class="ring-label">
-            <div class="ring-score">{{ user.readinessScore }}</div>
+            <div class="ring-score">{{ isLoadingUser ? '—' : readinessScore }}</div>
             <div class="ring-sub">Readiness</div>
           </div>
         </div>
         <div class="welcome-badges">
           <div class="wb-item">
-            <span class="wb-val">🔥 0</span>
-            <span class="wb-label">Day Streak</span>
+            <span class="wb-val">🔥 {{ currentUser?.simulationsUsedThisMonth ?? 0 }}</span>
+            <span class="wb-label">Sessions</span>
           </div>
           <div class="wb-divider"></div>
           <div class="wb-item">
-            <span class="wb-val">⚡ {{ currentUser?.karmaPoints || 0 }}</span>
-            <span class="wb-label">Karma Points</span>
+            <span class="wb-val">⚡ {{ currentUser?.karmaPoints ?? 0 }}</span>
+            <span class="wb-label">Karma</span>
+          </div>
+          <div class="wb-divider"></div>
+          <div class="wb-item">
+            <span class="wb-val">📚 {{ bookmarks.length }}</span>
+            <span class="wb-label">Saved</span>
           </div>
         </div>
       </div>
@@ -56,10 +76,38 @@
 
     <!-- Stats Row -->
     <div class="stats-row">
-      <app-stat-card icon="🎙️" value="{{ dashboard.totalSessions }}" label="Mock Sessions Done" color="teal" change="4 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📝" value="{{ dashboard.totalQuizzes }}" label="Quizzes Completed" color="cyan" change="2 this week" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📊" value="{{ dashboard.recentScore }}%" label="Latest Score" color="mint" change="vs 71% last time" [changePositive]="true"></app-stat-card>
-      <app-stat-card icon="📚" value="{{ dashboard.hoursStudied }}h" label="Total Study Time" color="sky"></app-stat-card>
+      <app-stat-card
+        icon="🎙️"
+        [value]="currentUser ? (currentUser.simulationsUsedThisMonth + '/' + currentUser.simulationsLimit) : (dashboard.totalSessions + '')"
+        label="Sessions Used"
+        color="teal"
+        [change]="currentUser ? (currentUser.simulationsLimit - currentUser.simulationsUsedThisMonth) + ' remaining' : ''"
+        [changePositive]="true">
+      </app-stat-card>
+      <app-stat-card
+        icon="⚡"
+        [value]="currentUser ? (currentUser.karmaPoints + '') : '0'"
+        label="Karma Points"
+        color="cyan"
+        change="Keep practicing"
+        [changePositive]="true">
+      </app-stat-card>
+      <app-stat-card
+        icon="📊"
+        [value]="profileCompletion + '%'"
+        label="Profile Completion"
+        color="mint"
+        [change]="profileCompletion < 100 ? 'Complete your profile' : 'Profile complete!'"
+        [changePositive]="profileCompletion >= 60">
+      </app-stat-card>
+      <app-stat-card
+        icon="📚"
+        [value]="resourceStats ? (resourceStats.totalCount + '') : '...'"
+        label="Library Resources"
+        color="sky"
+        [change]="resourceStats ? (resourceStats.newThisWeek + ' new this week') : ''"
+        [changePositive]="true">
+      </app-stat-card>
     </div>
 
     <!-- Main Grid -->
@@ -84,22 +132,40 @@
           </div>
         </div>
 
+        <!-- Profile Completeness (real data) -->
         <div class="card profile-completeness">
           <div class="pc-header">
             <div>
               <div class="pc-title">Profile Completeness</div>
               <div class="pc-sub">Complete your profile to get better recommendations</div>
             </div>
-            <div class="pc-pct">{{ user.profileCompletion }}%</div>
+            <div class="pc-pct" [class.pc-pct-full]="profileCompletion === 100">{{ profileCompletion }}%</div>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" [style.width]="user.profileCompletion + '%'"></div>
+            <div class="progress-fill" [style.width]="profileCompletion + '%'"></div>
           </div>
-          <div class="pc-todos">
-            <div class="pc-todo done">✓ Add target roles</div>
-            <div class="pc-todo done">✓ Complete first mock session</div>
-            <div class="pc-todo">+ Upload your CV</div>
-            <div class="pc-todo">+ Book a mentor session</div>
+          <div class="pc-todos" *ngIf="!isLoadingUser">
+            <div class="pc-todo" [class.done]="currentUser?.firstName && currentUser?.lastName">
+              {{ (currentUser?.firstName && currentUser?.lastName) ? '✓ Name set' : '+ Add your name' }}
+            </div>
+            <div class="pc-todo done">✓ Email confirmed</div>
+            <div class="pc-todo" [class.done]="!!currentUser?.bio">
+              {{ currentUser?.bio ? '✓ Bio added' : '+ Add a bio' }}
+            </div>
+            <div class="pc-todo" [class.done]="!!currentUser?.city">
+              {{ currentUser?.city ? '✓ City added' : '+ Add your city' }}
+            </div>
+            <div class="pc-todo" [class.done]="(currentUser?.simulationsUsedThisMonth ?? 0) > 0">
+              {{ (currentUser?.simulationsUsedThisMonth ?? 0) > 0 ? '✓ First session done' : '+ Complete a mock session' }}
+            </div>
+            <div class="pc-todo" [class.done]="currentUser?.isVerified">
+              {{ currentUser?.isVerified ? '✓ Email verified' : '+ Verify your email' }}
+            </div>
+          </div>
+          <div class="pc-todos" *ngIf="isLoadingUser">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line" style="width:70%"></div>
+            <div class="skeleton-line" style="width:80%"></div>
           </div>
         </div>
 
@@ -154,15 +220,63 @@
           </div>
         </div>
 
+        <!-- Saved Resources (real bookmarks) -->
         <div class="card">
           <app-section-header title="Saved Resources" icon="📚" actionLabel="Library"></app-section-header>
-          <div class="saved-resources">
-            <div class="sr-item" *ngFor="let r of savedResources">
-              <span class="sr-type">{{ r.icon }}</span>
-              <div class="sr-body">
-                <div class="sr-title">{{ r.title }}</div>
-                <div class="sr-meta">{{ r.duration }} · {{ r.category }}</div>
+
+          <div *ngIf="isLoadingBookmarks" class="saved-resources">
+            <div class="sr-skeleton" *ngFor="let _ of [1,2,3]">
+              <div class="skeleton-circle"></div>
+              <div style="flex:1">
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line" style="width:55%;margin-top:4px"></div>
               </div>
+            </div>
+          </div>
+
+          <div *ngIf="!isLoadingBookmarks && bookmarks.length === 0" class="saved-empty">
+            <span class="saved-empty-icon">📭</span>
+            <p>No saved resources yet</p>
+            <a routerLink="/library" class="btn btn-ghost btn-sm">Browse Library →</a>
+          </div>
+
+          <div *ngIf="!isLoadingBookmarks && bookmarks.length > 0" class="saved-resources">
+            <div class="sr-item" *ngFor="let bm of bookmarks.slice(0,4)">
+              <span class="sr-type">{{ getResourceTypeIcon(bm.resource.type) }}</span>
+              <div class="sr-body">
+                <div class="sr-title">{{ bm.resource.title }}</div>
+                <div class="sr-meta">{{ bm.resource.type | titlecase }} · {{ bm.resource.level | titlecase }}</div>
+              </div>
+            </div>
+            <a *ngIf="bookmarks.length > 4" routerLink="/library" class="sr-more">
+              +{{ bookmarks.length - 4 }} more saved →
+            </a>
+          </div>
+        </div>
+
+        <!-- Library Stats mini card -->
+        <div class="card lib-stats-card" *ngIf="resourceStats">
+          <app-section-header title="Library Overview" icon="📖" actionLabel="Explore"></app-section-header>
+          <div class="lib-stats-grid">
+            <div class="lib-stat-item">
+              <span class="lib-stat-icon">🎬</span>
+              <span class="lib-stat-val">{{ resourceStats.videoCount }}</span>
+              <span class="lib-stat-lbl">Videos</span>
+            </div>
+            <div class="lib-stat-item">
+              <span class="lib-stat-icon">📄</span>
+              <span class="lib-stat-val">{{ resourceStats.articleCount }}</span>
+              <span class="lib-stat-lbl">Articles</span>
+            </div>
+            <div class="lib-stat-item">
+              <span class="lib-stat-icon">🎙️</span>
+              <span class="lib-stat-val">{{ resourceStats.podcastCount }}</span>
+              <span class="lib-stat-lbl">Podcasts</span>
+            </div>
+            <div class="lib-stat-item">
+              <span class="lib-stat-icon">📝</span>
+              <span class="lib-stat-val">{{ resourceStats.quizCount }}</span>
+              <span class="lib-stat-lbl">Quizzes</span>
             </div>
           </div>
         </div>

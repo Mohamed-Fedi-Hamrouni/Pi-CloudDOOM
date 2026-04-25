@@ -1,6 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-settings',
@@ -13,10 +15,13 @@ import { FormsModule } from '@angular/forms';
           <h1>Settings</h1>
           <p>Manage your account, notifications, and preferences.</p>
         </div>
-        <button class="btn btn-primary" (click)="saved = true">Save Changes</button>
+        <button class="btn btn-primary" (click)="saveCurrentTab()" [disabled]="saving">
+          {{ saving ? 'Saving...' : 'Save Changes' }}
+        </button>
       </div>
 
-      <div class="saved-toast" *ngIf="saved">✓ Changes saved!</div>
+      <div class="saved-toast" *ngIf="saved">✓ Changes saved successfully!</div>
+      <div class="error-toast" *ngIf="saveError">{{ saveError }}</div>
 
       <div class="settings-layout">
 
@@ -39,34 +44,80 @@ import { FormsModule } from '@angular/forms';
           <!-- Account -->
           <div *ngIf="activeTab() === 'account'" class="settings-panel">
             <div class="sp-title">Account Information</div>
-            <div class="sp-desc">Update your personal details and login credentials.</div>
+            <div class="sp-desc">Update your personal details and preferences.</div>
 
-            <div class="form-grid">
+            <div *ngIf="isLoadingUser" class="account-skeleton">
+              <div class="sk-line" style="width:60%;height:36px"></div>
+              <div class="sk-line" style="width:60%;height:36px"></div>
+              <div class="sk-line" style="width:100%;height:80px"></div>
+            </div>
+
+            <div class="form-grid" *ngIf="!isLoadingUser">
               <div class="form-group">
-                <label>Full Name</label>
-                <input class="input" value="Amara Osei">
+                <label>First Name</label>
+                <input class="input" [(ngModel)]="editForm.firstName" placeholder="Your first name">
+              </div>
+              <div class="form-group">
+                <label>Last Name</label>
+                <input class="input" [(ngModel)]="editForm.lastName" placeholder="Your last name">
               </div>
               <div class="form-group">
                 <label>Email Address</label>
-                <input class="input" value="amara.osei@university.edu" type="email">
+                <input class="input" [value]="currentUser?.email || ''" readonly style="opacity:.7;cursor:not-allowed" type="email">
+                <span class="field-hint">Email is managed by your identity provider.</span>
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input class="input" value="+44 7700 900123" type="tel">
+                <input class="input" [(ngModel)]="editForm.phoneNumber" type="tel" placeholder="+216...">
               </div>
               <div class="form-group">
-                <label>Location</label>
-                <input class="input" value="London, United Kingdom">
+                <label>City</label>
+                <input class="input" [(ngModel)]="editForm.city" placeholder="e.g. Tunis">
+              </div>
+              <div class="form-group">
+                <label>Preferred Industry</label>
+                <select class="input" [(ngModel)]="editForm.preferredIndustry">
+                  <option value="">Select industry</option>
+                  <option value="TECHNOLOGY">Technology</option>
+                  <option value="FINANCE">Finance</option>
+                  <option value="HEALTHCARE">Healthcare</option>
+                  <option value="EDUCATION">Education</option>
+                  <option value="MARKETING">Marketing</option>
+                  <option value="ENGINEERING">Engineering</option>
+                  <option value="CONSULTING">Consulting</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Preferred Language</label>
+                <select class="input" [(ngModel)]="editForm.preferredLanguage">
+                  <option value="fr">Français</option>
+                  <option value="en">English</option>
+                  <option value="ar">Arabic</option>
+                </select>
               </div>
               <div class="form-group full-width">
                 <label>Bio</label>
-                <textarea class="input" rows="3">Final year CS student at UCL. Passionate about building scalable systems and getting into FAANG.</textarea>
+                <textarea class="input" rows="3" [(ngModel)]="editForm.bio" placeholder="Tell us about yourself, your goals and what you're looking for..."></textarea>
+              </div>
+            </div>
+
+            <div class="sp-divider"></div>
+            <div class="sp-title">Privacy</div>
+            <div class="notif-group" *ngIf="!isLoadingUser">
+              <div class="notif-item">
+                <div class="ni-label">
+                  <div class="ni-name">Public Profile</div>
+                  <div class="ni-desc">Allow other community members to view your profile.</div>
+                </div>
+                <div class="toggle-switch" [class.on]="editForm.profileVisible" (click)="editForm.profileVisible = !editForm.profileVisible">
+                  <div class="toggle-knob"></div>
+                </div>
               </div>
             </div>
 
             <div class="sp-divider"></div>
             <div class="sp-title">Change Password</div>
-
             <div class="form-grid">
               <div class="form-group">
                 <label>Current Password</label>
@@ -92,6 +143,28 @@ import { FormsModule } from '@angular/forms';
           <div *ngIf="activeTab() === 'notifications'" class="settings-panel">
             <div class="sp-title">Notification Preferences</div>
             <div class="sp-desc">Control how and when you hear from us.</div>
+
+            <div *ngIf="!isLoadingUser" class="notif-group" style="margin-bottom:var(--space-4)">
+              <div class="ng-title">Quick Settings (saved to your profile)</div>
+              <div class="notif-item">
+                <div class="ni-label">
+                  <div class="ni-name">Email Notifications</div>
+                  <div class="ni-desc">Receive session reports, reminders, and updates by email.</div>
+                </div>
+                <div class="toggle-switch" [class.on]="editForm.emailNotificationsEnabled" (click)="editForm.emailNotificationsEnabled = !editForm.emailNotificationsEnabled">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="notif-item">
+                <div class="ni-label">
+                  <div class="ni-name">Push Notifications</div>
+                  <div class="ni-desc">Receive in-app notifications for activity updates.</div>
+                </div>
+                <div class="toggle-switch" [class.on]="editForm.pushNotificationsEnabled" (click)="editForm.pushNotificationsEnabled = !editForm.pushNotificationsEnabled">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </div>
 
             <div class="notif-group" *ngFor="let group of notificationGroups">
               <div class="ng-title">{{ group.title }}</div>
@@ -185,9 +258,13 @@ import { FormsModule } from '@angular/forms';
 
             <div class="current-plan">
               <div class="cp-left">
-                <div class="cp-plan-name">⭐ Premium Plan</div>
-                <div class="cp-plan-price">$19 / month</div>
-                <div class="cp-plan-renewal">Renews on January 24, 2026</div>
+                <div class="cp-plan-name">
+                  {{ currentUser?.plan === 'PREMIUM' ? '⭐ Premium Plan' : currentUser?.plan === 'STUDENT' ? '🎓 Student Plan' : 'Free Plan' }}
+                </div>
+                <div class="cp-plan-price">{{ currentUser?.plan === 'FREE' ? '$0' : '$19' }} / month</div>
+                <div class="cp-plan-renewal">
+                  {{ currentUser?.subscriptionActive ? 'Subscription active' : 'No active subscription' }}
+                </div>
               </div>
               <div class="cp-actions">
                 <button class="btn btn-secondary btn-sm">Change Plan</button>
@@ -236,6 +313,12 @@ import { FormsModule } from '@angular/forms';
       animation: fadeInUp 0.3s ease both;
     }
 
+    .error-toast {
+      background: var(--error-50); border: 1px solid var(--error-200);
+      color: var(--error-700); padding: var(--space-3) var(--space-5);
+      border-radius: var(--radius-md); font-size: var(--text-sm); font-weight: 600;
+    }
+
     .settings-layout {
       display: grid;
       grid-template-columns: 220px 1fr;
@@ -282,11 +365,22 @@ import { FormsModule } from '@angular/forms';
     .sp-desc { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: calc(-1 * var(--space-3)); line-height: var(--leading-relaxed); }
     .sp-divider { height: 1px; background: var(--color-border); margin: var(--space-2) 0; }
 
+    /* Skeleton */
+    .account-skeleton { display: flex; flex-direction: column; gap: var(--space-3); }
+    .sk-line {
+      border-radius: var(--radius-sm);
+      background: linear-gradient(90deg, var(--neutral-100) 25%, var(--neutral-50) 50%, var(--neutral-100) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
     /* Forms */
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
     .form-group { display: flex; flex-direction: column; gap: var(--space-2); }
     .form-group.full-width { grid-column: 1 / -1; }
     .form-group label { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+    .field-hint { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
 
     /* Toggle */
     .toggle-switch {
@@ -383,10 +477,30 @@ import { FormsModule } from '@angular/forms';
     }
   `]
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnInit {
+  private http = inject(HttpClient);
+
   activeTab = signal('account');
   saved = false;
+  saveError = '';
+  saving = false;
   theme = 'light';
+
+  currentUser: any = null;
+  isLoadingUser = true;
+
+  editForm = {
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    city: '',
+    bio: '',
+    preferredIndustry: '',
+    preferredLanguage: 'fr',
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: false,
+    profileVisible: true,
+  };
 
   tabs = [
     { key: 'account',      icon: '👤', label: 'Account' },
@@ -445,8 +559,57 @@ export class SettingsComponent {
     { date: 'Sep 24, 2024', desc: 'Free to Premium Upgrade', amount: '$19.00' },
   ];
 
+  ngOnInit(): void {
+    this.http.get<any>(`${environment.apiUrl}/api/users/me`).subscribe({
+      next: (user) => {
+        this.currentUser = user;
+        this.editForm = {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          phoneNumber: user.phoneNumber || '',
+          city: user.city || '',
+          bio: user.bio || '',
+          preferredIndustry: user.preferredIndustry || '',
+          preferredLanguage: user.preferredLanguage || 'fr',
+          emailNotificationsEnabled: user.emailNotificationsEnabled ?? true,
+          pushNotificationsEnabled: user.pushNotificationsEnabled ?? false,
+          profileVisible: user.profileVisible ?? true,
+        };
+        this.isLoadingUser = false;
+      },
+      error: () => { this.isLoadingUser = false; }
+    });
+  }
+
   setTab(key: string) {
     this.activeTab.set(key);
     this.saved = false;
+    this.saveError = '';
+  }
+
+  saveCurrentTab(): void {
+    if (this.activeTab() === 'account' || this.activeTab() === 'notifications') {
+      this.saveProfile();
+    } else {
+      this.saved = true;
+      setTimeout(() => this.saved = false, 3000);
+    }
+  }
+
+  private saveProfile(): void {
+    this.saving = true;
+    this.saveError = '';
+    this.http.put<any>(`${environment.apiUrl}/api/users/me`, this.editForm).subscribe({
+      next: (updated) => {
+        this.currentUser = updated;
+        this.saving = false;
+        this.saved = true;
+        setTimeout(() => this.saved = false, 3000);
+      },
+      error: () => {
+        this.saving = false;
+        this.saveError = 'Failed to save changes. Please try again.';
+      }
+    });
   }
 }

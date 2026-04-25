@@ -1,9 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { ChartPlaceholderComponent } from '../../shared/components/chart-placeholder/chart-placeholder.component';
 import { MOCK_REPORTS } from '../../core/data/mock-data';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-reports',
@@ -22,9 +24,9 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
       <!-- Overall Stats -->
       <div class="report-stats">
         <app-stat-card icon="🎯" value="78%" label="Overall Score"        color="teal" change="vs 71% last session" [changePositive]="true"></app-stat-card>
-        <app-stat-card icon="🎙️" value="23"   label="Sessions Completed"  color="cyan"></app-stat-card>
+        <app-stat-card icon="🎙️" [value]="sessionsCompleted.toString()" label="Sessions Completed" color="cyan"></app-stat-card>
         <app-stat-card icon="📈" value="+7%"  label="Improvement (30d)"   color="mint" change="vs previous month" [changePositive]="true"></app-stat-card>
-        <app-stat-card icon="⏱️" value="36h"  label="Total Practice Time" color="sky"></app-stat-card>
+        <app-stat-card icon="⏱️" [value]="(sessionsCompleted * 1.5 | number:'1.0-0') + 'h'" label="Total Practice Time" color="sky"></app-stat-card>
       </div>
 
       <!-- Score Breakdown + Radar -->
@@ -180,9 +182,19 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
     }
   `]
 })
-export class ReportsComponent {
+export class ReportsComponent implements OnInit {
+  private http = inject(HttpClient);
+
   MOCK_REPORTS = MOCK_REPORTS;
   report = MOCK_REPORTS[0];
+  sessionsCompleted = 0;
+
+  ngOnInit(): void {
+    this.http.get<any>(`${environment.apiUrl}/api/users/me`).subscribe({
+      next: (user) => { this.sessionsCompleted = user.simulationsUsedThisMonth ?? 0; },
+      error: () => {}
+    });
+  }
 
   categories = [
     { name: 'Communication',    icon: '🗣️', score: 88 },

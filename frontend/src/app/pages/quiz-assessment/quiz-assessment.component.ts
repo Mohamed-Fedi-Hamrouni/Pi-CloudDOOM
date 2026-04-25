@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MOCK_QUIZZES, MOCK_QUIZ_QUESTIONS } from '../../core/data/mock-data';
 import { Quiz } from '../../core/models/models';
@@ -7,7 +8,7 @@ import { Quiz } from '../../core/models/models';
 @Component({
   selector: 'app-quiz-assessment',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent],
   template: `
     <div class="quiz-page animate-fade">
       <div class="page-header">
@@ -25,7 +26,7 @@ import { Quiz } from '../../core/models/models';
       <div class="quiz-filters">
         <div class="input-icon-wrap" style="flex:1; max-width:400px;">
           <span class="icon">🔍</span>
-          <input class="input" placeholder="Search quizzes...">
+          <input class="input" [(ngModel)]="searchQuery" placeholder="Search quizzes...">
         </div>
         <div class="filter-chips">
           <button class="chip" [class]="activeFilter() === 'all' ? 'chip-teal' : 'chip-neutral'" (click)="setFilter('all')">All</button>
@@ -45,7 +46,7 @@ import { Quiz } from '../../core/models/models';
         <!-- Left: Catalog -->
         <div class="quiz-catalog">
           <div class="quiz-card-item"
-            *ngFor="let quiz of quizzes"
+            *ngFor="let quiz of filteredQuizzes"
             [class.selected]="selectedQuiz()?.id === quiz.id"
             (click)="selectQuiz(quiz)">
             <div class="qci-top">
@@ -122,7 +123,7 @@ import { Quiz } from '../../core/models/models';
               <div class="aq-progress-bar">
                 <div class="aq-prog-label">
                   <span>Question {{ currentQuestion() + 1 }} of {{ quizQuestions.length }}</span>
-                  <span class="aq-timer">⏱ 12:43</span>
+                  <span class="aq-timer" [class.timer-warn]="quizTimeLeft() <= 60" [class.timer-danger]="quizTimeLeft() <= 15">⏱ {{ quizTimerDisplay() }}</span>
                 </div>
                 <div class="progress-bar" style="height:6px;">
                   <div class="progress-fill" [style.width]="((currentQuestion() + 1)/quizQuestions.length*100) + '%'"></div>
@@ -169,11 +170,11 @@ import { Quiz } from '../../core/models/models';
               <div class="rc-breakdown">
                 <div class="rc-bd-item success">
                   <span>✓</span>
-                  <span>2 Correct</span>
+                  <span>{{ correctCount }} Correct</span>
                 </div>
                 <div class="rc-bd-item error">
                   <span>✗</span>
-                  <span>1 Incorrect</span>
+                  <span>{{ quizQuestions.length - correctCount }} Incorrect</span>
                 </div>
               </div>
               <div class="rc-badges">
@@ -303,14 +304,18 @@ import { Quiz } from '../../core/models/models';
     .rc-badges { display: flex; justify-content: center; gap: var(--space-3); margin-bottom: var(--space-5); }
     .rc-ctas { display: flex; justify-content: center; gap: var(--space-3); }
 
+    .timer-warn { color: var(--warning-700) !important; background: var(--warning-50) !important; }
+    .timer-danger { color: var(--error-600) !important; background: var(--error-50) !important; animation: blink 0.8s ease infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.5} }
     @media (max-width: 1024px) { .quiz-layout { grid-template-columns: 1fr; } }
   `]
 })
-export class QuizAssessmentComponent {
+export class QuizAssessmentComponent implements OnDestroy {
   quizzes = MOCK_QUIZZES;
   quizQuestions = MOCK_QUIZ_QUESTIONS;
   sampleQuestion = MOCK_QUIZ_QUESTIONS[0];
   letters = ['A', 'B', 'C', 'D'];
+  searchQuery = '';
 
   selectedQuiz   = signal<Quiz | null>(null);
   activeQuiz     = signal(false);
@@ -319,10 +324,45 @@ export class QuizAssessmentComponent {
   selectedAnswer = signal<number | null>(null);
   answered       = signal(false);
   activeFilter   = signal('all');
-  quizScore      = 67;
+  quizTimeLeft   = signal(0);
+  private timerInterval: any = null;
+
+  userAnswers: number[] = [];
+  correctCount = 0;
+
+  get quizScore(): number {
+    return this.quizQuestions.length > 0
+      ? Math.round((this.correctCount / this.quizQuestions.length) * 100)
+      : 0;
+  }
+
+  quizTimerDisplay = computed(() => {
+    const t = this.quizTimeLeft();
+    const m = Math.floor(t / 60);
+    const s = t % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  });
+
+  get filteredQuizzes(): Quiz[] {
+    const q = this.searchQuery.toLowerCase();
+    const f = this.activeFilter();
+    return this.quizzes.filter(quiz => {
+      const matchesSearch = !q ||
+        quiz.title.toLowerCase().includes(q) ||
+        quiz.description?.toLowerCase().includes(q) ||
+        quiz.category?.toLowerCase().includes(q);
+      const matchesFilter = f === 'all' || quiz.category?.toLowerCase() === f;
+      return matchesSearch && matchesFilter;
+    });
+  }
 
   setFilter(f: string) { this.activeFilter.set(f); }
-  selectQuiz(q: Quiz) { this.selectedQuiz.set(q); this.activeQuiz.set(false); this.showResults.set(false); }
+  selectQuiz(q: Quiz) {
+    this.selectedQuiz.set(q);
+    this.activeQuiz.set(false);
+    this.showResults.set(false);
+    this.stopTimer();
+  }
 
   diffChip(d: string): string {
     return d === 'easy' ? 'chip chip-mint' : d === 'medium' ? 'chip chip-sand' : 'chip chip-peach';
@@ -334,12 +374,26 @@ export class QuizAssessmentComponent {
     this.currentQuestion.set(0);
     this.selectedAnswer.set(null);
     this.answered.set(false);
+    this.userAnswers = new Array(this.quizQuestions.length).fill(-1);
+    this.correctCount = 0;
+    const totalSeconds = this.quizQuestions.length * 30;
+    this.quizTimeLeft.set(totalSeconds);
+    this.stopTimer();
+    this.timerInterval = setInterval(() => {
+      const t = this.quizTimeLeft();
+      if (t > 0) {
+        this.quizTimeLeft.set(t - 1);
+      } else {
+        this.finishQuiz();
+      }
+    }, 1000);
   }
 
   selectAnswer(i: number) {
     if (this.answered()) return;
     this.selectedAnswer.set(i);
     this.answered.set(true);
+    this.userAnswers[this.currentQuestion()] = i;
   }
 
   nextQuestion() {
@@ -348,11 +402,24 @@ export class QuizAssessmentComponent {
       this.selectedAnswer.set(null);
       this.answered.set(false);
     } else {
-      this.activeQuiz.set(false);
-      this.showResults.set(true);
+      this.finishQuiz();
     }
   }
 
-  endQuiz() { this.activeQuiz.set(false); this.showResults.set(false); }
+  private finishQuiz() {
+    this.stopTimer();
+    this.correctCount = this.userAnswers.filter(
+      (ans, i) => ans === this.quizQuestions[i].correct
+    ).length;
+    this.activeQuiz.set(false);
+    this.showResults.set(true);
+  }
+
+  private stopTimer() {
+    if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+  }
+
+  endQuiz() { this.stopTimer(); this.activeQuiz.set(false); this.showResults.set(false); }
   resetQuiz() { this.showResults.set(false); this.selectedQuiz.set(null); }
+  ngOnDestroy() { this.stopTimer(); }
 }

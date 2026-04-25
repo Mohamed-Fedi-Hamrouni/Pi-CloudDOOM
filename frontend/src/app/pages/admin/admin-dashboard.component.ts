@@ -42,6 +42,115 @@ interface PageResponse {
     imports: [CommonModule, FormsModule],
     template: `
         <div class="admin-panel">
+
+            <!-- Admin Tab Bar -->
+            <div class="admin-tab-bar">
+                <button class="admin-tab" [class.active]="adminTab==='users'" (click)="adminTab='users'">👥 Users</button>
+                <button class="admin-tab" [class.active]="adminTab==='library'" (click)="adminTab==='library' ? null : switchToLibrary()">📚 Library</button>
+            </div>
+
+            <!-- ── Library Management Tab ─────────────────────────────────── -->
+            <div *ngIf="adminTab==='library'">
+                <div class="lib-stats-row">
+                    <div class="lib-stat-card">
+                        <div class="lib-stat-val">{{ libStats?.totalCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Total Resources</div>
+                    </div>
+                    <div class="lib-stat-card lib-stat-blue">
+                        <div class="lib-stat-val">{{ libStats?.videoCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Videos</div>
+                    </div>
+                    <div class="lib-stat-card lib-stat-green">
+                        <div class="lib-stat-val">{{ libStats?.articleCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Articles</div>
+                    </div>
+                    <div class="lib-stat-card lib-stat-yellow">
+                        <div class="lib-stat-val">{{ libStats?.podcastCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Podcasts</div>
+                    </div>
+                    <div class="lib-stat-card lib-stat-purple">
+                        <div class="lib-stat-val">{{ libStats?.quizCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Quizzes</div>
+                    </div>
+                    <div class="lib-stat-card">
+                        <div class="lib-stat-val">{{ libStats?.categoryCount ?? '…' }}</div>
+                        <div class="lib-stat-lbl">Categories</div>
+                    </div>
+                    <div class="lib-stat-card lib-stat-green">
+                        <div class="lib-stat-val">{{ libStats?.newThisWeek ?? '…' }}</div>
+                        <div class="lib-stat-lbl">New This Week</div>
+                    </div>
+                </div>
+
+                <div class="lib-actions-grid">
+                    <!-- Static Seed -->
+                    <div class="lib-action-card">
+                        <div class="lib-action-icon">⚡</div>
+                        <div class="lib-action-title">Static Seed</div>
+                        <div class="lib-action-desc">Instantly seed the library with curated resources across all industries (fast, no LLM required).</div>
+                        <div class="lib-action-btns">
+                            <button class="btn btn-primary btn-sm" (click)="seedStatic(false)" [disabled]="libLoading">
+                                {{ libLoading && libAction==='static' ? 'Seeding…' : 'Seed Library' }}
+                            </button>
+                            <button class="btn btn-ghost btn-sm" (click)="seedStatic(true)" [disabled]="libLoading" title="Wipe existing resources and reseed">
+                                ↺ Force Reseed
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Generate -->
+                    <div class="lib-action-card">
+                        <div class="lib-action-icon">🤖</div>
+                        <div class="lib-action-title">AI Generate</div>
+                        <div class="lib-action-desc">Generate new resources using the AI provider (Ollama / stub fallback). Pick count and optional filters.</div>
+                        <div class="lib-gen-controls">
+                            <div class="lib-gen-row">
+                                <label class="lib-gen-lbl">Count</label>
+                                <input type="number" class="input input-sm" [(ngModel)]="genCount" min="1" max="50" style="width:70px">
+                            </div>
+                            <div class="lib-gen-row">
+                                <label class="lib-gen-lbl">Industry</label>
+                                <select class="input input-sm" [(ngModel)]="genIndustry">
+                                    <option value="">All</option>
+                                    <option value="TECHNOLOGY">Technology</option>
+                                    <option value="FINANCE">Finance</option>
+                                    <option value="HEALTHCARE">Healthcare</option>
+                                    <option value="EDUCATION">Education</option>
+                                    <option value="MARKETING">Marketing</option>
+                                    <option value="ENGINEERING">Engineering</option>
+                                    <option value="CONSULTING">Consulting</option>
+                                    <option value="MEDIA">Media</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </div>
+                            <div class="lib-gen-row">
+                                <label class="lib-gen-lbl">Level</label>
+                                <select class="input input-sm" [(ngModel)]="genLevel">
+                                    <option value="">Any</option>
+                                    <option value="BEGINNER">Beginner</option>
+                                    <option value="INTERMEDIATE">Intermediate</option>
+                                    <option value="ADVANCED">Advanced</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" style="margin-top:0.75rem" (click)="generateAi()" [disabled]="libLoading">
+                            {{ libLoading && libAction==='generate' ? 'Generating…' : '✨ Generate' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Result banner -->
+                <div class="lib-result" *ngIf="libResult">
+                    <span *ngIf="libResult.created > 0" class="lib-result-ok">✓ {{ libResult.created }} resource{{ libResult.created !== 1 ? 's' : '' }} created</span>
+                    <span *ngIf="libResult.skipped > 0" class="lib-result-skip">⚠ {{ libResult.skipped }} skipped (duplicates or errors)</span>
+                    <span *ngIf="libResult.warnings?.length" class="lib-result-warn">{{ libResult.warnings[0] }}</span>
+                </div>
+                <div class="lib-result lib-result-err" *ngIf="libError">{{ libError }}</div>
+            </div>
+
+            <!-- ── Users Tab ───────────────────────────────────────────────── -->
+            <div *ngIf="adminTab==='users'">
+
             <!-- Stats Row -->
             <div class="admin-stats">
                 <div class="stat-box">
@@ -414,6 +523,8 @@ interface PageResponse {
                 </div>
             </div>
         </div>
+
+        </div> <!-- /admin-panel -->
     `,
     styles: [
         `
@@ -812,6 +923,83 @@ interface PageResponse {
                 margin-left: auto;
             }
 
+            /* Admin tabs */
+            .admin-tab-bar {
+                display: flex;
+                gap: 0.25rem;
+                border-bottom: 1px solid var(--color-border);
+                margin-bottom: 1.5rem;
+            }
+            .admin-tab {
+                padding: 0.5rem 1.25rem;
+                border: none;
+                background: none;
+                color: var(--color-text-muted);
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                margin-bottom: -1px;
+                transition: all 0.15s;
+                font-family: var(--font-body);
+            }
+            .admin-tab:hover { color: var(--teal-600); }
+            .admin-tab.active { color: var(--teal-600); border-bottom-color: var(--teal-500); font-weight: 600; }
+
+            /* Library tab */
+            .lib-stats-row {
+                display: grid;
+                grid-template-columns: repeat(7, 1fr);
+                gap: var(--space-3);
+                margin-bottom: var(--space-6);
+            }
+            .lib-stat-card {
+                background: var(--neutral-50);
+                border: 1px solid var(--color-border-light);
+                border-radius: var(--radius-lg);
+                padding: var(--space-4);
+                text-align: center;
+            }
+            .lib-stat-card.lib-stat-blue { background: var(--cyan-50); border-color: var(--cyan-100); }
+            .lib-stat-card.lib-stat-green { background: var(--teal-50); border-color: var(--teal-100); }
+            .lib-stat-card.lib-stat-yellow { background: var(--warning-50, #fffbeb); border-color: var(--warning-200, #fde68a); }
+            .lib-stat-card.lib-stat-purple { background: #f5f3ff; border-color: #e9d5ff; }
+            .lib-stat-val { font-size: 1.5rem; font-weight: 700; color: var(--teal-600); font-family: var(--font-display); }
+            .lib-stat-lbl { font-size: 0.7rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+            .lib-actions-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: var(--space-5);
+                margin-bottom: var(--space-5);
+            }
+            .lib-action-card {
+                border: 1px solid var(--color-border);
+                border-radius: var(--radius-xl);
+                padding: var(--space-6);
+                background: var(--color-surface);
+            }
+            .lib-action-icon { font-size: 2rem; margin-bottom: var(--space-3); }
+            .lib-action-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-2); }
+            .lib-action-desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.5; margin-bottom: var(--space-4); }
+            .lib-action-btns { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+            .lib-gen-controls { display: flex; flex-direction: column; gap: var(--space-3); }
+            .lib-gen-row { display: flex; align-items: center; gap: var(--space-3); }
+            .lib-gen-lbl { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); width: 60px; flex-shrink: 0; }
+            .input-sm { padding: 0.25rem 0.5rem; font-size: var(--text-sm); }
+
+            .lib-result { display: flex; flex-wrap: wrap; gap: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--teal-50); border: 1px solid var(--teal-100); font-size: var(--text-sm); }
+            .lib-result-ok { color: var(--success-600); font-weight: 600; }
+            .lib-result-skip { color: var(--warning-600); }
+            .lib-result-warn { color: var(--color-text-muted); }
+            .lib-result-err { background: var(--error-50); border-color: var(--error-200); color: var(--error-600); }
+
+            @media (max-width: 900px) {
+                .lib-stats-row { grid-template-columns: repeat(4, 1fr); }
+                .lib-actions-grid { grid-template-columns: 1fr; }
+            }
+
             @media (max-width: 768px) {
                 .admin-stats {
                     grid-template-columns: repeat(2, 1fr);
@@ -819,6 +1007,7 @@ interface PageResponse {
                 .detail-grid {
                     grid-template-columns: 1fr;
                 }
+                .lib-stats-row { grid-template-columns: repeat(2, 1fr); }
             }
         `,
     ],
@@ -840,9 +1029,78 @@ export class AdminDashboardComponent implements OnInit {
 
     stats = { total: 0, active: 0, pending: 0, suspended: 0 };
 
+    // Library tab
+    adminTab = 'users';
+    libStats: any = null;
+    libLoading = false;
+    libAction = '';
+    libResult: any = null;
+    libError = '';
+    genCount = 10;
+    genIndustry = '';
+    genLevel = '';
+
     ngOnInit(): void {
         this.loadUsers();
         this.loadStats();
+    }
+
+    switchToLibrary(): void {
+        this.adminTab = 'library';
+        this.libResult = null;
+        this.libError = '';
+        this.loadLibStats();
+        this.cdr.detectChanges();
+    }
+
+    loadLibStats(): void {
+        this.http.get<any>(`${environment.resourceApiUrl}/api/resources/stats`).subscribe({
+            next: (s) => { this.libStats = s; this.cdr.detectChanges(); },
+            error: () => {}
+        });
+    }
+
+    seedStatic(force: boolean): void {
+        this.libLoading = true;
+        this.libAction = 'static';
+        this.libResult = null;
+        this.libError = '';
+        this.http.post<any>(`${environment.resourceApiUrl}/api/resources/ai/seed/static?forceReseed=${force}`, {}).subscribe({
+            next: (res) => {
+                this.libResult = res;
+                this.libLoading = false;
+                this.loadLibStats();
+                this.cdr.detectChanges();
+            },
+            error: (err) => {
+                this.libError = err?.error?.message || 'Seed failed. Check logs.';
+                this.libLoading = false;
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
+    generateAi(): void {
+        this.libLoading = true;
+        this.libAction = 'generate';
+        this.libResult = null;
+        this.libError = '';
+        const body: any = { count: this.genCount };
+        if (this.genIndustry) body['industry'] = this.genIndustry;
+        if (this.genLevel) body['level'] = this.genLevel;
+        this.http.post<any>(`${environment.resourceApiUrl}/api/resources/ai/generate`, body).subscribe({
+            next: (res) => {
+                this.libResult = res;
+                this.libLoading = false;
+                this.loadLibStats();
+                this.cdr.detectChanges();
+            },
+            error: (err) => {
+                this.libError = err?.error?.message || 'Generation failed. Check logs.';
+                this.libLoading = false;
+                this.cdr.detectChanges();
+            }
+        });
     }
 
     loadUsers(): void {

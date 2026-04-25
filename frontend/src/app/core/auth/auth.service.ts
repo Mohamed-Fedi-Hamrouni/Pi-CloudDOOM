@@ -30,9 +30,9 @@ export class AuthService {
         }
     }
 
-    login(): void {
+    login(redirectPath = "/dashboard"): void {
         this.keycloak.login({
-            redirectUri: window.location.origin + "/dashboard",
+            redirectUri: window.location.origin + redirectPath,
         });
     }
 
@@ -53,9 +53,11 @@ export class AuthService {
     }
 
     getToken(): Promise<string> {
-        return this.keycloak.updateToken(30).then(() => {
-            return this.keycloak.token || "";
-        });
+        const update = this.keycloak.updateToken(30).then(() => this.keycloak.token || "");
+        const fallback = new Promise<string>(resolve =>
+            setTimeout(() => resolve(this.keycloak.token || ""), 5000)
+        );
+        return Promise.race([update, fallback]);
     }
 
     getTokenParsed(): any {
