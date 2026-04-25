@@ -1,7 +1,9 @@
 package com.microservice.resourceservice.config;
 
+import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +24,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    @Value("${cors.allowed-origins:http://localhost:*}")
+    private String corsAllowedOrigins;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthConverter jwtAuthConverter) throws Exception {
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
@@ -36,9 +41,20 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resources").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resources/{id:[0-9a-fA-F\\-]{36}}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/*/ai/summary").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/*/ai/summary/stream").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/*/ai/similar").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/*/ai/translate").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/*/ai/quality").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/resources/ai/check-duplicate").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/resources/ai/classify").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resources/search").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resources/filter").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resources/categories").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/ai/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/ai/*/summary").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/stats").permitAll()
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
@@ -51,7 +67,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*"));
+        configuration.setAllowedOriginPatterns(Arrays.asList(corsAllowedOrigins.split(",")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));

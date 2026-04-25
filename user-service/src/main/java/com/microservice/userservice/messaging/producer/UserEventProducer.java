@@ -23,7 +23,7 @@ public class UserEventProducer {
     private static final String TOPIC_VERIFIED     = "user.verified";
     private static final String TOPIC_SUSPENDED    = "user.suspended";
 
-    private final KafkaTemplate<String, UserEvent> kafkaTemplate;
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
 
     public void publishUserCreated(User user) {
         publish(TOPIC_CREATED, EventType.USER_CREATED, user);
@@ -53,7 +53,7 @@ public class UserEventProducer {
         UserEvent event = UserEvent.from(eventType, user);
         String key = user.getId().toString();
 
-        CompletableFuture<SendResult<String, UserEvent>> future =
+        CompletableFuture<SendResult<Object, Object>> future =
             kafkaTemplate.send(topic, key, event);
 
         future.whenComplete((result, ex) -> {

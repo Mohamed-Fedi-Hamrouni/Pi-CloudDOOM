@@ -4,9 +4,11 @@ import com.microservice.resourceservice.dto.ResourceCategoryRequest;
 import com.microservice.resourceservice.dto.ResourceCategoryResponse;
 import com.microservice.resourceservice.dto.ResourceRequest;
 import com.microservice.resourceservice.dto.ResourceResponse;
+import com.microservice.resourceservice.dto.ResourceStatsResponse;
 import com.microservice.resourceservice.dto.UserBookmarkResponse;
 import com.microservice.resourceservice.enums.IndustryEnum;
 import com.microservice.resourceservice.enums.ResourceLevelEnum;
+import com.microservice.resourceservice.enums.ResourceTypeEnum;
 import com.microservice.resourceservice.exception.BookmarkAlreadyExistsException;
 import com.microservice.resourceservice.exception.CategoryNotFoundException;
 import com.microservice.resourceservice.exception.ResourceNotFoundException;
@@ -24,9 +26,9 @@ import com.microservice.resourceservice.repository.UserBookmarkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,8 +64,18 @@ public class ResourceService {
 
     @Transactional(readOnly = true)
     public Page<ResourceResponse> searchResources(String query, Pageable pageable) {
-        return resourceRepository.searchByTitleOrDescription(query, pageable)
-            .map(resourceMapper::toResponse);
+        if (query == null || query.isBlank()) {
+            return getAllResources(pageable);
+        }
+        String trimmed = query.trim();
+        // The native FTS query already has ORDER BY ts_rank — strip the default sort from
+        // pageable so Hibernate doesn't append a second ORDER BY clause (invalid SQL).
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        Page<Resource> results = resourceRepository.searchFullText(trimmed, unsorted);
+        if (results.isEmpty()) {
+            results = resourceRepository.searchByTitleOrDescription(trimmed, pageable);
+        }
+        return results.map(resourceMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -84,14 +96,13 @@ public class ResourceService {
     }
 
     @Transactional
-    @CacheEvict(value = {"resource"}, allEntries = true)
+    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
     public ResourceResponse createResource(ResourceRequest request) {
         if (resourceRepository.existsByUrl(request.getUrl())) {
             throw new IllegalArgumentException("Resource with URL already exists: " + request.getUrl());
         }
 
-        ResourceCategory category = categoryRepository.findById(request.getCategoryId())
-            .orElseThrow(() -> new CategoryNotFoundException("Category not found: " + request.getCategoryId()));
+        ResourceCategory category = resolveCategoryOrDefault(request.getCategoryId(), request.getIndustry());
 
         Resource resource = resourceMapper.toEntity(request);
         resource.setCategory(category);
@@ -110,12 +121,14 @@ public class ResourceService {
     }
 
     @Transactional
+    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
     public ResourceResponse updateResource(UUID id, ResourceRequest request) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
 
-        ResourceCategory category = categoryRepository.findById(request.getCategoryId())
-            .orElseThrow(() -> new CategoryNotFoundException("Category not found: " + request.getCategoryId()));
+        ResourceCategory category = request.getCategoryId() != null
+            ? resolveCategoryOrDefault(request.getCategoryId(), request.getIndustry())
+            : resource.getCategory();
 
         if (!resource.getUrl().equals(request.getUrl()) && resourceRepository.existsByUrl(request.getUrl())) {
             throw new IllegalArgumentException("Resource with URL already exists: " + request.getUrl());
@@ -130,16 +143,28 @@ public class ResourceService {
         resource.setThumbUrl(request.getThumbUrl());
         resource.setCategory(category);
 
-        return resourceMapper.toResponse(resourceRepository.save(resource));
+        ResourceResponse updated = resourceMapper.toResponse(resourceRepository.save(resource));
+
+        ResourceEvent event = ResourceEvent.builder()
+            .eventId(UUID.randomUUID())
+            .resourceId(id)
+            .eventType("UPDATED")
+            .resourceTitle(resource.getTitle())
+            .timestamp(LocalDateTime.now())
+            .build();
+        eventProducer.publishResourceUpdated(event);
+
+        return updated;
     }
 
     @Transactional
-    @CacheEvict(value = {"resource"}, allEntries = true)
+    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
     public void deleteResource(UUID id) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
 
-        resourceRepository.delete(resource);
+        resource.setDeletedAt(LocalDateTime.now());
+        resourceRepository.save(resource);
 
         ResourceEvent event = ResourceEvent.builder()
             .eventId(UUID.randomUUID())
@@ -155,6 +180,20 @@ public class ResourceService {
     @Cacheable(value = "categories")
     public List<ResourceCategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream().map(categoryMapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ResourceStatsResponse getStats() {
+        return ResourceStatsResponse.builder()
+            .totalCount(resourceRepository.count())
+            .videoCount(resourceRepository.countByType(ResourceTypeEnum.VIDEO))
+            .articleCount(resourceRepository.countByType(ResourceTypeEnum.ARTICLE))
+            .podcastCount(resourceRepository.countByType(ResourceTypeEnum.PODCAST))
+            .bookCount(resourceRepository.countByType(ResourceTypeEnum.BOOK))
+            .quizCount(resourceRepository.countByType(ResourceTypeEnum.QUIZ))
+            .categoryCount(categoryRepository.count())
+            .newThisWeek(resourceRepository.countByCreatedAtAfter(java.time.LocalDateTime.now().minusDays(7)))
+            .build();
     }
 
     @Transactional
@@ -198,5 +237,29 @@ public class ResourceService {
         }
 
         bookmarkRepository.delete(bookmark);
+    }
+
+    private ResourceCategory resolveCategoryOrDefault(UUID categoryId, IndustryEnum industry) {
+        if (categoryId != null) {
+            return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new CategoryNotFoundException("Category not found: " + categoryId));
+        }
+
+        String defaultName = "General";
+        return categoryRepository.findByName(defaultName)
+            .orElseGet(() -> {
+                try {
+                    ResourceCategory created = ResourceCategory.builder()
+                        .name(defaultName)
+                        .description("Default category")
+                        .industry(industry != null ? industry : IndustryEnum.OTHER)
+                        .build();
+                    return categoryRepository.save(created);
+                } catch (Exception e) {
+                    // In case of race with unique constraint, try again.
+                    return categoryRepository.findByName(defaultName)
+                        .orElseThrow(() -> new IllegalStateException("Unable to resolve default category"));
+                }
+            });
     }
 }

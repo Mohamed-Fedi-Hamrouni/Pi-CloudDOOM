@@ -1,0 +1,68 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:0/not-real   # JwtDecoder is @MockitoBean — never called
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/resourcedb_test
+    username: postgres
+    password: "0000"
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    clean-disabled: false   # allow clean for test DB only
+
+  data:
+    redis:
+      host: localhost
+      port: 6379   # RedisConnectionFactory is @MockitoBean; errors handled by CacheErrorHandler
+
+  kafka:
+    bootstrap-servers: localhost:9999   # producer is @MockitoBean; lazy connection never fires
+
+  jpa:
+    show-sql: false
+
+management:
+  health:
+    redis:
+      enabled: false  # no real Redis in tests
+
+minio:
+  endpoint: http://localhost:9000
+  public-endpoint: http://localhost:9000
+  access-key: fake
+  secret-key: fake
+  bucket: test-bucket
+
+services:
+  user-service:
+    base-url: http://localhost:9999
+
+cors:
+  allowed-origins: "http://localhost:*"
+
+ai:
+  autoseed:
+    enabled: false
+    category-count: 0
+    resources-per-category: 0
+  generation:
+    provider: stub
+    schedule-enabled: false
+    fallback-to-stub: true
+    default-count: 1
+
+ollama:
+  base-url: http://localhost:11434
+  model: llama3.2
+  timeout-ms: 500

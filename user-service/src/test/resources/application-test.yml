@@ -1,0 +1,46 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:0/not-real   # JwtDecoder is @MockitoBean — never called
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/userdb_test
+    username: postgres
+    password: "0000"
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    clean-disabled: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379   # RedisConnectionFactory is @MockitoBean
+
+  kafka:
+    bootstrap-servers: localhost:9999   # UserEventProducer is not needed for context load
+
+management:
+  health:
+    redis:
+      enabled: false
+
+keycloak:
+  server-url: http://localhost:9999
+  realm: myapp-realm
+  client-id: user-service
+  client-secret: test-secret

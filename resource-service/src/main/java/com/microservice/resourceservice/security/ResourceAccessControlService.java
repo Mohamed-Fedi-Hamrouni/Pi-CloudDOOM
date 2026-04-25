@@ -1,5 +1,6 @@
 package com.microservice.resourceservice.security;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class ResourceAccessControlService {
 
     private final RestTemplate restTemplate;
@@ -72,15 +74,16 @@ public class ResourceAccessControlService {
         headers.setBearerAuth(bearerToken);
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
             userServiceBaseUrl + "/api/users/me",
             HttpMethod.GET,
             entity,
-            Map.class
+            (Class<Map<String, Object>>) (Class<?>) Map.class
         );
 
-        Map body = response.getBody();
+        Map<String, Object> body = response.getBody();
         if (body == null || body.get("role") == null) {
+            log.warn("user-service /api/users/me returned no role for subject");
             throw new AccessDeniedException("Unable to resolve application role");
         }
 

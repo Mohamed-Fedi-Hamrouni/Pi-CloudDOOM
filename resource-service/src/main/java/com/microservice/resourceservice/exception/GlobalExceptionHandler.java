@@ -1,5 +1,7 @@
 package com.microservice.resourceservice.exception;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -29,6 +32,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BookmarkAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleBookmarkAlreadyExists(BookmarkAlreadyExistsException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause().getMessage();
+        if (message != null && message.contains("url")) {
+            return build(HttpStatus.CONFLICT, "A resource with this URL already exists", null);
+        }
+        if (message != null && message.contains("name")) {
+            return build(HttpStatus.CONFLICT, "A category with this name already exists", null);
+        }
+        return build(HttpStatus.CONFLICT, "Duplicate entry — resource already exists", null);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -66,6 +81,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnhandled(Exception ex) {
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", null);
     }
 

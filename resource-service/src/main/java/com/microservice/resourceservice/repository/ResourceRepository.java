@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,7 +30,26 @@ public interface ResourceRepository extends JpaRepository<Resource, UUID> {
 
     Page<Resource> findByIndustryAndLevel(IndustryEnum industry, ResourceLevelEnum level, Pageable pageable);
 
+    // Full-text search using the generated search_vector column and GIN index.
+    // Falls back to LIKE when query contains characters not tokenised by plainto_tsquery.
+    // Native query is required because TSVECTOR is not a JPA type.
+    @Query(value = "SELECT r.* FROM resources r " +
+        "WHERE r.search_vector @@ plainto_tsquery('simple', :query) " +
+        "  AND r.deleted_at IS NULL " +
+        "ORDER BY ts_rank(r.search_vector, plainto_tsquery('simple', :query)) DESC",
+        countQuery = "SELECT COUNT(*) FROM resources r " +
+        "WHERE r.search_vector @@ plainto_tsquery('simple', :query) " +
+        "  AND r.deleted_at IS NULL",
+        nativeQuery = true)
+    Page<Resource> searchFullText(@Param("query") String query, Pageable pageable);
+
+    // LIKE fallback kept for compatibility with tests and pre-V3 databases.
     @Query("SELECT r FROM Resource r WHERE LOWER(r.title) LIKE LOWER(CONCAT('%', :query, '%')) " +
         "OR LOWER(r.description) LIKE LOWER(CONCAT('%', :query, '%'))")
     Page<Resource> searchByTitleOrDescription(@Param("query") String query, Pageable pageable);
+
+    // --- Stats helpers (used by ResourceService.getStats()) ---
+    long countByType(ResourceTypeEnum type);
+
+    long countByCreatedAtAfter(LocalDateTime after);
 }

@@ -13,6 +13,7 @@ public interface ResourceMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deletedAt", ignore = true)
     @Mapping(target = "bookmarks", ignore = true)
     @Mapping(target = "category", ignore = true)
     Resource toEntity(ResourceRequest request);
