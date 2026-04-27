@@ -13,6 +13,8 @@ export const environment = {
   production: false,
   apiUrl: 'http://localhost:8081',
   quizApiUrl: 'http://localhost:8082',
+  interviewApiUrl: "http://localhost:8084",
+  trainingApiUrl: "http://localhost:8083",
   keycloak: {
     url: 'http://localhost:8780',
     realm: 'myapp-realm',
@@ -22,4 +24,6 @@ export const environment = {
     onLoad: 'check-sso', // Ou 'login-required' pour forcer le login
     checkLoginIframe: false // ❌ DESACTIVE CECI (très important pour le local)
   }
+
+  
 };

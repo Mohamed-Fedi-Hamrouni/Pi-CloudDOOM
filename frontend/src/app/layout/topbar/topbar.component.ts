@@ -1,3 +1,6 @@
+
+import { ChangeDetectorRef, AfterViewInit } from '@angular/core';
+
 import {
     Component,
     Input,
@@ -6,6 +9,7 @@ import {
     inject,
     OnInit,
 } from "@angular/core";
+
 import { HttpClient } from "@angular/common/http";
 import { RouterLink } from "@angular/router";
 import { CommonModule } from "@angular/common";
@@ -275,6 +279,8 @@ export class TopbarComponent implements OnInit {
 
     authService = inject(AuthService);
     private http = inject(HttpClient);
+    // On garde l'injection via le constructeur
+    constructor(private cd: ChangeDetectorRef) {}
 
     user = {
         name: this.authService.getFullName() || MOCK_USER.name,
@@ -283,6 +289,8 @@ export class TopbarComponent implements OnInit {
         streak: 0,
         xp: 0,
     };
+
+    // ❌ Supprime le ngAfterViewInit qui était ici !
 
     ngOnInit(): void {
         this.http.get<any>("http://localhost:8081/api/users/me").subscribe({
@@ -300,11 +308,15 @@ export class TopbarComponent implements OnInit {
                     streak: 0,
                     xp: profile.karmaPoints || 0,
                 };
+                
+                // ✅ C'EST ICI qu'il faut prévenir Angular du changement !
+                this.cd.detectChanges(); 
             },
         });
     }
 
     private getInitials(): string {
+        // ... (ton code existant ne change pas)
         const name = this.authService.getFullName();
         if (!name) return MOCK_USER.initials;
         return name

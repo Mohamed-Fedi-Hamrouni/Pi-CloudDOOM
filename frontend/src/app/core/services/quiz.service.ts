@@ -1,62 +1,22 @@
-/*import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
-
-@Injectable({ providedIn: 'root' })
-export class QuizService {
-  private http = inject(HttpClient);
-  private apiUrl = environment.quizApiUrl;
-
-  // --- Gestion Admin ---
-  getQuizzes(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/api/quizzes`);
-  }
-
-  createQuiz(quiz: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/api/quizzes`, quiz);
-  }
-
- // Supprimer un quiz (Endpoint: DELETE /api/quizzes/{id})
-deleteQuiz(id: string) {
-  return this.http.delete(`${this.apiUrl}/api/quizzes/${id}`);
-}
-
-// Pour la modification, on récupère d'abord les données
-getQuizById(id: string) {
-  return this.http.get(`${this.apiUrl}/api/quizzes/${id}`);
-}
-
-// DANS TON SERVICE
-updateQuiz(id: string, data: any): Observable<any> {
-  // 1. Vérifie que le port est 8081 (comme pour le reste)
-  // 2. Vérifie que le chemin /api/quizzes/ est présent
-  return this.http.put(`http://localhost:8081/api/quizzes/${id}`, data);
-}
-
- // S'assurer que les URLs correspondent à ton AttemptController
-startQuiz(quizId: string): Observable<any> {
-  return this.http.post<any>(`${this.apiUrl}/quizzes/${quizId}/start`, {});
-}
-
-submitAttempt(attemptId: string, payload: any): Observable<any> {
-  return this.http.post<any>(`${this.apiUrl}/attempts/${attemptId}/submit`, payload);
-}
-
-  getMyAttempts(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/api/attempts/my`);
-  }
 
 
-  getAdminQuizzes() {
-    // Appel vers la nouvelle route qui ne cache rien
-    return this.http.get('http://localhost:8082/api/quizzes/admin/all');
-  }
-}*/
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable ,throwError} from 'rxjs';
 import { environment } from '../../../environments/environment';
+
+export interface OralEvalRequest {
+  questionText: string;
+  correctAnswer: string;
+  userTranscription: string;
+  language: string;
+}
+ 
+export interface OralEvalResponse {
+  score: number;       // 0-100
+  feedback: string;    // explication pédagogique de l'IA
+  isCorrect: boolean;  // score >= 60
+}
 
 @Injectable({ providedIn: 'root' })
 export class QuizService {
@@ -96,12 +56,14 @@ export class QuizService {
   }
 
   // --- Gestion des Tentatives (AttemptController) ---
-
-  startQuiz(quizId: string): Observable<any> {
-    // Java: @PostMapping("/api/quizzes/{quizId}/start")
-    // Note: Le chemin commence par /quizzes dans ton AttemptController
-    return this.http.post<any>(`${this.apiUrl}/quizzes/${quizId}/start`, {});
+startQuiz(quizId: string): Observable<any> {
+  // Protection : refuser les IDs numériques (ancien format)
+  if (!quizId || !isNaN(Number(quizId))) {
+    console.error('startQuiz: ID invalide (nombre au lieu de UUID):', quizId);
+    return throwError(() => new Error('ID quiz invalide: ' + quizId));
   }
+  return this.http.post<any>(`${this.apiUrl}/quizzes/${quizId}/start`, {});
+}
 
   submitAttempt(attemptId: string, payload: any): Observable<any> {
     // Java: @PostMapping("/api/attempts/{attemptId}/submit")
@@ -114,7 +76,33 @@ export class QuizService {
   }
 
   // Dans quiz.service.ts
+// ✅
 publishQuiz(id: string): Observable<void> {
-  return this.http.patch<void>(`${this.apiUrl}/${id}/publish`, {});
+  return this.http.patch<void>(`${this.apiUrl}/quizzes/${id}/publish`, {});
+}
+// ── NOUVEAU — Évaluation IA de la réponse orale ──────────────────
+  /**
+   * POST /api/quizzes/ai/evaluate-oral
+   *
+   * Envoie la transcription vocale à Groq pour une évaluation
+   * sémantique précise : tolère les paraphrases, pénalise les
+   * inexactitudes factuelles, retourne un score 0-100 + feedback.
+   */
+  evaluateOral(req: OralEvalRequest): Observable<OralEvalResponse> {
+    return this.http.post<OralEvalResponse>(
+      `${environment.quizApiUrl}/api/quizzes/ai/evaluate-oral`,
+      req
+    );
+  }
+
+  // Dans votre QuizService
+getQuizzesByModule(moduleId: string): Observable<any> {
+  // Vérifie que moduleId est un UUID valide
+  if (!moduleId) {
+    return throwError(() => new Error('ModuleId est requis pour filtrer les quiz'));
+  }
+  
+  // Appelle l'URL Java : @GetMapping("/api/quizzes/module/{moduleId}")
+  return this.http.get<any>(`${this.apiUrl}/quizzes/module/${moduleId}`);
 }
 }

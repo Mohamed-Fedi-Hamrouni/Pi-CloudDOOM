@@ -46,6 +46,8 @@ services:
     mailhog:
         image: mailhog/mailhog:latest
         container_name: userservice-mailhog
+        networks:
+            - default
         ports:
             - "1025:1025" # SMTP port
             - "8025:8025" # Web UI port
@@ -210,7 +212,45 @@ services:
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-user-service-secret-change-in-prod}
 
+    training-service:
+        build:
+            context: ../training-service
+            dockerfile: Dockerfile
+        container_name: trainingservice-app
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+        ports:
+            - "8083:8083"
+        environment:
+            SERVER_PORT: 8083
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/trainingdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-0000}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
+    interview-service:
+        build:
+            context: ../interview-service
+            dockerfile: Dockerfile
+        container_name: interviewservice-app
+        restart: unless-stopped
+        depends_on:
+            postgres:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+        ports:
+            - "8084:8084"
+        environment:
+            SERVER_PORT: 8084
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/interviewdb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-0000}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
       
 

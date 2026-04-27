@@ -1,4 +1,4 @@
-// User model
+// --- USER & PROFILE MODELS ---
 export interface User {
   id: string;
   name: string;
@@ -19,7 +19,6 @@ export interface User {
   streak: number;
 }
 
-// Mentor model
 export interface Mentor {
   id: string;
   name: string;
@@ -37,22 +36,32 @@ export interface Mentor {
   nextAvailable: string;
 }
 
-// Resource model
-export interface Resource {
+// --- TRAINING & LESSONS MODELS (Integrated version) ---
+export interface TrainingModuleLesson {
   id: string;
   title: string;
-  type: 'article' | 'video' | 'podcast' | 'exercise' | 'template';
-  category: string;
-  duration: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  tags: string[];
-  saved: boolean;
-  views: number;
-  rating: number;
-  description: string;
+  status: 'PENDING' | 'COMPLETED';
+  orderIndex: number;
+  format?: 'TEXT' | 'VIDEO' | string;
+  contentMarkdown?: string | null;
+  videoUrl?: string | null;
+  estimatedMinutes?: number;
 }
 
-// Quiz model
+export interface TrainingModule {
+  id: string;
+  title: string;
+  category: string;
+  progress: number;
+  xp: number;
+  lessons: number;
+  completedLessons: number;
+  status: 'locked' | 'in-progress' | 'completed';
+  icon: string;
+  moduleLessons?: TrainingModuleLesson[]; // Added by colleagues for deep integration
+}
+
+// --- QUIZ & RESOURCES MODELS ---
 export interface Quiz {
   id: string;
   title: string;
@@ -73,7 +82,21 @@ export interface QuizQuestion {
   explanation: string;
 }
 
-// Interview Session model
+export interface Resource {
+  id: string;
+  title: string;
+  type: 'article' | 'video' | 'podcast' | 'exercise' | 'template';
+  category: string;
+  duration: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  tags: string[];
+  saved: boolean;
+  views: number;
+  rating: number;
+  description: string;
+}
+
+// --- INTERVIEW & SESSIONS MODELS ---
 export interface InterviewSession {
   id: string;
   title: string;
@@ -88,7 +111,6 @@ export interface InterviewSession {
   notes: string;
 }
 
-// Report model
 export interface Report {
   id: string;
   sessionId: string;
@@ -108,7 +130,7 @@ export interface Report {
   suggestions: string[];
 }
 
-// Badge model
+// --- SOCIAL & GAMIFICATION MODELS ---
 export interface Badge {
   id: string;
   name: string;
@@ -120,7 +142,6 @@ export interface Badge {
   xpReward: number;
 }
 
-// Post model
 export interface Post {
   id: string;
   author: string;
@@ -134,20 +155,7 @@ export interface Post {
   type: 'discussion' | 'success' | 'question' | 'tip';
 }
 
-// Training module model
-export interface TrainingModule {
-  id: string;
-  title: string;
-  category: string;
-  progress: number;
-  xp: number;
-  lessons: number;
-  completedLessons: number;
-  status: 'locked' | 'in-progress' | 'completed';
-  icon: string;
-}
-
-// Pricing plan
+// --- PRICING MODELS ---
 export interface PricingPlan {
   id: string;
   name: string;

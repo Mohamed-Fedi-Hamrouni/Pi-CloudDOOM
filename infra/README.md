@@ -10,7 +10,7 @@ Lance toute l'infrastructure en une seule commande.
 | Redis        | 6379 | Cache et sessions              |
 | Kafka        | 9092 | Broker de messages             |
 | Zookeeper    | 2181 | Coordination Kafka             |
-| Keycloak     | 8080 | Serveur d'identité             |
+| Keycloak     | 8780 | Serveur d'identité             |
 | User Service | 8081 | API utilisateurs (Spring Boot) |
 | Frontend     | 4200 | Application Angular            |
 
