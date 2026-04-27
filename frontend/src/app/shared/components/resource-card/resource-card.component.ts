@@ -134,31 +134,49 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
 
       <!-- ══════════════ FOOTER ══════════════ -->
       <div class="rc__footer" (click)="$event.stopPropagation()">
-        <!-- Translate pill -->
+
+        <!-- Translate button -->
         <button
           type="button"
-          class="rc__pill"
-          [class.rc__pill--on]="isTranslated"
+          class="rc__tr-btn"
+          [class.rc__tr-btn--on]="isTranslated"
           [disabled]="isTranslating"
           (click)="toggleTranslation()"
-          [title]="isTranslated ? 'Voir original' : 'Traduire'">
-          <span *ngIf="isTranslating" class="rc__spin"></span>
-          <svg *ngIf="!isTranslating" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          {{ isTranslating ? '…' : (isTranslated ? 'Original' : translateLabel) }}
+          [title]="isTranslated ? 'Voir original · ' + translateLabel : 'Traduire vers ' + oppositeLangLabel">
+          <span *ngIf="isTranslating" class="rc__spin rc__spin--indigo"></span>
+          <ng-container *ngIf="!isTranslating">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span>{{ isTranslated ? 'Original' : translateLabel }}</span>
+            <span *ngIf="isTranslated" class="rc__tr-dot"></span>
+          </ng-container>
         </button>
 
         <div class="rc__footer-r">
           <!-- AI Summarize -->
           <button
             type="button"
-            class="rc__pill"
+            class="rc__ai-btn"
+            [class.rc__ai-btn--loading]="summarizing"
             [disabled]="summarizing"
             (click)="onSummarize()"
             title="Résumer avec l'IA">
-            <span *ngIf="summarizing" class="rc__spin"></span>
-            <svg *ngIf="!summarizing" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z"/></svg>
-            {{ summarizing ? 'IA…' : 'IA' }}
+            <span *ngIf="summarizing" class="rc__spin rc__spin--white"></span>
+            <ng-container *ngIf="!summarizing">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M12 2l1.8 5.4 5.2.8-3.8 3.7.9 5.1L12 14.5l-4.1 2.5.9-5.1L5 8.2l5.2-.8z"/>
+                <circle cx="5" cy="5" r="1.2"/>
+                <circle cx="19" cy="4" r="0.9"/>
+                <circle cx="20" cy="18" r="1.1"/>
+              </svg>
+              <span>Résumer</span>
+            </ng-container>
+            <span *ngIf="summarizing" class="rc__ai-loading-txt">IA…</span>
           </button>
+
           <!-- Open CTA -->
           <button type="button" class="rc__cta" (click)="onOpen()">
             Ouvrir
@@ -506,40 +524,94 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
     }
     .rc__footer-r { display: flex; align-items: center; gap: 6px; }
 
-    /* Ghost pills */
-    .rc__pill {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 5px 11px;
-      height: 29px;
-      border-radius: 999px;
-      border: 1px solid #e2e8f0;
+    /* ── Translate button ─────────────────────────────── */
+    .rc__tr-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 0 11px;
+      height: 30px;
+      border-radius: 9px;
+      border: 1.5px solid #e2e8f0;
       background: #f8fafc;
       color: #64748b;
       font-family: inherit;
-      font-size: 0.71rem;
-      font-weight: 600;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: background 130ms ease, color 130ms ease, border-color 130ms ease, transform 120ms ease;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease, transform 120ms ease;
+      flex-shrink: 0;
     }
-    .rc__pill:hover:not(:disabled) {
-      background: #f0fdf9;
-      color: #0d9488;
-      border-color: rgba(20,184,166,0.4);
+    .rc__tr-btn:hover:not(:disabled) {
+      background: #eef2ff;
+      color: #4f46e5;
+      border-color: #c7d2fe;
+      transform: translateY(-1px);
     }
-    .rc__pill--on {
-      background: #ecfeff;
-      color: #0e7490;
-      border-color: #a5f3fc;
+    .rc__tr-btn--on {
+      background: #eef2ff;
+      color: #4338ca;
+      border-color: #a5b4fc;
     }
-    .rc__pill:disabled { opacity: 0.5; cursor: not-allowed; }
-    .rc__pill:active:not(:disabled) { transform: scale(0.95); }
+    .rc__tr-btn--on:hover:not(:disabled) {
+      background: #e0e7ff;
+      border-color: #818cf8;
+    }
+    .rc__tr-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .rc__tr-btn:active:not(:disabled) { transform: scale(0.95); }
+    .rc__tr-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4f46e5;
+      flex-shrink: 0;
+    }
+
+    /* ── AI Summarize button ───────────────────────────── */
+    .rc__ai-btn {
+      position: relative;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 0 13px;
+      height: 30px;
+      border-radius: 9px;
+      border: none;
+      background: linear-gradient(130deg, #7c3aed 0%, #a855f7 60%, #c026d3 100%);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.71rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      overflow: hidden;
+      transition: box-shadow 150ms ease, transform 140ms ease;
+      box-shadow: 0 2px 10px rgba(124,58,237,0.35);
+      flex-shrink: 0;
+    }
+    .rc__ai-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent 38%, rgba(255,255,255,0.28) 52%, transparent 66%);
+      transform: translateX(-120%);
+      transition: transform 0.55s ease;
+    }
+    .rc__ai-btn:hover:not(:disabled)::after {
+      transform: translateX(120%);
+    }
+    .rc__ai-btn:hover:not(:disabled) {
+      box-shadow: 0 4px 18px rgba(124,58,237,0.5);
+      transform: translateY(-1px);
+    }
+    .rc__ai-btn:active:not(:disabled) { transform: scale(0.95); }
+    .rc__ai-btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+    .rc__ai-loading-txt { font-size: 0.7rem; font-weight: 700; }
 
     /* Primary CTA */
     .rc__cta {
       display: inline-flex; align-items: center; gap: 5px;
-      padding: 5px 14px;
-      height: 29px;
-      border-radius: 999px;
+      padding: 0 14px;
+      height: 30px;
+      border-radius: 9px;
       border: none;
       background: #14b8a6;
       color: #fff;
@@ -558,21 +630,29 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
     }
     .rc__cta:active { transform: scale(0.96); }
 
-    /* Spinner */
+    /* Spinners */
     .rc__spin {
       display: inline-block;
       width: 11px; height: 11px;
-      border: 2px solid rgba(20,184,166,0.2);
-      border-top-color: #14b8a6;
       border-radius: 50%;
       animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+    .rc__spin--indigo {
+      border: 2px solid rgba(99,102,241,0.2);
+      border-top-color: #6366f1;
+    }
+    .rc__spin--white {
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (prefers-reduced-motion: reduce) {
-      .rc, .rc__thumb, .rc__fallback-icon, .rc__bm, .rc__cta, .rc__pill {
+      .rc, .rc__thumb, .rc__fallback-icon, .rc__bm, .rc__cta, .rc__tr-btn, .rc__ai-btn {
         transition: none !important; animation: none !important; transform: none !important;
       }
+      .rc__ai-btn::after { display: none; }
     }
   `]
 })
