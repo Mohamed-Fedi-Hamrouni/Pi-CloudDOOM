@@ -254,13 +254,6 @@ interface ResourceEngagement {
                   (input)="onProgressInput(eng.resourceId, +$any($event.target).value)"
                   (change)="onProgressChange(eng.resourceId, +$any($event.target).value)"
                   [attr.aria-label]="'Progression : ' + getLocalProgress(eng.resourceId) + '%'">
-                <datalist id="pct-ticks">
-                  <option value="0"></option>
-                  <option value="25"></option>
-                  <option value="50"></option>
-                  <option value="75"></option>
-                  <option value="100"></option>
-                </datalist>
 
                 <!-- Hints -->
                 <div class="eng-progress-hint" *ngIf="eng.status === 'IN_PROGRESS'">
@@ -377,6 +370,15 @@ interface ResourceEngagement {
             </div>
           </div>
         </details>
+
+        <!-- Single datalist for all sliders -->
+        <datalist id="pct-ticks">
+          <option value="0"></option>
+          <option value="25"></option>
+          <option value="50"></option>
+          <option value="75"></option>
+          <option value="100"></option>
+        </datalist>
 
       </section>
 

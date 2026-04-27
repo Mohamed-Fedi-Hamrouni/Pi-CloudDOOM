@@ -33,6 +33,7 @@ export class AuthService {
     login(redirectPath = "/dashboard"): void {
         this.keycloak.login({
             redirectUri: window.location.origin + redirectPath,
+            prompt: "login",
         });
     }
 
