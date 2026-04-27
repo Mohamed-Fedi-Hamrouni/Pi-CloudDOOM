@@ -4201,15 +4201,6 @@ interface ResourceEngagement {
       color: #991b1b;
     }
 
-    .lib-pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-3);
-      margin-top: var(--space-2);
-      padding-top: var(--space-2);
-      border-top: 1px solid rgba(226, 232, 240, 0.9);
-    }
 
     @media (max-width: 768px) {
       .library-page {

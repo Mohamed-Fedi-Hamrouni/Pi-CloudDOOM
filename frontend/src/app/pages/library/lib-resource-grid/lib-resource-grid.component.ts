@@ -70,11 +70,38 @@ import { SectionHeaderComponent } from '../../../shared/components/section-heade
     </div>
 
     <!-- Pagination -->
-    <div class="lib-pagination" *ngIf="!isLoading && totalPages > 1">
-      <button class="btn btn-ghost btn-sm" (click)="pageChange.emit(currentPage - 1)" [disabled]="currentPage === 0">← Précédent</button>
-      <span class="chip chip-neutral">Page {{ currentPage + 1 }} / {{ totalPages }} · {{ totalElements }} total</span>
-      <button class="btn btn-ghost btn-sm" (click)="pageChange.emit(currentPage + 1)" [disabled]="currentPage + 1 >= totalPages">Suivant →</button>
-    </div>
+    <nav class="pg-bar" aria-label="Pagination" *ngIf="!isLoading && totalPages > 1">
+      <!-- Prev -->
+      <button class="pg-btn pg-arrow" (click)="pageChange.emit(currentPage - 1)"
+              [disabled]="currentPage === 0" aria-label="Page précédente">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="10 13 5 8 10 3"/>
+        </svg>
+      </button>
+
+      <!-- Page numbers with ellipsis -->
+      <ng-container *ngFor="let p of visiblePages">
+        <button *ngIf="p !== null" class="pg-btn pg-num"
+                [class.active]="p === currentPage"
+                (click)="pageChange.emit(p)"
+                [attr.aria-current]="p === currentPage ? 'page' : null">
+          {{ p + 1 }}
+        </button>
+        <span *ngIf="p === null" class="pg-ellipsis" aria-hidden="true">…</span>
+      </ng-container>
+
+      <!-- Next -->
+      <button class="pg-btn pg-arrow" (click)="pageChange.emit(currentPage + 1)"
+              [disabled]="currentPage + 1 >= totalPages" aria-label="Page suivante">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
+      </button>
+
+      <span class="pg-info">{{ totalElements }} ressource{{ totalElements !== 1 ? 's' : '' }}</span>
+    </nav>
   `,
   styles: [`
     :host { display: block; }
@@ -117,6 +144,82 @@ import { SectionHeaderComponent } from '../../../shared/components/section-heade
     @keyframes shimmer { to { background-position: -200% 0, -200% 0, -200% 0; } }
 
     .results-section { display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ── Pagination ── */
+    .pg-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 24px 0 6px;
+      flex-wrap: wrap;
+      border-top: 1px solid rgba(226,232,240,0.8);
+      margin-top: 8px;
+    }
+
+    .pg-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 36px;
+      padding: 0 4px;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      background: transparent;
+      color: #64748b;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .pg-btn:hover:not(:disabled):not(.active) {
+      background: #f1f5f9;
+      color: #1e293b;
+      border-color: #e2e8f0;
+    }
+    .pg-btn.active {
+      background: linear-gradient(135deg, #14b8a6, #0891b2);
+      color: #fff;
+      border-color: transparent;
+      font-weight: 600;
+      box-shadow: 0 3px 10px -2px rgba(20,184,166,0.45);
+    }
+    .pg-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .pg-arrow {
+      min-width: 36px;
+      padding: 0;
+      color: #94a3b8;
+    }
+    .pg-arrow:hover:not(:disabled) {
+      color: #14b8a6;
+    }
+    .pg-num {
+      min-width: 36px;
+    }
+    .pg-ellipsis {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 36px;
+      color: #cbd5e1;
+      font-size: 1rem;
+      letter-spacing: 1px;
+      user-select: none;
+    }
+    .pg-info {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-left: 10px;
+      white-space: nowrap;
+      font-weight: 500;
+    }
   `]
 })
 export class LibResourceGridComponent {
@@ -149,4 +252,36 @@ export class LibResourceGridComponent {
   trackById(_: number, r: Resource): string { return r.id; }
 
   getProgress(id: string): number { return this.progressMap[id] ?? 0; }
+
+  get visiblePages(): (number | null)[] {
+    const total = this.totalPages;
+    const cur = this.currentPage;
+
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i);
+    }
+
+    const window = new Set<number>();
+    window.add(0);
+    window.add(total - 1);
+    for (let i = Math.max(0, cur - 1); i <= Math.min(total - 1, cur + 1); i++) {
+      window.add(i);
+    }
+
+    const sorted = Array.from(window).sort((a, b) => a - b);
+    const result: (number | null)[] = [];
+    let prev = -1;
+
+    for (const p of sorted) {
+      if (prev >= 0 && p - prev === 2) {
+        result.push(prev + 1);
+      } else if (prev >= 0 && p - prev > 2) {
+        result.push(null);
+      }
+      result.push(p);
+      prev = p;
+    }
+
+    return result;
+  }
 }
