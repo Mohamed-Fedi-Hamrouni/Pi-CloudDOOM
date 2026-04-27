@@ -1,5 +1,7 @@
 package com.microservice.resourceservice.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.resourceservice.ai.service.OllamaClient;
 import com.microservice.resourceservice.config.AiGenerationProperties;
 import com.microservice.resourceservice.exception.ResourceNotFoundException;
@@ -13,8 +15,6 @@ import org.springframework.stereotype.Service;
 import java.io.Serializable;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Scores a resource on 3 dimensions (clarity, depth, usefulness) from 0 to 5.
@@ -29,6 +29,7 @@ public class AiQualityScoreService {
     private final ResourceRepository resourceRepository;
     private final AiGenerationProperties props;
     private final OllamaClient ollamaClient;
+    private final ObjectMapper objectMapper;
 
     public record QualityScore(
         double overall,
@@ -138,37 +139,47 @@ public class AiQualityScoreService {
         );
     }
 
-    private static String safe(String s) { return s == null ? "" : s.replace("\"", "'"); }
+    private static String safe(String s) { return PromptSanitizer.sanitizeTitle(s); }
 
-    private static final Pattern FIELD = Pattern.compile("\"(clarity|depth|usefulness)\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)");
-    private static final Pattern COMMENT = Pattern.compile("\"comment\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"");
-
-    private static QualityScore parse(String raw) {
+    private QualityScore parse(String raw) {
         if (raw == null) return null;
-        Matcher m = FIELD.matcher(raw);
-        double clarity = -1, depth = -1, useful = -1;
-        while (m.find()) {
-            String key = m.group(1);
-            double v = Double.parseDouble(m.group(2));
-            switch (key) {
-                case "clarity" -> clarity = v;
-                case "depth" -> depth = v;
-                case "usefulness" -> useful = v;
-                default -> { /* ignore */ }
-            }
+        try {
+            String json = extractFirstJson(raw);
+            JsonNode node = objectMapper.readTree(json != null ? json : raw);
+            double clarity  = node.path("clarity").asDouble(-1);
+            double depth    = node.path("depth").asDouble(-1);
+            double useful   = node.path("usefulness").asDouble(-1);
+            if (clarity < 0 || depth < 0 || useful < 0) return null;
+            String comment = node.path("comment").asText("");
+            double overall = Math.round(((clarity + depth + useful) / 3.0) * 10.0) / 10.0;
+            return new QualityScore(
+                overall,
+                Math.round(clarity * 10.0) / 10.0,
+                Math.round(depth * 10.0) / 10.0,
+                Math.round(useful * 10.0) / 10.0,
+                "ollama",
+                comment
+            );
+        } catch (Exception e) {
+            log.warn("Jackson parse failed for quality score: {}", e.getMessage());
+            return null;
         }
-        if (clarity < 0 || depth < 0 || useful < 0) return null;
-        Matcher cm = COMMENT.matcher(raw);
-        String comment = cm.find() ? cm.group(1).replace("\\\"", "\"") : "";
-        double overall = Math.round(((clarity + depth + useful) / 3.0) * 10.0) / 10.0;
-        return new QualityScore(
-            overall,
-            Math.round(clarity * 10.0) / 10.0,
-            Math.round(depth * 10.0) / 10.0,
-            Math.round(useful * 10.0) / 10.0,
-            "ollama",
-            comment
-        );
+    }
+
+    private static String extractFirstJson(String text) {
+        if (text == null) return null;
+        int start = text.indexOf('{');
+        if (start < 0) return null;
+        int depth = 0;
+        boolean inStr = false, esc = false;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (inStr) { if (esc) { esc = false; } else if (c == '\\') { esc = true; } else if (c == '"') { inStr = false; } continue; }
+            if (c == '"') { inStr = true; continue; }
+            if (c == '{') depth++;
+            else if (c == '}') { if (--depth == 0) return text.substring(start, i + 1); }
+        }
+        return null;
     }
 
     private String resolveProvider() {

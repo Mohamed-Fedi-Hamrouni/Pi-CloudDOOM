@@ -74,19 +74,26 @@ public class ResourceAccessControlService {
         headers.setBearerAuth(bearerToken);
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-            userServiceBaseUrl + "/api/users/me",
-            HttpMethod.GET,
-            entity,
-            (Class<Map<String, Object>>) (Class<?>) Map.class
-        );
+        try {
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                userServiceBaseUrl + "/api/users/me",
+                HttpMethod.GET,
+                entity,
+                (Class<Map<String, Object>>) (Class<?>) Map.class
+            );
 
-        Map<String, Object> body = response.getBody();
-        if (body == null || body.get("role") == null) {
-            log.warn("user-service /api/users/me returned no role for subject");
-            throw new AccessDeniedException("Unable to resolve application role");
+            Map<String, Object> body = response.getBody();
+            if (body == null || body.get("role") == null) {
+                log.warn("user-service /api/users/me returned no role; denying access");
+                throw new AccessDeniedException("Unable to resolve application role");
+            }
+
+            return String.valueOf(body.get("role")).trim().toUpperCase(Locale.ROOT);
+        } catch (AccessDeniedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("user-service is unreachable ({}); denying access by default", e.getMessage());
+            throw new AccessDeniedException("Admin role required (user-service unavailable)");
         }
-
-        return String.valueOf(body.get("role")).trim().toUpperCase(Locale.ROOT);
     }
 }

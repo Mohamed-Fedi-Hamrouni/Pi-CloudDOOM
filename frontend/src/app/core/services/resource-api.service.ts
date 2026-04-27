@@ -112,6 +112,26 @@ export interface ResourceRequestPayload {
   categoryId?: string | null;
 }
 
+export interface EngagementApiResponse {
+  id: string;
+  resourceId: string;
+  resourceTitle: string;
+  resourceUrl: string;
+  resourceType: string;
+  resourceThumbUrl: string | null;
+  resourceCategoryName: string | null;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  progressPct: number;
+  openCount: number;
+  notes: string | null;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  activityDays: string[];
+  streakDays: number;
+}
+
 export interface ResourceStatsResponse {
   totalCount: number;
   videoCount: number;
@@ -254,5 +274,25 @@ export class ResourceApiService {
       `${this.apiUrl}/api/resources/ai/seed?forceReseed=${forceReseed}`,
       {}
     );
+  }
+
+  getEngagements(): Observable<EngagementApiResponse[]> {
+    return this.http.get<EngagementApiResponse[]>(`${this.apiUrl}/api/resources/engagements`);
+  }
+
+  getEngagement(resourceId: string): Observable<EngagementApiResponse> {
+    return this.http.get<EngagementApiResponse>(`${this.apiUrl}/api/resources/engagements/${resourceId}`);
+  }
+
+  recordOpen(resourceId: string): Observable<EngagementApiResponse> {
+    return this.http.post<EngagementApiResponse>(`${this.apiUrl}/api/resources/engagements/${resourceId}/open`, {});
+  }
+
+  ensureEngagement(resourceId: string): Observable<EngagementApiResponse> {
+    return this.http.post<EngagementApiResponse>(`${this.apiUrl}/api/resources/engagements/${resourceId}/ensure`, {});
+  }
+
+  updateEngagement(resourceId: string, data: { status?: string; progressPct?: number; notes?: string }): Observable<EngagementApiResponse> {
+    return this.http.put<EngagementApiResponse>(`${this.apiUrl}/api/resources/engagements/${resourceId}`, data);
   }
 }

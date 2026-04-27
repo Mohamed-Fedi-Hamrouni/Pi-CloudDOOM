@@ -284,7 +284,7 @@ import { catchError, of } from 'rxjs';
                     </svg>
                   </div>
                   <div class="rfm-dropzone-title">Glissez-déposez votre fichier</div>
-                  <div class="rfm-dropzone-sub">PDF · Vidéo · Image — jusqu'à 50 MB</div>
+                  <div class="rfm-dropzone-sub">PDF · Vidéo · Image — jusqu'à 250 MB</div>
                   <label class="rfm-dropzone-btn">
                     <input class="rfm-visually-hidden" type="file" accept="application/pdf,video/*,image/*" (change)="onResourceFileSelected($event)">
                     <span>Parcourir</span>
@@ -1713,8 +1713,15 @@ export class ResourceFormModalComponent implements OnInit, OnChanges {
     }
   }
 
+  private static readonly MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
+
   uploadResourceFile(): void {
     if (!this.selectedResourceFile) {
+      return;
+    }
+    if (this.selectedResourceFile.size > ResourceFormModalComponent.MAX_UPLOAD_BYTES) {
+      this.formError = 'Le fichier dépasse la limite de 250 MB.';
+      this.selectedResourceFile = null;
       return;
     }
 
@@ -1738,6 +1745,11 @@ export class ResourceFormModalComponent implements OnInit, OnChanges {
 
   uploadThumbnailFile(): void {
     if (!this.selectedThumbnailFile) {
+      return;
+    }
+    if (this.selectedThumbnailFile.size > ResourceFormModalComponent.MAX_UPLOAD_BYTES) {
+      this.formError = 'Le fichier dépasse la limite de 250 MB.';
+      this.selectedThumbnailFile = null;
       return;
     }
 

@@ -31,4 +31,5 @@ public class ResourceResponse {
     private String categoryName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long viewCount;
 }

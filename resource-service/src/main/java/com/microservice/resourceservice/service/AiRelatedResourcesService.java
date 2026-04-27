@@ -7,6 +7,7 @@ import com.microservice.resourceservice.model.Resource;
 import com.microservice.resourceservice.repository.ResourceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ public class AiRelatedResourcesService {
 
         int safeLimit = Math.max(1, Math.min(limit, 10));
 
-        List<Resource> all = resourceRepository.findAll();
+        List<Resource> all = resourceRepository.findTopActive(PageRequest.of(0, 300));
         List<Scored> scored = new ArrayList<>();
         for (Resource candidate : all) {
             Set<String> candidateTokens = tokenize(buildSearchBlob(candidate));
@@ -87,8 +88,8 @@ public class AiRelatedResourcesService {
 
         int safeLimit = Math.max(1, Math.min(limit, 20));
 
-        // Score every other resource
-        List<Resource> all = resourceRepository.findAll();
+        // Score up to 300 most recent resources (bounded scan for performance)
+        List<Resource> all = resourceRepository.findTopActive(PageRequest.of(0, 300));
         List<Scored> scored = new ArrayList<>();
         for (Resource candidate : all) {
             if (candidate.getId().equals(resourceId)) continue;

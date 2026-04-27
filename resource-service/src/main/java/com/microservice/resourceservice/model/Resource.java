@@ -85,6 +85,10 @@ public class Resource {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "view_count", nullable = false)
+    @Builder.Default
+    private long viewCount = 0L;
+
     @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<UserBookmark> bookmarks = new ArrayList<>();

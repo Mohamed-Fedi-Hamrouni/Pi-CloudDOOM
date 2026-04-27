@@ -5,6 +5,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.SetBucketPolicyArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -131,6 +132,21 @@ public class ObjectStorageService {
     private String buildPublicUrl(String objectKey) {
         String base = publicEndpoint.endsWith("/") ? publicEndpoint.substring(0, publicEndpoint.length() - 1) : publicEndpoint;
         return base + "/" + bucketName + "/" + objectKey;
+    }
+
+    public void deleteObject(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) return;
+        try {
+            minioClient.removeObject(
+                RemoveObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(objectKey)
+                    .build()
+            );
+            log.info("Deleted MinIO object: {}/{}", bucketName, objectKey);
+        } catch (Exception ex) {
+            log.warn("Failed to delete MinIO object {}/{}: {}", bucketName, objectKey, ex.getMessage());
+        }
     }
 
     private void ensureBucketReady() throws Exception {

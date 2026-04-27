@@ -8,348 +8,458 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
   standalone: true,
   imports: [CommonModule],
   template: `
-    <article class="resource-card" [class.resource-card-compact]="compact" [class.resource-card-new]="highlight">
-      <!-- Thumbnail with overlays -->
-      <div class="card-thumb">
+    <article
+      class="rc"
+      [class.rc--new]="highlight"
+      [class.rc--saved]="resource.saved"
+      (mouseenter)="onCardHover()"
+      (click)="onOpen()"
+      (keydown.enter)="onOpen()"
+      tabindex="0"
+      role="button"
+      [attr.aria-label]="'Ouvrir : ' + resource.title">
+
+      <!-- ══════════════ MEDIA ZONE ══════════════ -->
+      <div class="rc__media" [ngClass]="typeHeaderClass">
+
+        <!-- Real thumbnail (stored URL or smart-derived) -->
         <img
-          *ngIf="resource.thumbnailUrl && !thumbError"
-          class="thumb-img"
-          [src]="resource.thumbnailUrl"
+          *ngIf="resolvedThumbUrl && !thumbError"
+          class="rc__thumb"
+          [src]="resolvedThumbUrl"
           [alt]="resource.title"
           loading="lazy"
           (error)="onThumbError()"
         />
-        <div *ngIf="!resource.thumbnailUrl || thumbError" class="thumb-fallback" [ngClass]="typeFallbackClass">
-          <span class="thumb-emoji" aria-hidden="true">{{ typeIcon }}</span>
+
+        <!-- Fallback: gradient + big emoji + source hint -->
+        <div *ngIf="!resolvedThumbUrl || thumbError" class="rc__fallback">
+          <span class="rc__fallback-icon" aria-hidden="true">{{ typeIcon }}</span>
+          <span class="rc__source-hint" *ngIf="sourceDomain" aria-hidden="true">
+            <img
+              class="rc__source-favicon"
+              [src]="'https://www.google.com/s2/favicons?domain=' + sourceDomain + '&sz=32'"
+              alt=""
+              loading="lazy"
+              (error)="faviconError = true"
+              *ngIf="!faviconError"
+            />
+            {{ sourceDomain }}
+          </span>
         </div>
 
-        <!-- "Nouveau" badge (shown only when the card was freshly created) -->
-        <span class="card-new-badge" *ngIf="highlight">
-          <span class="card-new-sparkle" aria-hidden="true">✨</span>
-          Nouveau
-        </span>
+        <!-- Scrim: image → card bg gradient at bottom -->
+        <div class="rc__scrim" aria-hidden="true"></div>
 
-        <!-- AI Quality score badge (bottom-left of thumb) -->
+        <!-- "Nouveau" ribbon -->
+        <span class="rc__ribbon" *ngIf="highlight" aria-hidden="true">✦ Nouveau</span>
+
+        <!-- Quality AI badge -->
         <span
-          class="card-quality-badge"
+          class="rc__quality"
           *ngIf="qualityScore !== null"
           [ngClass]="qualityClass"
-          [title]="qualityTooltip">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden="true">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
+          [title]="qualityTooltip"
+          aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           {{ qualityScore.toFixed(1) }}
         </span>
 
-        <!-- Bookmark overlay (top-right) -->
+        <!-- Bookmark -->
         <button
           type="button"
-          class="thumb-overlay-btn bookmark-btn"
-          [class.saved]="resource.saved"
+          class="rc__bm"
+          [class.rc__bm--on]="resource.saved"
+          [class.rc__bm--pending]="bookmarkPending"
+          [disabled]="bookmarkPending"
           (click)="onToggleSaved(); $event.stopPropagation()"
-          [attr.aria-label]="resource.saved ? 'Retirer des favoris' : 'Enregistrer'"
-          [title]="resource.saved ? 'Retirer des favoris' : 'Enregistrer'">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-            <path d="M6 2h12a2 2 0 0 1 2 2v18l-8-4-8 4V4a2 2 0 0 1 2-2z"/>
-          </svg>
+          [title]="bookmarkPending ? 'En cours…' : (resource.saved ? 'Retirer des favoris' : 'Enregistrer')">
+          <span *ngIf="bookmarkPending" class="rc__bm-spin" aria-hidden="true"></span>
+          <svg *ngIf="!bookmarkPending" viewBox="0 0 24 24" width="14" height="14" [attr.fill]="resource.saved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>
 
-        <!-- Admin overlay (top-left, reveals on hover) -->
-        <div class="admin-cluster" *ngIf="isAdmin">
-          <button
-            type="button"
-            class="thumb-overlay-btn"
-            (click)="onEdit(); $event.stopPropagation()"
-            aria-label="Modifier la ressource"
-            title="Modifier">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-            </svg>
+        <!-- Admin (hover) -->
+        <div class="rc__admin" *ngIf="isAdmin" (click)="$event.stopPropagation()">
+          <button type="button" class="rc__admin-btn" (click)="onEdit()" title="Modifier">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button
-            type="button"
-            class="thumb-overlay-btn danger"
-            (click)="onDelete(); $event.stopPropagation()"
-            aria-label="Supprimer la ressource"
-            title="Supprimer">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-            </svg>
+          <button type="button" class="rc__admin-btn rc__admin-btn--del" (click)="onDelete()" title="Supprimer">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
           </button>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="rc__prog" *ngIf="resource.saved && progress > 0" role="progressbar" [attr.aria-valuenow]="progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="rc__prog-fill" [style.width.%]="progress"></div>
         </div>
       </div>
 
-      <!-- Card body -->
-      <div class="card-body">
-        <div class="chip-row">
-          <span class="chip" [ngClass]="typeChipClass">{{ typeLabel }}</span>
-          <span class="chip chip-neutral">{{ levelLabel }}</span>
-          <span class="chip chip-mint" *ngIf="resource.saved && progress > 0">{{ progress }}% complété</span>
+      <!-- ══════════════ BODY ══════════════ -->
+      <div class="rc__body">
+
+        <!-- Chips -->
+        <div class="rc__chips">
+          <span class="rc__chip" [ngClass]="typeChipClass">{{ typeLabel }}</span>
+          <span class="rc__chip rc__chip--level">{{ levelLabel }}</span>
+          <span class="rc__chip rc__chip--pct" *ngIf="resource.saved && progress > 0">{{ progress }}% fait</span>
         </div>
 
-        <h3 class="card-title">{{ displayTitle }}</h3>
+        <!-- Title -->
+        <h3 class="rc__title">{{ displayTitle }}</h3>
 
-        <div class="card-desc-wrap">
-          <p class="card-desc">{{ displayDescription }}</p>
+        <!-- Description -->
+        <p class="rc__desc">{{ displayDescription }}</p>
+
+        <!-- Tags -->
+        <div class="rc__tags" *ngIf="resource.tags?.length">
+          <span *ngFor="let t of resource.tags.slice(0,3)" class="rc__tag">{{ t }}</span>
         </div>
 
-        <!-- Translation toggle bar -->
-        <div class="card-translate">
-          <button
-            type="button"
-            class="card-translate-btn"
-            [class.active]="isTranslated"
-            [disabled]="isTranslating"
-            (click)="toggleTranslation(); $event.stopPropagation()"
-            [title]="isTranslated ? 'Afficher l\\'original' : ('Traduire vers ' + oppositeLangLabel)">
-            <svg *ngIf="!isTranslating" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-            <span *ngIf="isTranslating" class="card-translate-spin" aria-hidden="true"></span>
-            {{ isTranslating ? '…' : (isTranslated ? 'Original' : translateLabel) }}
-          </button>
-        </div>
-
-        <!-- Metadata row with SVG icons -->
-        <div class="card-meta">
-          <span class="meta-item" [title]="'Durée : ' + resource.duration">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
+        <!-- Meta -->
+        <div class="rc__meta">
+          <span class="rc__meta-item" [title]="'Durée : ' + resource.duration">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             {{ resource.duration }}
           </span>
-          <span class="meta-item" [title]="'Note : ' + resource.rating">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
+          <span class="rc__meta-item" [title]="'Note : ' + resource.rating">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="#f59e0b"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             {{ resource.rating }}
           </span>
-          <span class="meta-item" [title]="resource.views + ' vues'">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            {{ resource.views.toLocaleString() }}
+          <span class="rc__meta-item" [title]="resource.views + ' vues'">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            {{ resource.views >= 1000 ? (resource.views / 1000 | number:'1.1-1') + 'k' : resource.views }}
           </span>
         </div>
+      </div>
 
-        <!-- Footer actions -->
-        <div class="card-footer">
-          <button type="button" class="btn btn-primary btn-sm" (click)="onOpen()">
-            Ouvrir
-          </button>
+      <!-- ══════════════ FOOTER ══════════════ -->
+      <div class="rc__footer" (click)="$event.stopPropagation()">
+        <!-- Translate pill -->
+        <button
+          type="button"
+          class="rc__pill"
+          [class.rc__pill--on]="isTranslated"
+          [disabled]="isTranslating"
+          (click)="toggleTranslation()"
+          [title]="isTranslated ? 'Voir original' : 'Traduire'">
+          <span *ngIf="isTranslating" class="rc__spin"></span>
+          <svg *ngIf="!isTranslating" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          {{ isTranslating ? '…' : (isTranslated ? 'Original' : translateLabel) }}
+        </button>
+
+        <div class="rc__footer-r">
+          <!-- AI Summarize -->
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
-            (click)="onSummarize()"
+            class="rc__pill"
             [disabled]="summarizing"
-            [title]="summarizing ? 'llama3:8b génère un résumé en local' : 'Résumer avec l\\'IA (llama3:8b local)'">
-            <svg *ngIf="!summarizing" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z"/>
-            </svg>
-            <span *ngIf="summarizing" class="card-summary-spin" aria-hidden="true"></span>
-            {{ summarizing ? 'IA en cours…' : 'Résumer (IA)' }}
+            (click)="onSummarize()"
+            title="Résumer avec l'IA">
+            <span *ngIf="summarizing" class="rc__spin"></span>
+            <svg *ngIf="!summarizing" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2z"/></svg>
+            {{ summarizing ? 'IA…' : 'IA' }}
+          </button>
+          <!-- Open CTA -->
+          <button type="button" class="rc__cta" (click)="onOpen()">
+            Ouvrir
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
         </div>
       </div>
+
     </article>
   `,
   styles: [`
     :host { display: block; height: 100%; }
 
-    .resource-card {
-      background: #fff;
-      border: 1px solid var(--color-border, #e2e8f0);
-      border-radius: var(--radius-lg, 1rem);
+    /* ── Shell ───────────────────────────────────────── */
+    .rc {
+      position: relative;
+      background: #ffffff;
+      border-radius: 18px;
+      border: 1px solid #eaeff6;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       height: 100%;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-      transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+      cursor: pointer;
+      box-shadow:
+        0 1px 2px rgba(15,23,42,0.04),
+        0 2px 8px rgba(15,23,42,0.04);
+      transition:
+        box-shadow   220ms cubic-bezier(.22,.68,0,1.2),
+        transform    220ms cubic-bezier(.22,.68,0,1.2),
+        border-color 220ms ease;
+      outline: none;
     }
-
-    .resource-card:hover {
-      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.10);
-      transform: translateY(-2px);
-      border-color: rgba(20, 184, 166, 0.4);
+    .rc:hover {
+      box-shadow:
+        0 4px 12px rgba(15,23,42,0.08),
+        0 12px 32px rgba(15,23,42,0.10);
+      transform: translateY(-4px);
+      border-color: rgba(20,184,166,0.5);
     }
-
-    /* Recently created (from AI Atelier) — pulse glow + slight border tint */
-    .resource-card-new {
+    .rc:focus-visible {
+      outline: 2px solid #14b8a6;
+      outline-offset: 3px;
+    }
+    .rc--new {
       border-color: #14b8a6;
-      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18), 0 8px 20px -6px rgba(15, 23, 42, 0.15);
-      animation: card-new-pulse 2.4s ease-in-out 0s 3;
+      animation: new-glow 2.6s ease-in-out 3;
     }
-    @keyframes card-new-pulse {
-      0%, 100% { box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18), 0 8px 20px -6px rgba(15, 23, 42, 0.15); }
-      50%      { box-shadow: 0 0 0 6px rgba(20, 184, 166, 0.32), 0 12px 28px -6px rgba(20, 184, 166, 0.35); }
-    }
-
-    .card-new-badge {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 3;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 12px 4px 10px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #14b8a6, #22d3ee);
-      color: #fff;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      box-shadow: 0 6px 14px -3px rgba(20, 184, 166, 0.55);
-      animation: card-new-pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1) 1;
-      pointer-events: none;
-    }
-    @keyframes card-new-pop {
-      from { opacity: 0; transform: translateY(-4px) scale(0.8); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .card-new-sparkle {
-      display: inline-block;
-      animation: card-new-sparkle 1.6s ease-in-out infinite;
-    }
-    @keyframes card-new-sparkle {
-      0%, 100% { transform: scale(1) rotate(0); }
-      50% { transform: scale(1.25) rotate(15deg); }
+    @keyframes new-glow {
+      0%,100% { box-shadow: 0 0 0 3px rgba(20,184,166,0.15), 0 2px 8px rgba(15,23,42,0.05); }
+      50%      { box-shadow: 0 0 0 7px rgba(20,184,166,0.10), 0 8px 24px rgba(20,184,166,0.20); }
     }
 
-    /* --- Thumbnail --- */
-    .card-thumb {
+    /* ── Media zone ──────────────────────────────────── */
+    .rc__media {
       position: relative;
-      aspect-ratio: 16 / 9;
-      width: 100%;
+      height: 164px;
+      flex-shrink: 0;
       overflow: hidden;
-      background: #f1f5f9;
     }
 
-    .thumb-img {
+    /* Per-type gradients (fallback + thumbnail tint) */
+    .rc__media         { background: linear-gradient(145deg, #0f766e 0%, #14b8a6 55%, #5eead4 100%); }
+    .rc__media.h-video    { background: linear-gradient(145deg, #4c1d95 0%, #7c3aed 55%, #a78bfa 100%); }
+    .rc__media.h-podcast  { background: linear-gradient(145deg, #9a3412 0%, #ea580c 55%, #fb923c 100%); }
+    .rc__media.h-exercise { background: linear-gradient(145deg, #9d174d 0%, #db2777 55%, #f9a8d4 100%); }
+    .rc__media.h-template { background: linear-gradient(145deg, #075985 0%, #0284c7 55%, #38bdf8 100%); }
+
+    /* Thumbnail image */
+    .rc__thumb {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
+      transition: transform 320ms cubic-bezier(.22,.68,0,1.2);
     }
+    .rc:hover .rc__thumb { transform: scale(1.04); }
 
-    .thumb-fallback {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #14b8a6, #22d3ee);
-    }
-    .thumb-fallback.type-video    { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
-    .thumb-fallback.type-podcast  { background: linear-gradient(135deg, #f97316, #f59e0b); }
-    .thumb-fallback.type-exercise { background: linear-gradient(135deg, #ec4899, #f43f5e); }
-    .thumb-fallback.type-template { background: linear-gradient(135deg, #06b6d4, #0ea5e9); }
-
-    .thumb-emoji {
-      font-size: 2.75rem;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
-    }
-
-    /* --- Overlays --- */
-    .thumb-overlay-btn {
+    /* Fallback content */
+    .rc__fallback {
       position: absolute;
-      width: 32px;
-      height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 999px;
-      cursor: pointer;
-      color: #fff;
-      background: rgba(15, 23, 42, 0.45);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      transition: background 180ms ease, color 180ms ease, transform 180ms ease;
-    }
-
-    .thumb-overlay-btn:hover { background: rgba(15, 23, 42, 0.65); transform: scale(1.06); }
-    .thumb-overlay-btn:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-    }
-
-    .bookmark-btn {
-      top: 8px;
-      right: 8px;
-      color: rgba(255, 255, 255, 0.75);
-    }
-    .bookmark-btn.saved {
-      background: var(--color-primary, #14b8a6);
-      color: #fff;
-    }
-
-    .admin-cluster {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      display: flex;
-      gap: 6px;
-    }
-    .admin-cluster .thumb-overlay-btn.danger:hover {
-      background: rgba(220, 38, 38, 0.85);
-    }
-
-    @media (hover: hover) {
-      .admin-cluster { opacity: 0; transition: opacity 180ms ease; }
-      .resource-card:hover .admin-cluster,
-      .resource-card:focus-within .admin-cluster { opacity: 1; }
-    }
-
-    /* --- Body --- */
-    .card-body {
-      padding: var(--space-4, 1rem);
+      inset: 0;
       display: flex;
       flex-direction: column;
-      gap: var(--space-2, 0.5rem);
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .rc__fallback-icon {
+      font-size: 2.8rem;
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.28));
+      transition: transform 280ms cubic-bezier(.22,.68,0,1.2);
+    }
+    .rc:hover .rc__fallback-icon { transform: scale(1.15) rotate(-5deg); }
+
+    /* Source domain hint (inside fallback) */
+    .rc__source-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.28);
+      color: rgba(255,255,255,0.92);
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rc__source-favicon {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    /* Scrim overlay (transparent → card bg) */
+    .rc__scrim {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 45%,
+        rgba(255,255,255,0.06) 75%,
+        rgba(255,255,255,0.18) 100%
+      );
+      pointer-events: none;
+    }
+
+    /* "Nouveau" ribbon */
+    .rc__ribbon {
+      position: absolute;
+      top: 10px; left: 10px;
+      z-index: 3;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.22);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      pointer-events: none;
+      animation: ribbon-pop 380ms cubic-bezier(.2,1.4,.4,1) 1;
+    }
+    @keyframes ribbon-pop { from { opacity:0; transform:scale(.7); } to { opacity:1; transform:scale(1); } }
+
+    /* Quality badge */
+    .rc__quality {
+      position: absolute;
+      bottom: 10px; left: 10px;
+      z-index: 3;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.52);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 800;
+      pointer-events: none;
+    }
+    .rc__quality svg { color: #fde68a; flex-shrink: 0; }
+    .rc__quality.q-top { background: rgba(5,150,105,0.75); }
+    .rc__quality.q-low { background: rgba(185,28,28,0.72); }
+
+    /* Bookmark button */
+    .rc__bm {
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 3;
+      width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 50%;
+      background: rgba(255,255,255,0.20);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: rgba(255,255,255,0.88);
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+    .rc__bm:hover { background: rgba(255,255,255,0.36); transform: scale(1.12); }
+    .rc__bm--on { background: rgba(255,255,255,0.92) !important; color: #0d9488 !important; }
+    .rc__bm--pending { opacity: 0.7; cursor: not-allowed; }
+    .rc__bm-spin {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+
+    /* Admin cluster */
+    .rc__admin {
+      position: absolute;
+      top: 10px; left: 10px;
+      z-index: 4;
+      display: flex; gap: 5px;
+      opacity: 0;
+      transition: opacity 160ms ease;
+    }
+    .rc:hover .rc__admin { opacity: 1; }
+    .rc__admin-btn {
+      width: 28px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 8px;
+      background: rgba(255,255,255,0.20);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: rgba(255,255,255,0.92);
+      cursor: pointer;
+      transition: background 140ms ease;
+    }
+    .rc__admin-btn:hover { background: rgba(255,255,255,0.36); }
+    .rc__admin-btn--del:hover { background: rgba(220,38,38,0.72) !important; }
+
+    /* Progress bar */
+    .rc__prog {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: rgba(255,255,255,0.22);
+    }
+    .rc__prog-fill {
+      height: 100%;
+      background: rgba(255,255,255,0.88);
+      border-radius: 0 4px 4px 0;
+      transition: width 500ms cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ── Body ─────────────────────────────────────────── */
+    .rc__body {
+      padding: 14px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
       flex: 1 1 auto;
       min-width: 0;
     }
 
-    .chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2, 0.5rem);
+    /* Chips */
+    .rc__chips {
+      display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+    }
+    .rc__chip {
+      display: inline-flex; align-items: center;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.63rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    /* Type chips */
+    .rc__chip--article  { background: #ccfbf1; color: #0f766e; }
+    .rc__chip--video    { background: #ede9fe; color: #6d28d9; }
+    .rc__chip--podcast  { background: #ffedd5; color: #c2410c; }
+    .rc__chip--exercise { background: #fce7f3; color: #9d174d; }
+    .rc__chip--template { background: #e0f2fe; color: #0369a1; }
+    /* Level chip */
+    .rc__chip--level    { background: #f1f5f9; color: #475569; }
+    /* Progress chip */
+    .rc__chip--pct      {
+      background: linear-gradient(90deg, #ccfbf1, #a5f3fc);
+      color: #0f766e;
     }
 
-    .card-title {
-      font-family: var(--font-display, 'Fraunces', serif);
-      font-size: var(--text-lg, 1.125rem);
-      font-weight: 600;
-      color: var(--color-text, #0f172a);
-      line-height: 1.3;
-      margin: 2px 0;
+    /* Title */
+    .rc__title {
+      font-size: 0.96rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.35;
+      margin: 0;
+      letter-spacing: -0.01em;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      word-break: break-word;
     }
 
-    .card-desc-wrap {
-      flex: 1 1 auto;
-    }
-
-    .card-desc {
-      font-family: var(--font-body, 'DM Sans', sans-serif);
-      font-size: var(--text-sm, 0.875rem);
-      color: var(--color-text-muted, #64748b);
-      line-height: 1.55;
+    /* Description */
+    .rc__desc {
+      font-size: 0.81rem;
+      color: #64748b;
+      line-height: 1.6;
       margin: 0;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -357,178 +467,111 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
       overflow: hidden;
     }
 
-    .card-meta {
-      display: flex;
-      gap: var(--space-4, 1rem);
-      align-items: center;
-      font-size: var(--text-xs, 0.75rem);
-      color: var(--color-text-muted, #64748b);
+    /* Tags */
+    .rc__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .rc__tag {
+      font-size: 0.62rem;
       font-weight: 500;
-      margin-top: var(--space-2, 0.5rem);
-    }
-
-    .meta-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .meta-item svg { flex-shrink: 0; }
-
-    /* --- Footer --- */
-    .card-footer {
-      display: flex;
-      gap: var(--space-2, 0.5rem);
-      padding-top: var(--space-3, 0.75rem);
-      margin-top: var(--space-2, 0.5rem);
-      border-top: 1px solid var(--color-border, #e2e8f0);
-    }
-
-    .btn {
-      padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-      border: 1px solid transparent;
-      border-radius: var(--radius-md, 0.625rem);
-      font-family: inherit;
-      font-weight: 600;
-      font-size: var(--text-xs, 0.75rem);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
-    }
-
-    .btn:disabled { cursor: not-allowed; opacity: 0.6; }
-    .btn:focus-visible { outline: 2px solid var(--color-primary, #14b8a6); outline-offset: 2px; }
-
-    .btn-primary {
-      background: var(--color-primary, #14b8a6);
-      color: #fff;
-    }
-    .btn-primary:hover:not(:disabled) { background: #0d9488; }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--color-text-muted, #64748b);
-      border-color: var(--color-border, #e2e8f0);
-    }
-    .btn-ghost:hover:not(:disabled) {
-      background: rgba(20, 184, 166, 0.08);
-      color: var(--color-primary, #14b8a6);
-      border-color: rgba(20, 184, 166, 0.3);
-    }
-
-    .btn-sm { padding: 6px 10px; }
-
-    /* --- Chips (self-contained in case global .chip changes) --- */
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      background: #f1f5f9;
-      color: #475569;
-      text-transform: capitalize;
-      letter-spacing: 0.02em;
-    }
-    .chip-neutral  { background: #f1f5f9;            color: #475569; }
-    .chip-purple   { background: #ede9fe;            color: #6d28d9; }
-    .chip-orange   { background: #ffedd5;            color: #c2410c; }
-    .chip-pink     { background: #fce7f3;            color: #be185d; }
-    .chip-cyan     { background: #cffafe;            color: #0e7490; }
-    .chip-teal     { background: #ccfbf1;            color: #0f766e; }
-    .chip-mint     { background: linear-gradient(90deg, #ccfbf1, #ecfeff); color: #0f766e; }
-
-    /* --- Compact mode --- */
-    .resource-card-compact .card-body { padding: var(--space-3, 0.75rem); gap: 6px; }
-    .resource-card-compact .card-title { font-size: var(--text-base, 1rem); }
-    .resource-card-compact .card-desc { -webkit-line-clamp: 1; }
-    .resource-card-compact .card-footer { padding-top: var(--space-2, 0.5rem); margin-top: 4px; }
-
-    /* AI Quality score badge */
-    .card-quality-badge {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      z-index: 3;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 9px 3px 7px;
-      border-radius: 999px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      background: rgba(15, 23, 42, 0.72);
-      color: #fff;
-      font-size: 0.7rem;
-      font-weight: 700;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-    }
-    .card-quality-badge svg { color: #fbbf24; }
-    .card-quality-badge.q-top { background: rgba(21, 128, 61, 0.85); border-color: rgba(134, 239, 172, 0.4); }
-    .card-quality-badge.q-good { background: rgba(15, 23, 42, 0.75); }
-    .card-quality-badge.q-low { background: rgba(153, 27, 27, 0.82); border-color: rgba(252, 165, 165, 0.3); }
-
-    .card-summary-spin {
-      display: inline-block;
-      width: 12px; height: 12px;
-      border: 2px solid rgba(20, 184, 166, 0.25);
-      border-top-color: #14b8a6;
-      border-radius: 50%;
-      animation: card-summary-spin 0.7s linear infinite;
-      margin-right: 2px;
-    }
-    @keyframes card-summary-spin { to { transform: rotate(360deg); } }
-
-    /* Translation button */
-    .card-translate {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      margin-top: -2px;
-    }
-    .card-translate-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border: 1px solid transparent;
-      border-radius: 999px;
-      background: transparent;
       color: #94a3b8;
-      font-size: 0.68rem;
+      background: #f8fafc;
+      border: 1px solid #e8edf5;
+      padding: 1px 7px;
+      border-radius: 6px;
+    }
+    .rc__tag::before { content: '#'; opacity: 0.6; }
+
+    /* Meta */
+    .rc__meta {
+      display: flex; gap: 12px; align-items: center;
+      padding-top: 4px;
+      border-top: 1px solid #f1f5f9;
+      margin-top: 2px;
+    }
+    .rc__meta-item {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 0.71rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .rc__meta-item svg { flex-shrink: 0; }
+
+    /* ── Footer ───────────────────────────────────────── */
+    .rc__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px 14px;
+      margin-top: auto;
+    }
+    .rc__footer-r { display: flex; align-items: center; gap: 6px; }
+
+    /* Ghost pills */
+    .rc__pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 5px 11px;
+      height: 29px;
+      border-radius: 999px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      font-family: inherit;
+      font-size: 0.71rem;
       font-weight: 600;
       cursor: pointer;
-      font-family: inherit;
-      transition: all 140ms ease;
+      transition: background 130ms ease, color 130ms ease, border-color 130ms ease, transform 120ms ease;
     }
-    .card-translate-btn:hover:not(:disabled) {
-      color: #0891b2;
+    .rc__pill:hover:not(:disabled) {
+      background: #f0fdf9;
+      color: #0d9488;
+      border-color: rgba(20,184,166,0.4);
+    }
+    .rc__pill--on {
       background: #ecfeff;
-      border-color: #cffafe;
-    }
-    .card-translate-btn.active {
       color: #0e7490;
-      background: #ecfeff;
       border-color: #a5f3fc;
     }
-    .card-translate-btn:disabled { opacity: 0.6; cursor: wait; }
-    .card-translate-spin {
-      display: inline-block;
-      width: 10px; height: 10px;
-      border: 2px solid rgba(8, 145, 178, 0.25);
-      border-top-color: #0891b2;
-      border-radius: 50%;
-      animation: card-summary-spin 0.7s linear infinite;
-    }
+    .rc__pill:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rc__pill:active:not(:disabled) { transform: scale(0.95); }
 
-    /* Reduced-motion */
+    /* Primary CTA */
+    .rc__cta {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 14px;
+      height: 29px;
+      border-radius: 999px;
+      border: none;
+      background: #14b8a6;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+      transition: background 130ms ease, transform 120ms ease, box-shadow 130ms ease;
+      box-shadow: 0 2px 8px rgba(20,184,166,0.30);
+    }
+    .rc__cta:hover {
+      background: #0d9488;
+      box-shadow: 0 4px 14px rgba(20,184,166,0.40);
+      transform: translateY(-1px);
+    }
+    .rc__cta:active { transform: scale(0.96); }
+
+    /* Spinner */
+    .rc__spin {
+      display: inline-block;
+      width: 11px; height: 11px;
+      border: 2px solid rgba(20,184,166,0.2);
+      border-top-color: #14b8a6;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     @media (prefers-reduced-motion: reduce) {
-      .resource-card, .thumb-overlay-btn, .admin-cluster, .btn {
-        transition: none !important;
-        transform: none !important;
+      .rc, .rc__thumb, .rc__fallback-icon, .rc__bm, .rc__cta, .rc__pill {
+        transition: none !important; animation: none !important; transform: none !important;
       }
     }
   `]
@@ -540,6 +583,7 @@ export class ResourceCardComponent implements OnInit {
   @Input() progress = 0;
   @Input() summarizing = false;
   @Input() highlight = false;
+  @Input() bookmarkPending = false;
   @Output() toggleSaved = new EventEmitter<void>();
   @Output() edit = new EventEmitter<Resource>();
   @Output() delete = new EventEmitter<Resource>();
@@ -547,25 +591,58 @@ export class ResourceCardComponent implements OnInit {
   @Output('summarize') summarizeClicked = new EventEmitter<Resource>();
 
   thumbError = false;
+  faviconError = false;
 
-  // Translation state
+  /**
+   * Returns the best image URL for this resource:
+   * 1. Backend-stored thumbnailUrl
+   * 2. YouTube video thumbnail derived from URL (no API key needed)
+   * 3. GitHub repo social preview derived from URL
+   * 4. null → triggers gradient fallback
+   */
+  get resolvedThumbUrl(): string | null {
+    if (this.resource.thumbnailUrl && !this.thumbError) return this.resource.thumbnailUrl;
+    const url = this.resource.url;
+    if (!url) return null;
+    try {
+      const u = new URL(url);
+      const host = u.hostname.replace(/^www\./, '');
+
+      // YouTube: works for both youtube.com/watch?v=ID and youtu.be/ID
+      if (host === 'youtube.com' || host === 'youtu.be') {
+        const vid = host === 'youtu.be'
+          ? u.pathname.replace(/^\//, '').split('?')[0]
+          : u.searchParams.get('v');
+        if (vid) return `https://img.youtube.com/vi/${vid}/hqdefault.jpg`;
+      }
+
+      // GitHub: public repo social preview (always available)
+      if (host === 'github.com') {
+        const parts = u.pathname.split('/').filter(p => p.length > 0);
+        if (parts.length >= 2) {
+          return `https://opengraph.githubassets.com/1/${parts[0]}/${parts[1]}`;
+        }
+      }
+
+    } catch { /* malformed URL → fallback */ }
+    return null;
+  }
+
   private resourceApi = inject(ResourceApiService);
   isTranslating = false;
   isTranslated = false;
   private translatedCache: { title: string; description: string; lang: string } | null = null;
 
-  // Quality score state
   qualityScore: number | null = null;
   qualityComment = '';
   qualityProvider = '';
+  private qualityLoaded = false;
 
-  ngOnInit(): void {
-    if (this.resource?.id && this.resource.id !== 'preview') {
-      this.loadQualityScore();
-    }
-  }
+  ngOnInit(): void {}
 
-  private loadQualityScore(): void {
+  onCardHover(): void {
+    if (this.qualityLoaded || !this.resource?.id || this.resource.id === 'preview') return;
+    this.qualityLoaded = true;
     this.resourceApi.qualityScore(this.resource.id).subscribe({
       next: (res) => {
         if (res && typeof res.overall === 'number') {
@@ -574,38 +651,50 @@ export class ResourceCardComponent implements OnInit {
           this.qualityProvider = res.provider || '';
         }
       },
-      error: () => { /* silent — quality is optional UX */ },
+      error: () => {},
     });
   }
 
   get qualityClass(): string {
     if (this.qualityScore === null) return '';
     if (this.qualityScore >= 4.2) return 'q-top';
-    if (this.qualityScore >= 3.0) return 'q-good';
+    if (this.qualityScore >= 3.0) return '';
     return 'q-low';
   }
 
   get qualityTooltip(): string {
-    if (this.qualityScore === null) return '';
-    const by = this.qualityProvider === 'ollama' ? ' (par llama3)' : '';
-    return `Score qualité IA ${this.qualityScore.toFixed(1)}/5${by}${this.qualityComment ? ' — ' + this.qualityComment : ''}`;
+    const by = this.qualityProvider === 'ollama' ? ' · llama3' : '';
+    return `Qualité IA ${this.qualityScore?.toFixed(1)}/5${by}${this.qualityComment ? ' — ' + this.qualityComment : ''}`;
   }
 
-  /** Heuristic: detect whether the title looks French or English to decide toggle direction. */
+  /** Extract a clean domain name from the resource URL for the source hint. */
+  get sourceDomain(): string {
+    try {
+      const url = this.resource?.url;
+      if (!url) return '';
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      const knownLabels: Record<string, string> = {
+        'youtube.com': 'YouTube', 'youtu.be': 'YouTube',
+        'github.com': 'GitHub', 'dev.to': 'DEV.to',
+        'medium.com': 'Medium', 'freecodecamp.org': 'freeCodeCamp',
+        'udemy.com': 'Udemy', 'coursera.org': 'Coursera',
+        'spotify.com': 'Spotify', 'goodreads.com': 'Goodreads',
+        'codewars.com': 'Codewars', 'leetcode.com': 'LeetCode',
+        'hackerrank.com': 'HackerRank', 'pluralsight.com': 'Pluralsight',
+      };
+      return knownLabels[host] ?? host;
+    } catch { return ''; }
+  }
+
   private detectLang(): 'fr' | 'en' {
-    const t = (this.resource?.title || '').toLowerCase() + ' ' + (this.resource?.description || '').toLowerCase();
-    const frHints = [' le ', ' la ', ' les ', ' un ', ' une ', ' des ', ' et ', ' pour ', ' avec ', ' dans ', 'é', 'è', 'ê', 'à', 'ç'];
-    const hits = frHints.reduce((n, w) => n + (t.includes(w) ? 1 : 0), 0);
+    const t = (this.resource?.title || '') + ' ' + (this.resource?.description || '');
+    const frHints = [' le ', ' la ', ' les ', ' un ', ' une ', ' des ', ' et ', ' pour ', ' avec ', 'é', 'è', 'ê', 'à', 'ç'];
+    const hits = frHints.reduce((n, w) => n + (t.toLowerCase().includes(w) ? 1 : 0), 0);
     return hits >= 2 ? 'fr' : 'en';
   }
 
-  get oppositeLangLabel(): string {
-    return this.detectLang() === 'fr' ? 'l\'anglais' : 'le français';
-  }
-
-  get translateLabel(): string {
-    return this.detectLang() === 'fr' ? 'EN' : 'FR';
-  }
+  get oppositeLangLabel(): string { return this.detectLang() === 'fr' ? "l'anglais" : 'le français'; }
+  get translateLabel(): string { return this.detectLang() === 'fr' ? 'EN' : 'FR'; }
 
   get displayTitle(): string {
     return this.isTranslated && this.translatedCache ? this.translatedCache.title : this.resource.title;
@@ -617,16 +706,8 @@ export class ResourceCardComponent implements OnInit {
 
   toggleTranslation(): void {
     if (this.isTranslating) return;
-    // If already translated, just toggle back to original (no network call).
-    if (this.isTranslated) {
-      this.isTranslated = false;
-      return;
-    }
-    // Cached translation exists? show instantly.
-    if (this.translatedCache) {
-      this.isTranslated = true;
-      return;
-    }
+    if (this.isTranslated) { this.isTranslated = false; return; }
+    if (this.translatedCache) { this.isTranslated = true; return; }
     const target: 'fr' | 'en' = this.detectLang() === 'fr' ? 'en' : 'fr';
     this.isTranslating = true;
     this.resourceApi.translateResource(this.resource.id, target).subscribe({
@@ -640,62 +721,34 @@ export class ResourceCardComponent implements OnInit {
   }
 
   get typeIcon(): string {
-    switch (this.resource.type) {
-      case 'video': return '🎬';
-      case 'podcast': return '🎙️';
-      case 'exercise': return '💪';
-      case 'template': return '📋';
-      default: return '📄';
-    }
+    const m: Record<string, string> = { article: '📄', video: '🎬', podcast: '🎙️', exercise: '💪', template: '📋' };
+    return m[this.resource?.type] ?? '📄';
   }
 
   get typeLabel(): string {
-    const map: Record<Resource['type'], string> = {
-      article: 'Article',
-      video: 'Vidéo',
-      podcast: 'Podcast',
-      exercise: 'Exercice',
-      template: 'Modèle',
-    };
-    return map[this.resource.type] ?? this.resource.type;
+    const m: Record<Resource['type'], string> = { article: 'Article', video: 'Vidéo', podcast: 'Podcast', exercise: 'Exercice', template: 'Modèle' };
+    return m[this.resource.type] ?? this.resource.type;
   }
 
   get levelLabel(): string {
-    const map: Record<Resource['level'], string> = {
-      beginner: 'Débutant',
-      intermediate: 'Intermédiaire',
-      advanced: 'Avancé',
-    };
-    return map[this.resource.level] ?? this.resource.level;
+    const m: Record<Resource['level'], string> = { beginner: 'Débutant', intermediate: 'Intermédiaire', advanced: 'Avancé' };
+    return m[this.resource.level] ?? this.resource.level;
   }
 
   get typeChipClass(): string {
-    switch (this.resource.type) {
-      case 'video': return 'chip-purple';
-      case 'podcast': return 'chip-orange';
-      case 'exercise': return 'chip-pink';
-      case 'template': return 'chip-cyan';
-      default: return 'chip-teal';
-    }
+    return `rc__chip--${this.resource.type}`;
   }
 
-  get typeFallbackClass(): string {
-    return `type-${this.resource.type}`;
+  get typeHeaderClass(): string {
+    return `h-${this.resource.type}`;
   }
 
   onThumbError() { this.thumbError = true; }
-
   onToggleSaved() { this.toggleSaved.emit(); }
-
   onEdit() { this.edit.emit(this.resource); }
-
   onDelete() {
-    if (confirm(`Supprimer « ${this.resource.title} » ? Cette action est irréversible.`)) {
-      this.delete.emit(this.resource);
-    }
+    if (confirm(`Supprimer « ${this.resource.title} » ?`)) this.delete.emit(this.resource);
   }
-
   onOpen() { this.open.emit(this.resource); }
-
   onSummarize() { this.summarizeClicked.emit(this.resource); }
 }

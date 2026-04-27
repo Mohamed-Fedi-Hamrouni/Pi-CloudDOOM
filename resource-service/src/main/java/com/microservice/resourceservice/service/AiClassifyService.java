@@ -1,5 +1,7 @@
 package com.microservice.resourceservice.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.resourceservice.ai.service.OllamaClient;
 import com.microservice.resourceservice.config.AiGenerationProperties;
 import com.microservice.resourceservice.enums.IndustryEnum;
@@ -11,11 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * "Tout remplir avec l'IA": given just a title (and optional description), asks the LLM
@@ -30,6 +31,7 @@ public class AiClassifyService {
     private final OllamaClient ollamaClient;
     private final AiGenerationProperties props;
     private final ResourceCategoryRepository categoryRepository;
+    private final ObjectMapper objectMapper;
 
     public record Classification(
         String title,
@@ -65,6 +67,8 @@ public class AiClassifyService {
 
     // ============ Ollama path ============
     private Classification classifyWithOllama(String title, String descriptionHint, List<ResourceCategory> allCats) {
+        title = PromptSanitizer.sanitizeTitle(title);
+        descriptionHint = PromptSanitizer.sanitizeDescription(descriptionHint);
         String categoryList = allCats.stream()
             .map(c -> "- " + c.getName())
             .limit(40)
@@ -92,12 +96,33 @@ public class AiClassifyService {
         String raw = ollamaClient.generate(prompt, 350);
         if (raw == null || raw.isBlank()) return null;
 
-        ResourceTypeEnum type = parseEnum(raw, "type", ResourceTypeEnum.class, ResourceTypeEnum.ARTICLE);
-        ResourceLevelEnum level = parseEnum(raw, "level", ResourceLevelEnum.class, ResourceLevelEnum.INTERMEDIATE);
-        IndustryEnum industry = parseEnum(raw, "industry", IndustryEnum.class, IndustryEnum.TECHNOLOGY);
-        String description = parseString(raw, "description");
-        String categoryName = parseString(raw, "category");
-        List<String> tags = parseTags(raw);
+        ResourceTypeEnum type = ResourceTypeEnum.ARTICLE;
+        ResourceLevelEnum level = ResourceLevelEnum.INTERMEDIATE;
+        IndustryEnum industry = IndustryEnum.TECHNOLOGY;
+        String description = null;
+        String categoryName = null;
+        List<String> tags = List.of();
+
+        try {
+            String json = extractFirstJson(raw);
+            JsonNode node = objectMapper.readTree(json != null ? json : raw);
+            type = parseEnumNode(node, "type", ResourceTypeEnum.class, ResourceTypeEnum.ARTICLE);
+            level = parseEnumNode(node, "level", ResourceLevelEnum.class, ResourceLevelEnum.INTERMEDIATE);
+            industry = parseEnumNode(node, "industry", IndustryEnum.class, IndustryEnum.TECHNOLOGY);
+            description = node.path("description").asText(null);
+            categoryName = node.path("category").asText(null);
+            JsonNode tagsNode = node.path("tags");
+            if (tagsNode.isArray()) {
+                List<String> parsed = new ArrayList<>();
+                for (JsonNode t : tagsNode) {
+                    String s = t.asText("").trim().toLowerCase(Locale.ROOT);
+                    if (!s.isBlank()) parsed.add(s);
+                }
+                tags = parsed;
+            }
+        } catch (Exception e) {
+            log.warn("Jackson parse failed for classify response, using defaults: {}", e.getMessage());
+        }
 
         ResourceCategory matchedCat = matchCategory(categoryName, allCats, industry);
 
@@ -170,35 +195,27 @@ public class AiClassifyService {
     }
 
     // ============ parsing helpers ============
-    private static <E extends Enum<E>> E parseEnum(String json, String field, Class<E> type, E defaultValue) {
-        String val = parseString(json, field);
-        if (val == null) return defaultValue;
+    private static <E extends Enum<E>> E parseEnumNode(JsonNode root, String field, Class<E> type, E defaultValue) {
+        String val = root.path(field).asText(null);
+        if (val == null || val.isBlank()) return defaultValue;
         try { return Enum.valueOf(type, val.trim().toUpperCase(Locale.ROOT)); }
         catch (Exception e) { return defaultValue; }
     }
 
-    private static String parseString(String json, String field) {
-        Pattern p = Pattern.compile("\"" + field + "\"\\s*:\\s*\"((?:\\\\\"|[^\"])*)\"");
-        Matcher m = p.matcher(json);
-        if (m.find()) {
-            return m.group(1).replace("\\\"", "\"").replace("\\n", " ").trim();
+    private static String extractFirstJson(String text) {
+        if (text == null) return null;
+        int start = text.indexOf('{');
+        if (start < 0) return null;
+        int depth = 0;
+        boolean inStr = false, esc = false;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (inStr) { if (esc) { esc = false; } else if (c == '\\') { esc = true; } else if (c == '"') { inStr = false; } continue; }
+            if (c == '"') { inStr = true; continue; }
+            if (c == '{') depth++;
+            else if (c == '}') { if (--depth == 0) return text.substring(start, i + 1); }
         }
         return null;
-    }
-
-    private static List<String> parseTags(String json) {
-        Pattern p = Pattern.compile("\"tags\"\\s*:\\s*\\[([^\\]]*)\\]");
-        Matcher m = p.matcher(json);
-        if (!m.find()) return List.of();
-        String inner = m.group(1);
-        Pattern t = Pattern.compile("\"((?:\\\\\"|[^\"])*)\"");
-        Matcher tm = t.matcher(inner);
-        List<String> out = new java.util.ArrayList<>();
-        while (tm.find()) {
-            String s = tm.group(1).replace("\\\"", "\"").trim().toLowerCase(Locale.ROOT);
-            if (!s.isBlank()) out.add(s);
-        }
-        return out;
     }
 
     private static ResourceCategory matchCategory(String name, List<ResourceCategory> allCats, IndustryEnum industry) {

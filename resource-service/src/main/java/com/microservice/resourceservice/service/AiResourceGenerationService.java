@@ -17,8 +17,9 @@ import com.microservice.resourceservice.service.ai.AiResourceProvider;
 import com.microservice.resourceservice.service.ai.OpenAiChatCompletionsResourceProvider;
 import com.microservice.resourceservice.service.ai.OllamaAiResourceProvider;
 import com.microservice.resourceservice.service.ai.StubAiResourceProvider;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -28,12 +29,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AiResourceGenerationService {
 
@@ -44,6 +41,27 @@ public class AiResourceGenerationService {
     private final StubAiResourceProvider stubProvider;
     private final OllamaAiResourceProvider ollamaProvider;
     private final OpenAiChatCompletionsResourceProvider openAiProvider;
+    private final ThreadPoolTaskExecutor aiTaskExecutor;
+
+    public AiResourceGenerationService(
+        AiGenerationProperties props,
+        ResourceCategoryRepository categoryRepository,
+        ResourceRepository resourceRepository,
+        ResourceService resourceService,
+        StubAiResourceProvider stubProvider,
+        OllamaAiResourceProvider ollamaProvider,
+        OpenAiChatCompletionsResourceProvider openAiProvider,
+        @Qualifier("aiTaskExecutor") ThreadPoolTaskExecutor aiTaskExecutor
+    ) {
+        this.props = props;
+        this.categoryRepository = categoryRepository;
+        this.resourceRepository = resourceRepository;
+        this.resourceService = resourceService;
+        this.stubProvider = stubProvider;
+        this.ollamaProvider = ollamaProvider;
+        this.openAiProvider = openAiProvider;
+        this.aiTaskExecutor = aiTaskExecutor;
+    }
 
     public AiGenerateResourcesResponse generateAndInsert(AiGenerateResourcesRequest request) {
         int requested = resolveCount(request);
@@ -60,11 +78,6 @@ public class AiResourceGenerationService {
         IndustryEnum industry = request != null ? request.getIndustry() : null;
         ResourceLevelEnum level = request != null ? request.getLevel() : null;
         ResourceTypeEnum type = request != null ? request.getType() : null;
-
-        // Parallel LLM calls — up to 4 concurrent requests across categories.
-        // Ollama typically handles ~2 concurrent generations well; 4 stays safe even on CPU.
-        final int parallelism = Math.min(4, Math.max(1, perCategoryCounts.size()));
-        ExecutorService pool = Executors.newFixedThreadPool(parallelism);
 
         final AiResourceProvider providerRef = provider;
         final IndustryEnum industryRef = industry;
@@ -91,7 +104,7 @@ public class AiResourceGenerationService {
                     }
                 }
                 return new CategoryDrafts(category, drafts, localWarnings);
-            }, pool));
+            }, aiTaskExecutor));
         }
 
         // Gather all results. CompletableFuture.allOf lets us wait once for everything.
@@ -99,12 +112,7 @@ public class AiResourceGenerationService {
         List<String> warnings = new ArrayList<>();
         int skipped = 0;
 
-        try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        } finally {
-            pool.shutdown();
-            try { pool.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
-        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
         // DB inserts are kept sequential to preserve transactional ordering + avoid pool contention.
         for (CompletableFuture<CategoryDrafts> f : futures) {

@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,6 +48,10 @@ public interface ResourceRepository extends JpaRepository<Resource, UUID> {
     @Query("SELECT r FROM Resource r WHERE LOWER(r.title) LIKE LOWER(CONCAT('%', :query, '%')) " +
         "OR LOWER(r.description) LIKE LOWER(CONCAT('%', :query, '%'))")
     Page<Resource> searchByTitleOrDescription(@Param("query") String query, Pageable pageable);
+
+    // Soft-delete-safe, limited list for in-memory similarity scoring
+    @Query("SELECT r FROM Resource r ORDER BY r.createdAt DESC")
+    List<Resource> findTopActive(Pageable pageable);
 
     // --- Stats helpers (used by ResourceService.getStats()) ---
     long countByType(ResourceTypeEnum type);

@@ -16,6 +16,7 @@ public interface ResourceMapper {
     @Mapping(target = "deletedAt", ignore = true)
     @Mapping(target = "bookmarks", ignore = true)
     @Mapping(target = "category", ignore = true)
+    @Mapping(target = "viewCount", ignore = true)
     Resource toEntity(ResourceRequest request);
 
     @Mapping(source = "category.id", target = "categoryId")

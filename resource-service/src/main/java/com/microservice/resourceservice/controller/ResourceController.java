@@ -52,6 +52,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+
 @RestController
 @RequestMapping("/api/resources")
 @RequiredArgsConstructor
@@ -171,6 +173,19 @@ public class ResourceController {
         return aiResourceSummaryService.streamSummary(id);
     }
 
+    @PostMapping("/{id}/view")
+    public ResponseEntity<Void> incrementView(@PathVariable UUID id) {
+        resourceService.incrementViewCount(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/fetch-thumb")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasAuthority('SCOPE_admin')")
+    @Operation(summary = "Fetch and store OG image for a resource (admin)")
+    public ResponseEntity<ResourceResponse> fetchThumb(@PathVariable UUID id) {
+        return ResponseEntity.ok(resourceService.fetchAndUpdateThumb(id));
+    }
+
     @GetMapping("/search")
     public ResponseEntity<Page<ResourceResponse>> searchResources(
         @RequestParam String query,
@@ -258,7 +273,7 @@ public class ResourceController {
 
     @GetMapping("/bookmarks")
     public ResponseEntity<List<UserBookmarkResponse>> getBookmarks(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = resolveUserId(jwt);
         return ResponseEntity.ok(resourceService.getUserBookmarks(userId));
     }
 
@@ -267,7 +282,7 @@ public class ResourceController {
         @PathVariable UUID id,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = resolveUserId(jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(resourceService.addBookmark(userId, id));
     }
 
@@ -276,8 +291,20 @@ public class ResourceController {
         @PathVariable UUID id,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = resolveUserId(jwt);
         resourceService.removeBookmark(userId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    private static UUID resolveUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(BAD_REQUEST, "Missing JWT subject");
+        }
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(BAD_REQUEST,
+                "JWT subject is not a valid UUID: " + jwt.getSubject());
+        }
     }
 }

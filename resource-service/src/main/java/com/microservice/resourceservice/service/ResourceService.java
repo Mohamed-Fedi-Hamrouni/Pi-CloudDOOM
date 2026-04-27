@@ -26,6 +26,7 @@ import com.microservice.resourceservice.repository.UserBookmarkRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +51,7 @@ public class ResourceService {
     private final ResourceCategoryMapper categoryMapper;
     private final UserBookmarkMapper bookmarkMapper;
     private final ResourceEventProducer eventProducer;
+    private final OgImageFetchService ogImageFetchService;
 
     @Transactional(readOnly = true)
     public Page<ResourceResponse> getAllResources(Pageable pageable) {
@@ -96,7 +99,7 @@ public class ResourceService {
     }
 
     @Transactional
-    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
+    @CacheEvict(value = "categories", allEntries = true)
     public ResourceResponse createResource(ResourceRequest request) {
         if (resourceRepository.existsByUrl(request.getUrl())) {
             throw new IllegalArgumentException("Resource with URL already exists: " + request.getUrl());
@@ -107,6 +110,21 @@ public class ResourceService {
         Resource resource = resourceMapper.toEntity(request);
         resource.setCategory(category);
         Resource saved = resourceRepository.save(resource);
+
+        // Async: fetch OG image if no thumbnail was supplied
+        if (saved.getThumbUrl() == null || saved.getThumbUrl().isBlank()) {
+            final UUID savedId = saved.getId();
+            final String savedUrl = saved.getUrl();
+            CompletableFuture.runAsync(() -> {
+                ogImageFetchService.resolve(savedUrl).ifPresent(imgUrl -> {
+                    resourceRepository.findById(savedId).ifPresent(r -> {
+                        r.setThumbUrl(imgUrl);
+                        resourceRepository.save(r);
+                        log.info("Auto-set thumbUrl for resource {}: {}", savedId, imgUrl);
+                    });
+                });
+            });
+        }
 
         ResourceEvent event = ResourceEvent.builder()
             .eventId(UUID.randomUUID())
@@ -121,7 +139,14 @@ public class ResourceService {
     }
 
     @Transactional
-    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "ai-summary",   key = "#id.toString()"),
+        @CacheEvict(value = "ai-quality",   key = "#id.toString()"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':fr'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':en'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':es'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':ar'")
+    })
     public ResourceResponse updateResource(UUID id, ResourceRequest request) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
@@ -158,7 +183,14 @@ public class ResourceService {
     }
 
     @Transactional
-    @CacheEvict(value = {"resource", "resource-summary"}, allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "ai-summary",   key = "#id.toString()"),
+        @CacheEvict(value = "ai-quality",   key = "#id.toString()"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':fr'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':en'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':es'"),
+        @CacheEvict(value = "ai-translate", key = "#id.toString() + ':ar'")
+    })
     public void deleteResource(UUID id) {
         Resource resource = resourceRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
@@ -203,6 +235,28 @@ public class ResourceService {
             throw new IllegalArgumentException("Category with name already exists: " + request.getName());
         }
         return categoryMapper.toResponse(categoryRepository.save(categoryMapper.toEntity(request)));
+    }
+
+    @Transactional
+    public long incrementViewCount(UUID id) {
+        Resource resource = resourceRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
+        resource.setViewCount(resource.getViewCount() + 1);
+        resourceRepository.save(resource);
+        return resource.getViewCount();
+    }
+
+    /** Manually trigger OG image fetch for a resource. Used by admin endpoint. */
+    @Transactional
+    public ResourceResponse fetchAndUpdateThumb(UUID id) {
+        Resource resource = resourceRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
+        ogImageFetchService.resolve(resource.getUrl()).ifPresent(imgUrl -> {
+            resource.setThumbUrl(imgUrl);
+            resourceRepository.save(resource);
+            log.info("Manually updated thumbUrl for resource {}: {}", id, imgUrl);
+        });
+        return resourceMapper.toResponse(resource);
     }
 
     @Transactional(readOnly = true)
