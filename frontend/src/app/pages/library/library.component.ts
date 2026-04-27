@@ -7198,10 +7198,12 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
   }
 
   openSimilarResource(apiRes: ResourceApiResponse): void {
-    const uiRes = this.toUiResource(apiRes);
-    // Close then reopen with new resource for a clean reveal
-    this.closeSummaryModal();
-    setTimeout(() => this.onResourceSummarize(uiRes), 80);
+    if (apiRes.url) {
+      window.open(apiRes.url, '_blank', 'noopener,noreferrer');
+      if (this.authService.isAuthenticated()) {
+        this.resourceApi.recordOpen(apiRes.id).subscribe({ error: () => {} });
+      }
+    }
   }
 
   regenerateSummary(): void {
