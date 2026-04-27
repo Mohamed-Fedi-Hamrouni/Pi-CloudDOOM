@@ -71,8 +71,8 @@ public class EngagementController {
         try {
             return UUID.fromString(jwt.getSubject());
         } catch (IllegalArgumentException e) {
-            throw new org.springframework.web.server.ResponseStatusException(BAD_REQUEST,
-                "JWT subject is not a valid UUID: " + jwt.getSubject());
+            // Non-standard Keycloak subject — derive a stable v3 UUID from the raw string
+            return UUID.nameUUIDFromBytes(jwt.getSubject().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
     }
 }
