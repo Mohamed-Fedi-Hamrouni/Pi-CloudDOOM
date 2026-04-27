@@ -4,7 +4,6 @@ package com.microservice.interviewservice.service.impl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.microservice.interviewservice.exception.ResourceNotFoundException;
 import com.microservice.interviewservice.model.PerformanceReport;
 import com.microservice.interviewservice.model.ProgressTracker;
 import com.microservice.interviewservice.repository.ProgressTrackerRepository;
@@ -46,7 +45,11 @@ public class ProgressTrackerServiceImpl implements ProgressTrackerService {
     @Transactional(readOnly = true)
     public ProgressTracker getProgressForUser(String userId) {
         return trackerRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No progress found for user. Complete at least one session first."));
+                .orElseGet(() -> ProgressTracker.builder()
+                        .userId(userId)
+                        .totalSessionsCompleted(0)
+                        .averageScore(0.0)
+                        .bestScore(0.0)
+                        .build());
     }
 }

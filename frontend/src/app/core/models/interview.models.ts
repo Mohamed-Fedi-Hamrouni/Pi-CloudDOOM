@@ -1,4 +1,5 @@
 // Enums matching backend exactly
+export type InterviewLanguage = "EN" | "FR" | "AR_TN";
 export type InterviewType =
     | "BEHAVIORAL"
     | "TECHNICAL"
@@ -17,7 +18,7 @@ export type IndustryType =
     | "ENGINEERING"
     | "CONSULTING"
     | "SALES_MARKETING";
-export type CareerLevel = "INTERN" | "JUNIOR" | "MID" | "SENIOR" | "LEAD";
+export type CareerLevel = "JUNIOR" | "MID" | "SENIOR";
 export type PreparationLevel =
     | "BEGINNER"
     | "INTERMEDIATE"
@@ -42,12 +43,14 @@ export interface InterviewSessionResponse {
     endedAt: string | null;
     createdAt: string;
     remainingTimeMinutes: number;
+    language: InterviewLanguage;
 }
 
 export interface CreateSessionRequest {
     type: InterviewType;
     industry: IndustryType;
     targetLevel: CareerLevel;
+    language?: InterviewLanguage;
     durationMinutes: number;
     difficultyLevel: number;
     isRecorded: boolean;
@@ -93,8 +96,12 @@ export interface PerformanceReport {
     actionableRecommendations: string;
     estimatedSessionsToNextLevel: number;
     generatedAt: string;
+        hesitationScore?: number;
+    stressProxyScore?: number;
+    behavioralSummary?: string;
+    communicationSummary?: string;
+    stressProxySummary?: string;
 }
-
 export interface ProgressTracker {
     userId: string;
     totalSessionsCompleted: number;

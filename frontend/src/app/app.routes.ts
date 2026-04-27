@@ -40,6 +40,20 @@ export const routes: Routes = [
                     ),
             },
             {
+                path: "live-interview/:id",
+                loadComponent: () =>
+                    import("./pages/live-interview/live-interview.component").then(
+                        (m) => m.LiveInterviewComponent,
+                    ),
+            },
+            {
+                path: "quick-interview/:id",
+                loadComponent: () =>
+                    import("./pages/quick-interview/quick-interview.component").then(
+                        (m) => m.QuickInterviewComponent,
+                    ),
+            },
+            {
                 path: "reports",
                 loadComponent: () =>
                     import("./pages/reports/reports.component").then(

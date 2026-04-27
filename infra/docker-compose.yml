@@ -439,7 +439,6 @@ volumes:
   uploadsdata:
   whisperdata:
   kokorodata:
-
 networks:
   default:
     name: userservice-network

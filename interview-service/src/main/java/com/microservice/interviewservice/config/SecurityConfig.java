@@ -22,7 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity          // enables @PreAuthorize on controller methods
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -36,29 +36,39 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
 
+                // ── Live voice / TTS public endpoints ─────────────────────
+                .requestMatchers(HttpMethod.POST, "/api/live-voice/speak").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/live-voice/available").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/live-voice/**").permitAll()
+
+                // ── D-ID Avatar public test endpoint ──────────────────────
+                .requestMatchers(HttpMethod.POST, "/api/avatar/talk").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/avatar/**").permitAll()
+
                 // ── Questions ─────────────────────────────────────────────
-                .requestMatchers(HttpMethod.GET,    "/api/questions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.GET,    "/api/questions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
                 .requestMatchers(HttpMethod.POST,   "/api/questions/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/questions/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/questions/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH,  "/api/questions/**").hasRole("ADMIN")
 
                 // ── Admin-only interview + progress routes ────────────────
-                // These come BEFORE the broader /api/interview-sessions/** rule
-                // so that Spring picks the more specific match first.
                 .requestMatchers("/api/interview-sessions/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/progress/admin/**").hasRole("ADMIN")
 
-                // ── Interview sessions (authenticated users) ──────────────
-                .requestMatchers(HttpMethod.POST,   "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-                .requestMatchers(HttpMethod.GET,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-                .requestMatchers(HttpMethod.PUT,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-                .requestMatchers(HttpMethod.PATCH,  "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
-                // DELETE on own session — ownership enforced in service layer
-                .requestMatchers(HttpMethod.DELETE, "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+                // ── Interview sessions ────────────────────────────────────
+                .requestMatchers(HttpMethod.POST,   "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+                .requestMatchers(HttpMethod.GET,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+                .requestMatchers(HttpMethod.PUT,    "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+                .requestMatchers(HttpMethod.PATCH,  "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+                .requestMatchers(HttpMethod.DELETE, "/api/interview-sessions/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
 
-                // ── Progress (own) ────────────────────────────────────────
-                .requestMatchers("/api/progress/**").hasAnyRole("USER", "ADMIN", "MANAGER")
+                // ── Progress ──────────────────────────────────────────────
+                .requestMatchers("/api/progress/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+
+                // ── Live interviews ───────────────────────────────────────
+                .requestMatchers(HttpMethod.POST, "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
+                .requestMatchers(HttpMethod.GET,  "/api/live-interviews/**").hasAnyRole("USER", "ADMIN", "MANAGER", "MENTOR")
 
                 .anyRequest().authenticated()
             )

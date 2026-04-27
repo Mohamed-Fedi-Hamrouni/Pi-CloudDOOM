@@ -4,9 +4,11 @@ import com.microservice.interviewservice.ennum.CareerLevelEnum;
 import com.microservice.interviewservice.ennum.IndustryEnum;
 import com.microservice.interviewservice.ennum.InterviewTypeEnum;
 import com.microservice.interviewservice.ennum.SessionStatusEnum;
+import com.microservice.interviewservice.ennum.InterviewLanguage;
 import com.microservice.interviewservice.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.*;
+
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -37,6 +39,11 @@ public class InterviewSession {
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     private InterviewTypeEnum type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language", nullable = false, length = 16)
+    @Builder.Default
+    private InterviewLanguage language = InterviewLanguage.EN;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "industry", nullable = false)
