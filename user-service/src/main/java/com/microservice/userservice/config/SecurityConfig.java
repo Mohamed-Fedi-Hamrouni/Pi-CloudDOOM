@@ -17,6 +17,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.microservice.userservice.security.JwtAuthConverter;
+import com.microservice.userservice.security.ApiRequestLoggingFilter;
 import com.microservice.userservice.security.KeycloakRoleSyncFilter;
 
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class SecurityConfig {
 
     private final JwtAuthConverter jwtAuthConverter;
     private final KeycloakRoleSyncFilter keycloakRoleSyncFilter;
+    private final ApiRequestLoggingFilter apiRequestLoggingFilter;
 
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -42,11 +44,13 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             .requestMatchers("/actuator/health").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/users/register").permitAll()
             .requestMatchers("/api/public/**").permitAll()
+            .requestMatchers("/uploads/**").permitAll()
             .anyRequest().authenticated()
         )
         .oauth2ResourceServer(oauth2 -> oauth2
             .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
         )
+        .addFilterAfter(apiRequestLoggingFilter, BearerTokenAuthenticationFilter.class)
         .addFilterAfter(keycloakRoleSyncFilter, BearerTokenAuthenticationFilter.class);
 
     return http.build();

@@ -19,12 +19,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
+import com.microservice.userservice.service.AvatarStorageService;
 import com.microservice.userservice.service.UserService;
 
 import jakarta.validation.Valid;
@@ -36,6 +40,7 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+    private final AvatarStorageService avatarStorageService;
 
     // ── PUBLIC ────────────────────────────────────────────────────────────────
 
@@ -50,19 +55,36 @@ public class UserController {
     // ── CURRENT USER ──────────────────────────────────────────────────────────
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(
-            userService.findByKeycloakId(jwt.getSubject()));
+    public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.findOrProvisionFromJwt(jwt));
     }
 
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateCurrentUser(
             @Valid @RequestBody UpdateUserRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        UserResponse current = userService.findByKeycloakId(jwt.getSubject());
+        UserResponse current = userService.findOrProvisionFromJwt(jwt);
         return ResponseEntity.ok(
             userService.update(current.getId(), request));
+    }
+
+    @PostMapping("/me/avatar")
+    public ResponseEntity<java.util.Map<String, String>> uploadAvatar(
+            @RequestParam("file") MultipartFile file) {
+        String storedPath = avatarStorageService.storeAvatar(file);
+        String publicUrl = ServletUriComponentsBuilder
+                .fromCurrentContextPath()
+                .path(storedPath)
+                .toUriString();
+
+        return ResponseEntity.ok(java.util.Map.of("url", publicUrl));
+    }
+
+    @PostMapping("/me/cv")
+    public ResponseEntity<UserResponse> uploadCv(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.uploadCv(jwt.getSubject(), file));
     }
 
     // ── ADMIN ENDPOINTS ───────────────────────────────────────────────────────
@@ -71,6 +93,12 @@ public class UserController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
         return ResponseEntity.ok(userService.findAll(pageable));
+    }
+
+    @GetMapping("/identities")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Page<UserIdentityResponse>> getAllUserIdentities(Pageable pageable) {
+        return ResponseEntity.ok(userService.findAllIdentities(pageable));
     }
 
     @GetMapping("/search")
@@ -127,7 +155,7 @@ public class UserController {
     }
 
     @GetMapping("/by-role")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<UserResponse>> getUsersByRole(
             @RequestParam RoleEnum role,
             Pageable pageable) {
@@ -149,5 +177,13 @@ public ResponseEntity<Page<UserResponse>> getDeletedUsers(Pageable pageable) {
 @PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public ResponseEntity<UserResponse> restoreUser(@PathVariable UUID id) {
     return ResponseEntity.ok(userService.restoreUser(id));
+}
+
+@PatchMapping("/{id}/availability")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<UserResponse> toggleAvailability(
+        @PathVariable UUID id,
+        @RequestParam UserStatus status) {
+    return ResponseEntity.ok(userService.updateStatus(id, status));
 }
 }

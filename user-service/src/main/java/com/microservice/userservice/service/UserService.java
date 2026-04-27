@@ -1,7 +1,10 @@
 package com.microservice.userservice.service;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -11,9 +14,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microservice.userservice.dto.CreateUserRequest;
 import com.microservice.userservice.dto.UpdateUserRequest;
+import com.microservice.userservice.dto.UserIdentityResponse;
 import com.microservice.userservice.dto.UserResponse;
 import com.microservice.userservice.enums.RoleEnum;
 import com.microservice.userservice.enums.UserStatus;
@@ -23,6 +30,9 @@ import com.microservice.userservice.mapper.UserMapper;
 import com.microservice.userservice.messaging.producer.UserEventProducer;
 import com.microservice.userservice.model.User;
 import com.microservice.userservice.repository.UserRepository;
+
+import org.springframework.security.oauth2.jwt.Jwt;
+import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +45,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserEventProducer eventProducer;
+    private final ObjectMapper objectMapper;
+    private final CvStorageService cvStorageService;
+
+    private final PdfTextExtractorService pdfTextExtractorService;
+private final CvAiParsingService cvAiParsingService;
+private final CvNormalizationService cvNormalizationService;
+private final CvProfileEnrichmentService cvProfileEnrichmentService;
 
     // ── CREATE ────────────────────────────────────────────────────────────────
 
@@ -56,12 +73,13 @@ public class UserService {
         user.setKeycloakId(keycloakId);
         user.setRole(RoleEnum.USER);
         user.setStatus(UserStatus.PENDING_VERIFICATION);
+        user.setSkillsJson(serializeSkills(request.getSkills()));
 
         User saved = userRepository.save(user);
         eventProducer.publishUserCreated(saved);
 
         log.info("User created successfully with id: {}", saved.getId());
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     // ── READ ──────────────────────────────────────────────────────────────────
@@ -71,7 +89,7 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with id: {}", id);
         return userRepository.findById(id)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with id: " + id));
     }
@@ -81,7 +99,7 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with keycloakId: {}", keycloakId);
         return userRepository.findByKeycloakId(keycloakId)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with keycloakId: " + keycloakId));
     }
@@ -91,29 +109,34 @@ public class UserService {
         log.info("Cache MISS - fetching user from DB with email: {}", email);
         return userRepository.findByEmail(email)
             .filter(u -> u.getDeletedAt() == null)
-            .map(userMapper::toResponse)
+            .map(this::toResponseWithSkills)
             .orElseThrow(() -> new UserNotFoundException(
                 "User not found with email: " + email));
     }
 
     public Page<UserResponse> findAll(Pageable pageable) {
         return userRepository.findByDeletedAtIsNull(pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
+    }
+
+    public Page<UserIdentityResponse> findAllIdentities(Pageable pageable) {
+        return userRepository.findByDeletedAtIsNull(pageable)
+            .map(userMapper::toIdentityResponse);
     }
 
     public Page<UserResponse> search(String query, Pageable pageable) {
         return userRepository.searchUsers(query, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     public Page<UserResponse> findByStatus(UserStatus status, Pageable pageable) {
         return userRepository.findByStatusAndDeletedAtIsNull(status, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     public Page<UserResponse> findByRole(RoleEnum role, Pageable pageable) {
         return userRepository.findByRoleAndDeletedAtIsNull(role, pageable)
-            .map(userMapper::toResponse);
+            .map(this::toResponseWithSkills);
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -135,12 +158,72 @@ public class UserService {
                 "User not found with id: " + id));
 
         userMapper.updateEntity(request, user);
+        if (request.getSkills() != null) {
+            user.setSkillsJson(serializeSkills(request.getSkills()));
+        }
         User saved = userRepository.save(user);
         eventProducer.publishUserUpdated(saved);
 
         log.info("User updated successfully with id: {}", saved.getId());
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
+
+   @Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users", allEntries = true),
+    @CacheEvict(value = "users-by-keycloak", allEntries = true),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+public UserResponse uploadCv(String keycloakId, MultipartFile file) {
+    log.info("Uploading CV for user with keycloakId: {}", keycloakId);
+
+    User user = userRepository.findByKeycloakId(keycloakId)
+        .filter(u -> u.getDeletedAt() == null)
+        .orElseThrow(() -> new UserNotFoundException(
+            "User not found with keycloakId: " + keycloakId));
+
+    String previousCvUrl = user.getCvUrl();
+    String currentCvUrl = cvStorageService.storeCv(file, user.getId());
+
+    user.setCvUrl(currentCvUrl);
+
+    try {
+        // ── Step 1: Extract text from PDF
+        var extraction = pdfTextExtractorService.extractText(currentCvUrl);
+
+        if (!extraction.isUsable()) {
+            log.warn("CV extraction is low quality, skipping AI parsing for user {}", user.getId());
+        } else {
+            String text = extraction.text();
+
+            // ── Step 2: AI parsing
+            var parsed = cvAiParsingService.parse(text);
+
+            // ── Step 3: Normalize
+            var normalized = cvNormalizationService.normalize(parsed);
+
+            // ── Step 4: Apply to user
+            cvProfileEnrichmentService.applyToUser(user, normalized);
+
+            log.info("CV successfully parsed and applied for user {}", user.getId());
+        }
+
+    } catch (Exception ex) {
+        // IMPORTANT: CV upload must NOT fail if AI fails
+        log.error("CV parsing failed for user {}: {}", user.getId(), ex.getMessage());
+    }
+
+    // ── Step 5: Save user
+    User saved = userRepository.save(user);
+
+    // ── Step 6: Cleanup old file
+    cvStorageService.deleteOldCvIfManaged(previousCvUrl, currentCvUrl);
+
+    // ── Step 7: Emit event
+    eventProducer.publishUserUpdated(saved);
+
+    return toResponseWithSkills(saved);
+}
 
     @Transactional
     @Caching(evict = {
@@ -160,7 +243,7 @@ public class UserService {
         User saved = userRepository.save(user);
         eventProducer.publishUserRoleChanged(saved);
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -186,7 +269,7 @@ public class UserService {
             eventProducer.publishUserVerified(saved);
         }
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -208,7 +291,7 @@ public class UserService {
         User saved = userRepository.save(user);
         eventProducer.publishUserVerified(saved);
 
-        return userMapper.toResponse(saved);
+        return toResponseWithSkills(saved);
     }
 
     @Transactional
@@ -267,7 +350,7 @@ public class UserService {
 
     public Page<UserResponse> findDeleted(Pageable pageable) {
     return userRepository.findByDeletedAtIsNotNull(pageable)
-        .map(userMapper::toResponse);
+        .map(this::toResponseWithSkills);
 }
 
 @Transactional
@@ -284,6 +367,116 @@ public UserResponse restoreUser(UUID id) {
     user.setStatus(UserStatus.ACTIVE);
     User saved = userRepository.save(user);
     log.info("User restored successfully with id: {}", saved.getId());
-    return userMapper.toResponse(saved);
+    return toResponseWithSkills(saved);
+}
+
+private UserResponse toResponseWithSkills(User user) {
+    UserResponse response = userMapper.toResponse(user);
+    response.setSkills(deserializeSkills(user.getSkillsJson()));
+    return response;
+}
+
+private String serializeSkills(List<String> skills) {
+    if (skills == null || skills.isEmpty()) {
+        return null;
+    }
+
+    List<String> normalizedSkills = skills.stream()
+        .filter(skill -> skill != null && !skill.isBlank())
+        .map(String::trim)
+        .distinct()
+        .collect(Collectors.toList());
+
+    if (normalizedSkills.isEmpty()) {
+        return null;
+    }
+
+    try {
+        return objectMapper.writeValueAsString(normalizedSkills);
+    } catch (IOException exception) {
+        log.warn("Failed to serialize skills", exception);
+        return null;
+    }
+}
+
+private List<String> deserializeSkills(String skillsJson) {
+    if (skillsJson == null || skillsJson.isBlank()) {
+        return List.of();
+    }
+
+    try {
+        return objectMapper.readValue(skillsJson, new TypeReference<List<String>>() {});
+    } catch (IOException exception) {
+        log.warn("Failed to deserialize skills for payload", exception);
+        return List.of();
+    }
+}
+
+@Transactional
+@Caching(evict = {
+    @CacheEvict(value = "users-by-keycloak", key = "#jwt.subject"),
+    @CacheEvict(value = "users-by-email", allEntries = true)
+})
+// ── Replace findOrProvisionFromJwt in UserService.java with this version ──
+
+public UserResponse findOrProvisionFromJwt(Jwt jwt) {
+    String keycloakId = jwt.getSubject();
+    String email      = jwt.getClaimAsString("email");
+
+    // 1. Already exists → update lastLogin, sync passkey status, and return
+    Optional<User> existing = userRepository.findByKeycloakId(keycloakId)
+            .filter(u -> u.getDeletedAt() == null);
+    if (existing.isPresent()) {
+        User u = existing.get();
+        u.setLastLoginAt(LocalDateTime.now());
+        syncPasskeyStatus(u, jwt);                          // ← NEW
+        return toResponseWithSkills(userRepository.save(u));
+    }
+
+    // 2. Same email but different keycloakId (edge: account linking race)
+    //    → re-key to the new sub so we don't create a duplicate
+    if (email != null) {
+        Optional<User> byEmail = userRepository.findByEmail(email)
+                .filter(u -> u.getDeletedAt() == null);
+        if (byEmail.isPresent()) {
+            User u = byEmail.get();
+            u.setKeycloakId(keycloakId);
+            u.setLastLoginAt(LocalDateTime.now());
+            syncPasskeyStatus(u, jwt);                      // ← NEW
+            log.info("Re-linked existing user {} to new keycloakId {}", u.getId(), keycloakId);
+            return toResponseWithSkills(userRepository.save(u));
+        }
+    }
+
+    // 3. Brand-new social user → auto-create
+    User user = User.builder()
+            .keycloakId(keycloakId)
+            .email(email != null ? email : keycloakId + "@social.local")
+            .firstName(jwt.getClaimAsString("given_name"))
+            .lastName(jwt.getClaimAsString("family_name"))
+            .role(RoleEnum.USER)
+            .status(UserStatus.PENDING_VERIFICATION)
+            .lastLoginAt(LocalDateTime.now())
+            .build();
+
+    User saved = userRepository.save(user);
+    eventProducer.publishUserCreated(saved);
+    log.info("Auto-provisioned social user {} from keycloakId {}", saved.getId(), keycloakId);
+    return toResponseWithSkills(saved);
+}
+
+// ── NEW: sync passkey flag from JWT ACR claim ──────────────────────────────
+// Keycloak sets acr = "webauthn-passwordless" when user authenticates via passkey.
+// We record this as a UI hint only — Keycloak remains the auth source of truth.
+private void syncPasskeyStatus(User user, Jwt jwt) {
+    String acr = jwt.getClaimAsString("acr");
+    boolean authenticatedViaPasskey = acr != null &&
+            (acr.equals("webauthn-passwordless") || acr.contains("webauthn"));
+
+    if (authenticatedViaPasskey && !Boolean.TRUE.equals(user.getPasskeyRegistered())) {
+        user.setPasskeyRegistered(true);
+        user.setPasskeyRegisteredAt(LocalDateTime.now());
+        log.info("Passkey registered recorded for user {}", user.getId());
+    }
 }
 }

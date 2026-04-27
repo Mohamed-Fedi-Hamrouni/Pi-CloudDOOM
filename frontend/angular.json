@@ -32,7 +32,9 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": [],
+            "scripts": [
+              "node_modules/@fullcalendar/core/index.global.min.js"
+            ],
             "optimization": {
               "scripts": true,
               "styles": {

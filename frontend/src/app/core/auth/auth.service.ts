@@ -5,6 +5,9 @@ import { environment } from "../../../environments/environment";
 @Injectable({ providedIn: "root" })
 export class AuthService {
     private keycloak: Keycloak;
+    private initialized = false;
+    private tokenRefreshInFlight: Promise<string> | null = null;
+    private readonly tokenRefreshTimeoutMs = 3000;
 
     constructor() {
         this.keycloak = new Keycloak({
@@ -16,24 +19,25 @@ export class AuthService {
 
     async init(): Promise<boolean> {
         try {
-            const authenticated = await Promise.race([
-                this.keycloak.init({
-                    onLoad: "check-sso",
-                    silentCheckSsoRedirectUri:
-                        window.location.origin + "/assets/silent-check-sso.html",
-                    silentCheckSsoFallback: false,
-                    pkceMethod: "S256",
-                    checkLoginIframe: false,
-                }),
-                new Promise<boolean>((resolve) =>
-                    setTimeout(() => resolve(false), 5000)
-                ),
-            ]);
+            const authenticated = await this.keycloak.init({
+                onLoad: "check-sso",
+                silentCheckSsoRedirectUri:
+                    window.location.origin + "/assets/silent-check-sso.html",
+                pkceMethod: "S256",
+                checkLoginIframe: false,
+            });
+
+            this.initialized = true;
             return authenticated;
         } catch (error) {
             console.error("Keycloak init error:", error);
+            this.initialized = true;
             return false;
         }
+    }
+
+    isInitialized(): boolean {
+        return this.initialized;
     }
 
     login(): void {
@@ -54,14 +58,85 @@ export class AuthService {
         });
     }
 
+    // ── Passkey: trigger Keycloak's WebAuthn registration for logged-in user ──
+    registerPasskey(): void {
+        const accountUrl = `${environment.keycloak.url}/realms/${environment.keycloak.realm}/account`;
+        // Redirect to Keycloak account console → Security → Signing In
+        // where the user can register a passkey under "Passwordless"
+        window.location.href = accountUrl + "/#/security/signing-in";
+    }
+
+    // ── Passkey: trigger via Application Initiated Action (AIA) ──
+    registerPasskeyViaAIA(): void {
+        this.keycloak.login({
+            action: "webauthn-register-passwordless",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    // ── Passkey login entry point ──
+    loginWithPasskey(): void {
+        // Keycloak's browser-passkey flow handles routing to WebAuthn authenticator
+        this.keycloak.login({
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
     isAuthenticated(): boolean {
         return !!this.keycloak.authenticated;
     }
 
     getToken(): Promise<string> {
-        return this.keycloak.updateToken(30).then(() => {
-            return this.keycloak.token || "";
+        const existingToken = this.keycloak.token || "";
+
+        if (!this.initialized) {
+            return Promise.resolve(existingToken);
+        }
+        if (!this.isAuthenticated()) {
+            return Promise.resolve("");
+        }
+
+        // If we already have a token, don't block the request waiting for refresh.
+        // Kick off refresh in background and return the current token immediately.
+        if (existingToken) {
+            if (!this.tokenRefreshInFlight) {
+                this.tokenRefreshInFlight = this.keycloak
+                    .updateToken(30)
+                    .then(() => this.keycloak.token || existingToken)
+                    .catch((err) => {
+                        console.warn("Keycloak updateToken failed; using existing token", err);
+                        return this.keycloak.token || existingToken;
+                    })
+                    .finally(() => {
+                        this.tokenRefreshInFlight = null;
+                    });
+            }
+            return Promise.resolve(existingToken);
+        }
+
+        // No token yet: attempt a refresh, but never hang forever.
+        if (this.tokenRefreshInFlight) {
+            return this.tokenRefreshInFlight;
+        }
+
+        const refreshPromise = this.keycloak
+            .updateToken(30)
+            .then(() => this.keycloak.token || "")
+            .catch((err) => {
+                console.warn("Keycloak updateToken failed; no token available", err);
+                return this.keycloak.token || "";
+            });
+
+        this.tokenRefreshInFlight = Promise.race([
+            refreshPromise,
+            new Promise<string>((resolve) => {
+                window.setTimeout(() => resolve(""), this.tokenRefreshTimeoutMs);
+            }),
+        ]).finally(() => {
+            this.tokenRefreshInFlight = null;
         });
+
+        return this.tokenRefreshInFlight;
     }
 
     getTokenParsed(): any {
@@ -69,11 +144,31 @@ export class AuthService {
     }
 
     getUserRoles(): string[] {
-        return this.keycloak.tokenParsed?.["realm_access"]?.["roles"] || [];
+        const token: any = this.keycloak.tokenParsed || {};
+
+        const realmRoles: string[] = token?.["realm_access"]?.["roles"] || [];
+
+        const resourceAccess: Record<string, any> = token?.["resource_access"] || {};
+        const resourceRoles: string[] = Object.values(resourceAccess)
+            .flatMap((client: any) => client?.roles || []);
+
+        // De-dupe, keep as-is (callers can normalize case)
+        return Array.from(new Set([...(realmRoles || []), ...(resourceRoles || [])]));
     }
 
     hasRole(role: string): boolean {
-        return this.getUserRoles().includes(role);
+        const roles = this.getUserRoles().map((r) => String(r).toUpperCase());
+        const target = String(role || "").toUpperCase();
+
+        if (!target) return false;
+        if (roles.includes(target)) return true;
+
+        // Normalize ROLE_ prefix differences (Keycloak often returns roles without ROLE_)
+        if (target.startsWith("ROLE_")) {
+            return roles.includes(target.substring("ROLE_".length));
+        }
+
+        return roles.includes(`ROLE_${target}`);
     }
 
     getKeycloakId(): string {
@@ -94,5 +189,32 @@ export class AuthService {
 
     getLastName(): string {
         return this.keycloak.tokenParsed?.["family_name"] || "";
+    }
+
+    // ── Check if user authenticated via passkey (acr claim) ──
+    isPasskeyAuthenticated(): boolean {
+        const acr = this.keycloak.tokenParsed?.["acr"];
+        return acr === "webauthn-passwordless" || acr === "webauthn";
+    }
+
+    loginWithGoogle(): void {
+        this.keycloak.login({
+            idpHint: "google",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithLinkedIn(): void {
+        this.keycloak.login({
+            idpHint: "linkedin-openid-connect",
+            redirectUri: window.location.origin + "/dashboard",
+        });
+    }
+
+    loginWithGitHub(): void {
+        this.keycloak.login({
+            idpHint: "github",
+            redirectUri: window.location.origin + "/dashboard",
+        });
     }
 }

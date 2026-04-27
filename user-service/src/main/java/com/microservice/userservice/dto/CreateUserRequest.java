@@ -1,6 +1,9 @@
 package com.microservice.userservice.dto;
 
+import java.util.List;
+
 import com.microservice.userservice.enums.IndustryEnum;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,13 +24,10 @@ public class CreateUserRequest {
     @Size(min = 2, max = 50)
     private String lastName;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
-    private String password;
-
     private String phoneNumber;
     private String city;
     private IndustryEnum preferredIndustry;
     private String preferredLanguage;
+    private List<String> skills;
 }
 
