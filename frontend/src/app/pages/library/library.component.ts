@@ -1165,42 +1165,58 @@ interface ResourceEngagement {
             </div>
 
             <!-- Related resources (AI similarity) -->
-            <div class="ast-section" *ngIf="similarLoading || similarResources.length > 0">
-              <div class="ast-section-label">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                RESSOURCES SIMILAIRES DÉTECTÉES
+            <div class="ast-sim-section" *ngIf="similarLoading || similarResources.length > 0">
+
+              <div class="ast-sim-header">
+                <span class="ast-sim-header-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                    <path d="M10 2l1.5 4.5 4.5.7-3.3 3.2.8 4.6L10 13l-3.5 2 .8-4.6L4 7.2l4.5-.7z"/>
+                    <circle cx="3.5" cy="3.5" r="1.1"/>
+                    <circle cx="16.5" cy="4" r="0.9"/>
+                    <circle cx="17" cy="15" r="1"/>
+                  </svg>
+                </span>
+                <span class="ast-sim-header-text">Aller plus loin</span>
+                <span class="ast-sim-header-count" *ngIf="!similarLoading && similarResources.length > 0">{{ similarResources.length }}</span>
               </div>
 
-              <div class="ast-similar-skel" *ngIf="similarLoading">
-                <div class="ast-similar-skel-card" *ngFor="let _ of [1,2,3]"></div>
+              <!-- Skeletons -->
+              <div class="ast-sim-list" *ngIf="similarLoading">
+                <div class="ast-sim-skel" *ngFor="let _ of [1,2,3]"></div>
               </div>
 
-              <div class="ast-similar" *ngIf="!similarLoading">
+              <!-- Items -->
+              <div class="ast-sim-list" *ngIf="!similarLoading">
                 <button
                   type="button"
-                  class="ast-similar-item"
+                  class="ast-sim-item"
                   *ngFor="let s of similarResources; let i = index"
-                  [style.animation-delay]="(i * 80) + 'ms'"
+                  [style.animation-delay]="(i * 70) + 'ms'"
                   (click)="openSimilarResource(s)">
-                  <div class="ast-similar-thumb" [ngClass]="'sts-' + mapType(s.type)">
+
+                  <!-- Thumb -->
+                  <div class="ast-sim-thumb" [ngClass]="'ast-sim-t-' + mapType(s.type)">
                     <img *ngIf="s.thumbUrl" [src]="s.thumbUrl" [alt]="s.title" loading="lazy" (error)="s.thumbUrl = null" />
-                    <span *ngIf="!s.thumbUrl" class="ast-similar-emoji">{{ typeIcon(mapType(s.type)) }}</span>
+                    <span *ngIf="!s.thumbUrl" class="ast-sim-emoji">{{ typeIcon(mapType(s.type)) }}</span>
                   </div>
-                  <div class="ast-similar-body">
-                    <div class="ast-similar-name">{{ s.title }}</div>
-                    <div class="ast-similar-meta">
-                      <span class="ast-similar-chip">{{ typeLabel(mapType(s.type)) }}</span>
-                      <span class="ast-similar-chip-muted">{{ levelLabel(mapLevel(s.level)) }}</span>
-                      <span class="ast-similar-chip-muted" *ngIf="s.categoryName">· {{ s.categoryName }}</span>
+
+                  <!-- Body -->
+                  <div class="ast-sim-body">
+                    <div class="ast-sim-title">{{ s.title }}</div>
+                    <div class="ast-sim-tags">
+                      <span class="ast-sim-badge" [ngClass]="'ast-sim-b-' + mapType(s.type)">{{ typeLabel(mapType(s.type)) }}</span>
+                      <span class="ast-sim-level">{{ levelLabel(mapLevel(s.level)) }}</span>
+                      <span class="ast-sim-cat" *ngIf="s.categoryName">{{ s.categoryName }}</span>
                     </div>
                   </div>
-                  <svg class="ast-similar-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                    <polyline points="12 5 19 12 12 19"/>
-                  </svg>
+
+                  <!-- Arrow -->
+                  <span class="ast-sim-cta" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="3" y1="8" x2="13" y2="8"/>
+                      <polyline points="9 4 13 8 9 12"/>
+                    </svg>
+                  </span>
                 </button>
               </div>
             </div>
@@ -5432,81 +5448,165 @@ interface ResourceEngagement {
     }
     .ast-btn svg.spin { animation: aia-orbit-spin 0.8s linear infinite; }
 
-    /* Similar resources in Summary Theater */
-    .ast-similar { display: flex; flex-direction: column; gap: 6px; }
-    .ast-similar-item {
+    /* ── Similar resources — "Aller plus loin" ───────── */
+    .ast-sim-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 4px;
+    }
+
+    /* Header row */
+    .ast-sim-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-      background: #fff;
+      gap: 7px;
+    }
+    .ast-sim-header-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .ast-sim-header-text {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #475569;
+      flex: 1;
+    }
+    .ast-sim-header-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px; height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+
+    /* List + items */
+    .ast-sim-list { display: flex; flex-direction: column; gap: 5px; }
+
+    .ast-sim-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 9px 11px 9px 9px;
+      border-radius: 12px;
+      border: 1.5px solid #f1f5f9;
+      background: #fafbfc;
       cursor: pointer;
       text-align: left;
       font-family: inherit;
+      width: 100%;
       opacity: 0;
-      transform: translateY(6px);
-      animation: ast-sim-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+      transform: translateX(-8px);
+      animation: ast-sim-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+      transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
     }
-    @keyframes ast-sim-in { to { opacity: 1; transform: translateY(0); } }
-    .ast-similar-item:hover {
-      border-color: #22d3ee;
-      background: linear-gradient(135deg, #f8fafc, #f0fdfa);
-      transform: translateX(2px);
+    @keyframes ast-sim-in { to { opacity: 1; transform: translateX(0); } }
+
+    .ast-sim-item:hover {
+      border-color: rgba(20, 184, 166, 0.4);
+      background: linear-gradient(100deg, #f0fdfa, #f8fafc);
+      box-shadow: 0 2px 10px rgba(20, 184, 166, 0.1);
     }
-    .ast-similar-thumb {
-      position: relative;
-      width: 44px; height: 44px;
+
+    /* Thumb */
+    .ast-sim-thumb {
+      width: 42px; height: 42px;
       border-radius: 10px;
       overflow: hidden;
       flex-shrink: 0;
       background: linear-gradient(135deg, #14b8a6, #22d3ee);
       display: flex; align-items: center; justify-content: center;
     }
-    .ast-similar-thumb.sts-video    { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
-    .ast-similar-thumb.sts-podcast  { background: linear-gradient(135deg, #f97316, #f59e0b); }
-    .ast-similar-thumb.sts-exercise { background: linear-gradient(135deg, #ec4899, #f43f5e); }
-    .ast-similar-thumb.sts-template { background: linear-gradient(135deg, #06b6d4, #0ea5e9); }
-    .ast-similar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .ast-similar-emoji { font-size: 1.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
-    .ast-similar-body { flex: 1; min-width: 0; }
-    .ast-similar-name {
-      font-size: 0.86rem;
+    .ast-sim-t-video    { background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important; }
+    .ast-sim-t-podcast  { background: linear-gradient(135deg, #ea580c, #f97316) !important; }
+    .ast-sim-t-exercise { background: linear-gradient(135deg, #db2777, #ec4899) !important; }
+    .ast-sim-t-template { background: linear-gradient(135deg, #0284c7, #06b6d4) !important; }
+    .ast-sim-thumb img  { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ast-sim-emoji      { font-size: 1.25rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+    /* Body */
+    .ast-sim-body { flex: 1; min-width: 0; }
+    .ast-sim-title {
+      font-size: 0.84rem;
       font-weight: 600;
       color: #0f172a;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-bottom: 4px;
     }
-    .ast-similar-meta {
+    .ast-sim-tags {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.72rem;
-      color: #64748b;
-      margin-top: 3px;
+      gap: 5px;
+      flex-wrap: nowrap;
     }
-    .ast-similar-chip {
-      padding: 2px 8px;
+    .ast-sim-badge {
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 2px 7px;
       border-radius: 999px;
-      background: #f0fdfa;
+      background: #ccfbf1;
       color: #0f766e;
-      font-weight: 600;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
     }
-    .ast-similar-chip-muted { color: #94a3b8; font-weight: 500; }
-    .ast-similar-arrow { color: #94a3b8; flex-shrink: 0; transition: color 160ms ease, transform 160ms ease; }
-    .ast-similar-item:hover .ast-similar-arrow { color: #14b8a6; transform: translateX(3px); }
+    .ast-sim-b-video    { background: #ede9fe; color: #6d28d9; }
+    .ast-sim-b-podcast  { background: #ffedd5; color: #c2410c; }
+    .ast-sim-b-exercise { background: #fce7f3; color: #9d174d; }
+    .ast-sim-b-template { background: #e0f2fe; color: #0369a1; }
+    .ast-sim-level {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .ast-sim-cat {
+      font-size: 0.67rem;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .ast-sim-cat::before { content: '· '; }
 
-    /* Skeleton for similar */
-    .ast-similar-skel { display: flex; flex-direction: column; gap: 6px; }
-    .ast-similar-skel-card {
-      height: 60px;
-      border-radius: 10px;
-      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
-      background-size: 400% 100%;
-      animation: shimmer 1.2s ease-in-out infinite;
+    /* CTA arrow */
+    .ast-sim-cta {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: #94a3b8;
+      flex-shrink: 0;
+      transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+    .ast-sim-item:hover .ast-sim-cta {
+      background: #14b8a6;
+      color: #fff;
+      transform: translateX(2px);
+    }
+
+    /* Skeleton */
+    .ast-sim-skel {
+      height: 62px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #f1f5f9 25%, #e8edf5 50%, #f1f5f9 75%);
+      background-size: 300% 100%;
+      animation: shimmer 1.3s ease-in-out infinite;
     }
 
     @media (max-width: 640px) {
