@@ -1,4 +1,4 @@
-<div class="profile-page animate-fade" *ngIf="user">
+<div class="profile-page animate-fade" *ngIf="user && !isLoading">
     <!-- Profile Header -->
     <div class="profile-header card">
         <div class="ph-cover"></div>
@@ -440,4 +440,25 @@
     </div>
 </div>
 
-<div *ngIf="!user" class="loading-profile">Loading your profile...</div>
+<div *ngIf="isLoading" class="loading-profile">
+    <div class="profile-skeleton">
+        <div class="skel-cover"></div>
+        <div class="skel-body">
+            <div class="skel-avatar"></div>
+            <div class="skel-lines">
+                <div class="skel-line" style="width:200px;height:22px"></div>
+                <div class="skel-line" style="width:140px;height:14px;margin-top:8px"></div>
+                <div class="skel-line" style="width:100px;height:12px;margin-top:6px"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div *ngIf="!isLoading && !user && loadError" class="profile-error card">
+    <div class="pe-title">Could not load your profile</div>
+    <p class="pe-subtitle">{{ loadError }}</p>
+    <div class="pe-actions">
+        <button class="btn btn-primary btn-sm" (click)="loadProfile()">Retry</button>
+        <button *ngIf="canRelogin" class="btn btn-secondary btn-sm" (click)="relogin()">Re-login</button>
+    </div>
+</div>

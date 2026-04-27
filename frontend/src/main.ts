@@ -9,7 +9,16 @@ import { AuthService } from './app/core/auth/auth.service';
 import { authInterceptor } from './app/core/interceptors/auth.interceptor';
 
 function initializeKeycloak(authService: AuthService) {
-  return () => authService.init();
+  return () =>
+    Promise.race([
+      authService.init(),
+      new Promise<boolean>((resolve) =>
+        setTimeout(() => {
+          console.warn('Keycloak init timed out, continuing app bootstrap.');
+          resolve(false);
+        }, 5000)
+      ),
+    ]);
 }
 
 bootstrapApplication(AppComponent, {

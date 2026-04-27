@@ -9,6 +9,6 @@ export const authGuard: CanActivateFn = async (route, state) => {
     return true;
   }
 
-  authService.login();
+  authService.login(state?.url || '/dashboard');
   return false;
 };

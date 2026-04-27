@@ -1,8 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { BadgeCardComponent } from '../../shared/components/badge-card/badge-card.component';
-import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../core/data/mock-data';
+import { MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../core/data/mock-data';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-training-gamification',
@@ -17,7 +19,7 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
         </div>
         <div class="level-badge">
           <span>⚡</span>
-          <span>Level {{ user.level }}</span>
+          <span>Level {{ userLevel }}</span>
         </div>
       </div>
 
@@ -25,33 +27,33 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
       <div class="xp-banner card">
         <div class="xp-left">
           <div class="xp-avatar">
-            <div class="avatar-placeholder avatar-xl" style="font-size:1.1rem; width:64px; height:64px;">{{ user.initials }}</div>
-            <div class="xp-level-badge">{{ user.level }}</div>
+            <div class="avatar-placeholder avatar-xl" style="font-size:1.1rem; width:64px; height:64px;">{{ userInitials }}</div>
+            <div class="xp-level-badge">{{ userLevel }}</div>
           </div>
           <div class="xp-info">
-            <div class="xp-name">{{ user.name }}</div>
-            <div class="xp-title">Level {{ user.level }} Candidate · {{ user.xp.toLocaleString() }} XP</div>
+            <div class="xp-name">{{ userName }}</div>
+            <div class="xp-title">Level {{ userLevel }} Candidate · {{ userXp.toLocaleString() }} XP</div>
             <div class="xp-bar-wrap">
               <div class="progress-bar">
-                <div class="progress-fill" style="width: 64%"></div>
+                <div class="progress-fill" [style.width]="xpProgress + '%'"></div>
               </div>
-              <div class="xp-bar-label">{{ user.xp.toLocaleString() }} / 6,000 XP to Level {{ user.level + 1 }}</div>
+              <div class="xp-bar-label">{{ userXp.toLocaleString() }} / {{ xpToNextLevel.toLocaleString() }} XP to Level {{ userLevel + 1 }}</div>
             </div>
           </div>
         </div>
         <div class="xp-right">
           <div class="xp-stat-group">
             <div class="xp-stat">
-              <div class="xp-stat-val">🔥 {{ user.streak }}</div>
-              <div class="xp-stat-label">Day Streak</div>
+              <div class="xp-stat-val">🎙️ {{ userSessions }}</div>
+              <div class="xp-stat-label">Sessions</div>
             </div>
             <div class="xp-stat">
               <div class="xp-stat-val">🏅 {{ earnedCount }}</div>
               <div class="xp-stat-label">Badges</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">📅 Day 7</div>
-              <div class="xp-stat-label">Best Streak</div>
+              <div class="xp-stat-val">✓ {{ userVerified ? 'Verified' : 'Unverified' }}</div>
+              <div class="xp-stat-label">Account</div>
             </div>
           </div>
         </div>
@@ -138,8 +140,8 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
           <div class="motivation-banner">
             <div class="mb-icon">🔥</div>
             <div class="mb-text">
-              <strong>{{ user.streak }}-day streak!</strong><br>
-              <span>You're on a roll. Don't break the chain.</span>
+              <strong>{{ userSessions }} sessions done!</strong><br>
+              <span>{{ userSessions > 0 ? "You're making great progress. Keep it up!" : "Complete your first session to start earning XP!" }}</span>
             </div>
           </div>
 
@@ -329,13 +331,59 @@ import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../c
     }
   `]
 })
-export class TrainingGamificationComponent {
-  user = MOCK_USER;
+export class TrainingGamificationComponent implements OnInit {
+  private http = inject(HttpClient);
+
+  currentUser: any = null;
   modules = MOCK_TRAINING;
   allBadges = MOCK_BADGES;
   leaderboard = MOCK_LEADERBOARD;
 
   get earnedCount() { return MOCK_BADGES.filter(b => b.earned).length; }
+
+  get userName(): string {
+    if (!this.currentUser) return 'Loading...';
+    const first = this.currentUser.firstName || '';
+    const last = this.currentUser.lastName || '';
+    return (first + ' ' + last).trim() || 'Candidate';
+  }
+
+  get userInitials(): string {
+    if (!this.currentUser) return '??';
+    return ((this.currentUser.firstName?.[0] || '') + (this.currentUser.lastName?.[0] || '')).toUpperCase() || '??';
+  }
+
+  get userXp(): number {
+    return this.currentUser?.karmaPoints ?? 0;
+  }
+
+  get userLevel(): number {
+    return Math.max(1, Math.floor(this.userXp / 500) + 1);
+  }
+
+  get xpToNextLevel(): number {
+    return this.userLevel * 500;
+  }
+
+  get xpProgress(): number {
+    const xpInCurrentLevel = this.userXp % 500;
+    return Math.min(100, Math.round((xpInCurrentLevel / 500) * 100));
+  }
+
+  get userSessions(): number {
+    return this.currentUser?.simulationsUsedThisMonth ?? 0;
+  }
+
+  get userVerified(): boolean {
+    return this.currentUser?.isVerified ?? false;
+  }
+
+  ngOnInit(): void {
+    this.http.get<any>(`${environment.apiUrl}/api/users/me`).subscribe({
+      next: (user) => { this.currentUser = user; },
+      error: () => {}
+    });
+  }
 
   dailyGoals = [
     { title: 'Complete 1 mock interview',        xp: 150, done: true,  action: 'Start' },

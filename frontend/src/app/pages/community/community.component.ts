@@ -1,12 +1,14 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock-data';
+import { AuthService } from '../../core/auth/auth.service';
 
 @Component({
   selector: 'app-community',
   standalone: true,
-  imports: [CommonModule, SectionHeaderComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent],
   template: `
     <div class="community-page animate-fade">
       <div class="page-header">
@@ -25,30 +27,30 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
           <!-- Create post panel -->
           <div class="card create-post-card">
             <div class="cp-input-row">
-              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">AO</div>
-              <input class="input cp-input" placeholder="Share something with the community...">
+              <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ userInitials }}</div>
+              <input class="input cp-input" [(ngModel)]="newPostContent" placeholder="Share something with the community...">
             </div>
             <div class="cp-actions">
               <div class="cp-type-btns">
-                <button class="btn btn-ghost btn-sm">💡 Tip</button>
-                <button class="btn btn-ghost btn-sm">❓ Question</button>
-                <button class="btn btn-ghost btn-sm">🎉 Success Story</button>
-                <button class="btn btn-ghost btn-sm">💬 Discussion</button>
+                <button class="btn btn-ghost btn-sm" [class.btn-active]="newPostType === 'tip'" (click)="newPostType = 'tip'">💡 Tip</button>
+                <button class="btn btn-ghost btn-sm" [class.btn-active]="newPostType === 'question'" (click)="newPostType = 'question'">❓ Question</button>
+                <button class="btn btn-ghost btn-sm" [class.btn-active]="newPostType === 'success'" (click)="newPostType = 'success'">🎉 Success Story</button>
+                <button class="btn btn-ghost btn-sm" [class.btn-active]="newPostType === 'discussion'" (click)="newPostType = 'discussion'">💬 Discussion</button>
               </div>
-              <button class="btn btn-primary btn-sm">Post</button>
+              <button class="btn btn-primary btn-sm" (click)="createPost()" [disabled]="!newPostContent.trim()">Post</button>
             </div>
           </div>
 
           <!-- Feed filter -->
           <div class="tabs">
-            <button class="tab-item active">All Posts</button>
-            <button class="tab-item">Success Stories 🎉</button>
-            <button class="tab-item">Questions ❓</button>
-            <button class="tab-item">Tips 💡</button>
+            <button class="tab-item" [class.active]="activeFilter === 'all'" (click)="setFilter('all')">All Posts</button>
+            <button class="tab-item" [class.active]="activeFilter === 'success'" (click)="setFilter('success')">Success Stories 🎉</button>
+            <button class="tab-item" [class.active]="activeFilter === 'question'" (click)="setFilter('question')">Questions ❓</button>
+            <button class="tab-item" [class.active]="activeFilter === 'tip'" (click)="setFilter('tip')">Tips 💡</button>
           </div>
 
           <!-- Posts -->
-          <div class="post-card card" *ngFor="let post of posts">
+          <div class="post-card card" *ngFor="let post of filteredPosts">
             <div class="post-header">
               <div class="avatar-placeholder avatar-md" style="font-size:0.8rem;">{{ post.authorInitials }}</div>
               <div class="post-author-info">
@@ -66,8 +68,8 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
             </div>
 
             <div class="post-footer">
-              <button class="post-action-btn">
-                <span>👍</span>
+              <button class="post-action-btn" [class.liked]="post.liked" (click)="toggleLike(post)">
+                <span>{{ post.liked ? '❤️' : '👍' }}</span>
                 <span>{{ post.likes }}</span>
               </button>
               <button class="post-action-btn">
@@ -78,9 +80,9 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
                 <span>↗️</span>
                 <span>Share</span>
               </button>
-              <button class="post-action-btn" style="margin-left:auto;">
-                <span>🔖</span>
-                <span>Save</span>
+              <button class="post-action-btn" style="margin-left:auto;" [class.saved]="post.saved" (click)="toggleSave(post)">
+                <span>{{ post.saved ? '🔖' : '🔖' }}</span>
+                <span>{{ post.saved ? 'Saved' : 'Save' }}</span>
               </button>
             </div>
 
@@ -209,6 +211,9 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
       transition: all var(--transition-fast);
     }
     .post-action-btn:hover { background: var(--neutral-50); color: var(--color-text); }
+    .post-action-btn.liked { color: var(--error-500); }
+    .post-action-btn.saved { color: var(--teal-600); }
+    .btn-active { background: var(--teal-50) !important; color: var(--teal-700) !important; border-color: var(--teal-200) !important; }
 
     /* Comments */
     .post-comments { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border-light); }
@@ -241,9 +246,61 @@ import { MOCK_POSTS, TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock
   `]
 })
 export class CommunityComponent {
-  posts = MOCK_POSTS;
+  private authService = inject(AuthService);
+
+  posts: any[] = MOCK_POSTS.map(p => ({ ...p, liked: false, saved: false }));
   trendingTopics = TRENDING_TOPICS;
   whoToFollow = WHO_TO_FOLLOW;
+  activeFilter = 'all';
+  newPostContent = '';
+  newPostType = 'discussion';
+
+  get userInitials(): string {
+    const first = this.authService.getFirstName();
+    const last = this.authService.getLastName();
+    return ((first?.[0] || '') + (last?.[0] || '')).toUpperCase() || 'U';
+  }
+
+  get userName(): string {
+    const name = this.authService.getFullName();
+    return name || 'You';
+  }
+
+  get filteredPosts(): any[] {
+    if (this.activeFilter === 'all') return this.posts;
+    return this.posts.filter(p => p.type === this.activeFilter);
+  }
+
+  setFilter(f: string): void { this.activeFilter = f; }
+
+  toggleLike(post: any): void {
+    post.liked = !post.liked;
+    post.likes += post.liked ? 1 : -1;
+  }
+
+  toggleSave(post: any): void { post.saved = !post.saved; }
+
+  createPost(): void {
+    if (!this.newPostContent.trim()) return;
+    const newPost = {
+      id: Date.now(),
+      author: this.userName,
+      authorInitials: this.userInitials,
+      authorTitle: 'Community Member',
+      type: this.newPostType,
+      content: this.newPostContent.trim(),
+      tags: [],
+      likes: 0,
+      comments: 0,
+      timeAgo: 'Just now',
+      liked: false,
+      saved: false,
+    };
+    this.posts = [newPost, ...this.posts];
+    this.newPostContent = '';
+    this.newPostType = 'discussion';
+    this.activeFilter = 'all';
+  }
 
   typeLabel(type: string): string {
     const labels: Record<string, string> = {

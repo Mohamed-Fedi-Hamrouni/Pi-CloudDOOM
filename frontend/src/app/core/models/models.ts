@@ -41,6 +41,8 @@ export interface Mentor {
 export interface Resource {
   id: string;
   title: string;
+  url?: string;
+  thumbnailUrl?: string;
   type: 'article' | 'video' | 'podcast' | 'exercise' | 'template';
   category: string;
   duration: string;

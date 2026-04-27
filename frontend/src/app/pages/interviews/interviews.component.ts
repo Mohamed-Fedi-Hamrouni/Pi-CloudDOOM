@@ -1,6 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnDestroy, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { MOCK_INTERVIEWS, MOCK_QUIZ_QUESTIONS } from '../../core/data/mock-data';
 import { InterviewSession } from '../../core/models/models';
@@ -8,7 +8,7 @@ import { InterviewSession } from '../../core/models/models';
 @Component({
   selector: 'app-interviews',
   standalone: true,
-  imports: [CommonModule, RouterLink, SectionHeaderComponent],
+  imports: [CommonModule, FormsModule, SectionHeaderComponent],
   template: `
     <div class="interviews-page animate-fade">
 
@@ -69,7 +69,7 @@ import { InterviewSession } from '../../core/models/models';
         <div class="interview-detail">
 
           <!-- Session selected: show details -->
-          <ng-container *ngIf="selectedSession() && !practiceMode()">
+          <ng-container *ngIf="selectedSession() && !practiceMode() && !submitted()">
             <div class="card detail-card">
               <div class="dc-header">
                 <div>
@@ -130,16 +130,16 @@ import { InterviewSession } from '../../core/models/models';
           </ng-container>
 
           <!-- Practice Mode -->
-          <ng-container *ngIf="practiceMode()">
+          <ng-container *ngIf="practiceMode() && !submitted()">
             <div class="practice-panel card">
               <div class="pp-header">
                 <div class="pp-progress">
-                  <span class="pp-q-num">Question {{ currentQ() + 1 }} of 3</span>
+                  <span class="pp-q-num">Question {{ currentQ() + 1 }} of {{ totalQuestions }}</span>
                   <div class="pp-prog-bar progress-bar">
-                    <div class="progress-fill" [style.width]="((currentQ() + 1) / 3 * 100) + '%'"></div>
+                    <div class="progress-fill" [style.width]="((currentQ() + 1) / totalQuestions * 100) + '%'"></div>
                   </div>
                 </div>
-                <div class="pp-timer">⏱ {{ timerDisplay }}</div>
+                <div class="pp-timer" [class.timer-warn]="timeLeft() <= 30" [class.timer-danger]="timeLeft() <= 10">⏱ {{ timerDisplay() }}</div>
                 <button class="btn btn-ghost btn-sm" (click)="endPractice()">✕ End</button>
               </div>
 
@@ -169,16 +169,32 @@ import { InterviewSession } from '../../core/models/models';
               <div class="pp-controls">
                 <button class="btn btn-secondary btn-sm" (click)="prevQ()" [disabled]="currentQ() === 0">← Prev</button>
                 <div class="pp-dots">
-                  <span *ngFor="let d of [0,1,2]" class="pp-dot" [class.active]="currentQ() === d"></span>
+                  <span *ngFor="let d of questionIndices" class="pp-dot" [class.active]="currentQ() === d" [class.done]="currentQ() > d"></span>
                 </div>
-                <button class="btn btn-primary btn-sm" (click)="nextQ()" *ngIf="currentQ() < 2">Next →</button>
-                <button class="btn btn-primary btn-sm" (click)="endPractice()" *ngIf="currentQ() === 2">Submit ✓</button>
+                <button class="btn btn-primary btn-sm" (click)="nextQ()" *ngIf="currentQ() < totalQuestions - 1">Next →</button>
+                <button class="btn btn-success btn-sm" (click)="submitSession()" *ngIf="currentQ() === totalQuestions - 1">Submit ✓</button>
               </div>
             </div>
           </ng-container>
 
+          <!-- Submitted state -->
+          <div class="card submitted-card" *ngIf="submitted()">
+            <div class="sub-icon">🎉</div>
+            <h2 class="sub-title">Session Complete!</h2>
+            <p class="sub-sub">Your responses have been recorded. AI analysis will be available shortly.</p>
+            <div class="sub-stats">
+              <div class="sub-stat"><div class="ss-val">{{ totalQuestions }}</div><div class="ss-lbl">Questions answered</div></div>
+              <div class="sub-stat"><div class="ss-val">{{ answeredCount }}</div><div class="ss-lbl">With answers</div></div>
+              <div class="sub-stat"><div class="ss-val">~{{ totalQuestions * 2 }}m</div><div class="ss-lbl">Estimated time</div></div>
+            </div>
+            <div class="sub-actions">
+              <button class="btn btn-primary" (click)="resetSession()">Practice Again</button>
+              <button class="btn btn-secondary" (click)="goToReports()">View Reports</button>
+            </div>
+          </div>
+
           <!-- No selection -->
-          <div class="empty-state" *ngIf="!selectedSession() && !practiceMode()">
+          <div class="empty-state" *ngIf="!selectedSession() && !practiceMode() && !submitted()">
             <div class="empty-state-icon">🎙️</div>
             <h3>Select a session</h3>
             <p>Choose an interview from the list, or start a new mock session to begin practicing.</p>
@@ -471,25 +487,71 @@ import { InterviewSession } from '../../core/models/models';
       transition: background var(--transition-fast);
     }
     .pp-dot.active { background: var(--teal-500); }
+    .pp-dot.done { background: var(--teal-300); }
+
+    .timer-warn { background: var(--warning-50) !important; color: var(--warning-700) !important; }
+    .timer-danger { background: var(--error-50) !important; color: var(--error-600) !important; animation: pulse 1s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+    .btn-success { background: var(--success-600); color: white; border: none; }
+    .btn-success:hover { background: var(--success-700); }
+
+    /* Submitted card */
+    .submitted-card {
+      text-align: center; display: flex; flex-direction: column;
+      align-items: center; gap: var(--space-5); padding: var(--space-10) var(--space-8);
+    }
+    .sub-icon { font-size: 3.5rem; }
+    .sub-title { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; }
+    .sub-sub { font-size: var(--text-sm); color: var(--color-text-muted); max-width: 400px; }
+    .sub-stats { display: flex; gap: var(--space-8); margin: var(--space-2) 0; }
+    .sub-stat { text-align: center; }
+    .ss-val { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; color: var(--teal-600); }
+    .ss-lbl { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+    .sub-actions { display: flex; gap: var(--space-3); }
 
     @media (max-width: 1024px) {
       .interviews-layout { grid-template-columns: 1fr; }
     }
   `]
 })
-export class InterviewsComponent {
+export class InterviewsComponent implements OnDestroy {
   sessions = MOCK_INTERVIEWS;
   activeTab = signal<'upcoming' | 'completed'>('upcoming');
   selectedSession = signal<InterviewSession | null>(null);
   practiceMode = signal(false);
+  submitted = signal(false);
   currentQ = signal(0);
+  answers = signal<string[]>([]);
   answer = signal('');
-  timerDisplay = '2:00';
+  timeLeft = signal(120);
+  private timerInterval: any = null;
+
+  timerDisplay = computed(() => {
+    const t = this.timeLeft();
+    const m = Math.floor(t / 60);
+    const s = t % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  });
+
+  get totalQuestions(): number {
+    return this.practiceQuestions.length;
+  }
+
+  get questionIndices(): number[] {
+    return Array.from({ length: this.totalQuestions }, (_, i) => i);
+  }
+
+  get answeredCount(): number {
+    return this.answers().filter(a => a && a.trim().length > 0).length;
+  }
 
   practiceQuestions = [
     '"Tell me about a time you led a team through a challenging project. What was your approach and what was the outcome?"',
     '"Describe a situation where you had to deal with a difficult stakeholder. How did you handle it?"',
     '"Give me an example of a time you failed at something. What did you learn from that experience?"',
+    '"Describe a project where you had to learn something quickly under pressure."',
+    '"Tell me about your greatest professional achievement so far."',
   ];
 
   prepTips = [
@@ -517,24 +579,101 @@ export class InterviewsComponent {
     this.activeTab.set(tab);
     this.selectedSession.set(null);
     this.practiceMode.set(false);
+    this.submitted.set(false);
+    this.stopTimer();
   }
 
   selectSession(s: InterviewSession) {
     this.selectedSession.set(s);
     this.practiceMode.set(false);
+    this.submitted.set(false);
+    this.stopTimer();
   }
 
-  startPractice() { this.practiceMode.set(true); this.currentQ.set(0); }
-  endPractice()   { this.practiceMode.set(false); }
-  startNewSession() {
-    this.selectedSession.set(this.upcoming[0]);
+  startPractice() {
     this.practiceMode.set(true);
+    this.submitted.set(false);
+    this.currentQ.set(0);
+    this.answers.set(new Array(this.totalQuestions).fill(''));
+    this.answer.set('');
+    this.startTimer();
+  }
+
+  endPractice() {
+    this.practiceMode.set(false);
+    this.stopTimer();
+  }
+
+  submitSession() {
+    this.saveAnswer();
+    this.practiceMode.set(false);
+    this.submitted.set(true);
+    this.stopTimer();
+  }
+
+  resetSession() {
+    this.submitted.set(false);
+    this.selectedSession.set(null);
+  }
+
+  goToReports() {
+    this.submitted.set(false);
+  }
+
+  startNewSession() {
+    if (this.upcoming.length > 0) {
+      this.selectedSession.set(this.upcoming[0]);
+    }
+    this.startPractice();
   }
 
   setAnswer(e: Event) {
     this.answer.set((e.target as HTMLTextAreaElement).value);
   }
 
-  nextQ() { if (this.currentQ() < 2) this.currentQ.update(q => q + 1); }
-  prevQ() { if (this.currentQ() > 0) this.currentQ.update(q => q - 1); }
+  private saveAnswer() {
+    const all = [...this.answers()];
+    all[this.currentQ()] = this.answer();
+    this.answers.set(all);
+  }
+
+  nextQ() {
+    if (this.currentQ() < this.totalQuestions - 1) {
+      this.saveAnswer();
+      this.currentQ.update(q => q + 1);
+      this.answer.set(this.answers()[this.currentQ()] || '');
+      this.startTimer();
+    }
+  }
+
+  prevQ() {
+    if (this.currentQ() > 0) {
+      this.saveAnswer();
+      this.currentQ.update(q => q - 1);
+      this.answer.set(this.answers()[this.currentQ()] || '');
+      this.startTimer();
+    }
+  }
+
+  private startTimer() {
+    this.stopTimer();
+    this.timeLeft.set(120);
+    this.timerInterval = setInterval(() => {
+      const t = this.timeLeft();
+      if (t > 0) {
+        this.timeLeft.set(t - 1);
+      } else {
+        this.stopTimer();
+      }
+    }, 1000);
+  }
+
+  private stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+  }
+
+  ngOnDestroy() { this.stopTimer(); }
 }

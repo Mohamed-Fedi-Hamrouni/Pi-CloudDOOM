@@ -108,10 +108,34 @@ services:
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.created --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.updated --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.deleted --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.role-changed --partitions 3 --replication-factor 1
             kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.events.DLQ --partitions 1 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.created --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.updated --partitions 3 --replication-factor 1
+            kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.deleted --partitions 3 --replication-factor 1
             echo 'Topics créés :'
             kafka-topics --list --bootstrap-server kafka:29092
             "
+
+    minio:
+        image: minio/minio:latest
+        container_name: resourceservice-minio
+        restart: unless-stopped
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+            MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+        ports:
+            - "${MINIO_PORT:-9000}:9000"
+            - "${MINIO_CONSOLE_PORT:-9001}:9001"
+        volumes:
+            - miniodata:/data
+        healthcheck:
+            test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 20s
 
     keycloak:
         image: quay.io/keycloak/keycloak:24.0.1
@@ -121,7 +145,7 @@ services:
             postgres:
                 condition: service_healthy
         ports:
-            - "${KEYCLOAK_PORT:-8080}:8080"
+            - "${KEYCLOAK_PORT:-8090}:8080"
         environment:
             KC_DB: postgres
             KC_DB_URL: jdbc:postgresql://postgres:5432/keycloakdb
@@ -142,7 +166,7 @@ services:
             test:
                 [
                     "CMD-SHELL",
-                    "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/master HTTP/1.0\\r\\n\\r\\n\" >&3; cat <&3 | grep -q \"realm\"'",
+                    "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/master HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; timeout 5 cat <&3 | grep -q realm'"
                 ]
             interval: 30s
             timeout: 15s
@@ -175,12 +199,98 @@ services:
             SPRING_REDIS_PORT: 6379
             SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
             SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-            KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8090}/realms/${KC_REALM_NAME:-myapp-realm}
             KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
             KEYCLOAK_SERVER_URL: http://keycloak:8080
             KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
             KEYCLOAK_CLIENT_ID: user-service
             KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
+
+    ollama:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama
+        restart: unless-stopped
+        profiles: ["ai-ollama"]
+        ports:
+            - "${OLLAMA_PORT:-11434}:11434"
+        volumes:
+            - ollamadata:/root/.ollama
+        healthcheck:
+            test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 20s
+
+    ollama-init:
+        image: ollama/ollama:latest
+        container_name: userservice-ollama-init
+        profiles: ["ai-ollama"]
+        depends_on:
+            ollama:
+                condition: service_started
+        environment:
+            OLLAMA_HOST: http://ollama:11434
+            OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+        entrypoint: ["/bin/sh", "-c"]
+        command: >-
+            "echo 'Waiting for Ollama…';
+             until ollama list >/dev/null 2>&1; do sleep 2; done;
+             echo 'Pulling model '\"$$OLLAMA_MODEL\"'…';
+             ollama pull \"$$OLLAMA_MODEL\";
+             echo 'Model ready.'"
+        restart: "no"
+
+    resource-service:
+        build:
+            context: ../resource-service
+            dockerfile: Dockerfile
+        container_name: resourceservice-app
+        restart: unless-stopped
+        # Allow the container to reach Ollama running on the host machine
+        # ("host.docker.internal" is the host IP; extra_hosts makes it work on Linux too).
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            kafka:
+                condition: service_healthy
+            keycloak:
+                condition: service_started
+            minio:
+                condition: service_healthy
+        ports:
+            - "${RESOURCE_SERVICE_PORT:-8087}:8087"
+        environment:
+            SERVER_PORT: 8087
+            SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/resourcedb
+            SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+            SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+            SPRING_REDIS_HOST: redis
+            SPRING_REDIS_PORT: 6379
+            SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+            SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+            KEYCLOAK_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8090}/realms/${KC_REALM_NAME:-myapp-realm}
+            KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+            USER_SERVICE_BASE_URL: http://user-service:8081
+            MINIO_ENDPOINT: http://minio:9000
+            MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+            MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+            MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+            MINIO_BUCKET: resource-library
+            # AI: groq (fast cloud LLM, OpenAI-compatible) — set GROQ_API_KEY in .env
+            # Falls back to enriched stub instantly when no API key is provided.
+            # Override AI_PROVIDER=ollama or AI_PROVIDER=stub in .env if needed.
+            AI_PROVIDER: ${AI_PROVIDER:-groq}
+            AI_FALLBACK_TO_STUB: "true"
+            GROQ_API_KEY: ${GROQ_API_KEY:-}
+            GROQ_MODEL: ${GROQ_MODEL:-llama3-8b-8192}
+            OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+            OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3:8b}
+            OLLAMA_TIMEOUT_MS: "180000"
 
     frontend:
         build:
@@ -200,6 +310,8 @@ volumes:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    miniodata:
+    ollamadata:
 
 networks:
     default:

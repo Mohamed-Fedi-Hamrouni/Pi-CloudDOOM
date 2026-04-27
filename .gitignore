@@ -41,3 +41,9 @@ dist/
 # Coverage / temp
 coverage/
 .mtj.tmp/
+
+# Archive exports (not versioned)
+*.zip
+
+# Claude Code internal data
+.claude/

@@ -421,6 +421,30 @@
     "notBefore" : 0,
     "groups" : [ ]
   }, {
+    "id": "adminyos-0001-0001-0001-000000000001",
+    "username": "adminyosr@test.com",
+    "firstName": "AdminYosr",
+    "lastName": "SuperAdmin",
+    "email": "adminyosr@test.com",
+    "emailVerified": true,
+    "createdTimestamp": 1774290210000,
+    "enabled": true,
+    "totp": false,
+    "credentials": [
+      {
+        "id": "cred-adminyos-0001-0001-000000000001",
+        "type": "password",
+        "createdDate": 1774290210001,
+        "secretData": "{\"value\":\"vQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQn6QwQ==\",\"salt\":\"saltadminyosr0001==\",\"additionalParameters\":{}}",
+        "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+      }
+    ],
+    "disableableCredentialTypes": [],
+    "requiredActions": [],
+    "realmRoles": ["default-roles-myapp-realm", "ROLE_ADMIN"],
+    "notBefore": 0,
+    "groups": []
+  }, {
     "id" : "103c5ee6-f8f7-41be-856c-db9ec2eb8600",
     "username" : "service-account-user-service",
     "emailVerified" : false,
@@ -576,8 +600,8 @@
     "enabled" : true,
     "alwaysDisplayInConsole" : false,
     "clientAuthenticatorType" : "client-secret",
-    "redirectUris" : [ "http://localhost:4200/*" ],
-    "webOrigins" : [ "http://localhost:4200" ],
+    "redirectUris" : [ "http://localhost:4200/*", "http://localhost:50182/*", "http://localhost:*/*" ],
+    "webOrigins" : [ "http://localhost:4200", "http://localhost:50182", "http://localhost:*" ],
     "notBefore" : 0,
     "bearerOnly" : false,
     "consentRequired" : false,

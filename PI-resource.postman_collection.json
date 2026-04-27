@@ -1,0 +1,671 @@
+{
+  "info": {
+    "_postman_id": "pi-resource-service-collection",
+    "name": "PI Resource Service - MS-7",
+    "description": "Complete API test suite for Resource Library microservice (MS-7)\nBase URL: http://localhost:8087\nAuth: OAuth2 Bearer Token from Keycloak",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Setup",
+      "item": [
+        {
+          "name": "[SETUP] Generate Admin Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  let resp = pm.response.json();",
+                  "  pm.environment.set('access_token', resp.access_token);",
+                  "  pm.environment.set('token_expires_in', resp.expires_in);",
+                  "  console.log('✓ Admin token generated and saved');",
+                  "} else {",
+                  "  console.error('✗ Token generation failed:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "angular-client"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "username",
+                  "value": "adminyosr@test.com"
+                },
+                {
+                  "key": "password",
+                  "value": "0000"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://localhost:8090/realms/myapp-realm/protocol/openid-connect/token",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8090",
+              "path": [
+                "realms",
+                "myapp-realm",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resources",
+      "item": [
+        {
+          "name": "GET /resources - List all",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.test('Response is paginated', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp).to.have.property('content');",
+                  "  pm.expect(resp).to.have.property('totalElements');",
+                  "  pm.expect(resp).to.have.property('totalPages');",
+                  "});",
+                  "if (pm.response.json().content.length > 0) {",
+                  "  pm.environment.set('resource_id', pm.response.json().content[0].id);",
+                  "  pm.environment.set('category_id', pm.response.json().content[0].categoryId);",
+                  "  console.log('✓ Resource ID captured:', pm.environment.get('resource_id'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources?page=0&size=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /resources/{id} - Get by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.test('Response has resource fields', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp).to.have.property('id');",
+                  "  pm.expect(resp).to.have.property('title');",
+                  "  pm.expect(resp).to.have.property('description');",
+                  "  pm.expect(resp).to.have.property('categoryId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/{{resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "{{resource_id}}"]
+            }
+          }
+        },
+        {
+          "name": "GET /resources/search - Search by title",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/search?query=Python&page=0&size=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "Python"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /resources/filter - Filter by criteria",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/filter?industry=TECHNOLOGY&level=INTERMEDIATE&page=0&size=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "filter"],
+              "query": [
+                {
+                  "key": "industry",
+                  "value": "TECHNOLOGY"
+                },
+                {
+                  "key": "level",
+                  "value": "INTERMEDIATE"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /resources - Create (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function() {",
+                  "  pm.expect(pm.response.code).to.equal(201);",
+                  "});",
+                  "pm.test('Response has created resource', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp).to.have.property('id');",
+                  "  pm.expect(resp.title).to.equal('Advanced Kubernetes Guide');",
+                  "  pm.environment.set('created_resource_id', resp.id);",
+                  "  console.log('✓ Created resource:', resp.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Advanced Kubernetes Guide\",\n  \"description\": \"Master Kubernetes orchestration, deployments, and scaling\",\n  \"url\": \"https://kubernetes.io/docs/home/\",\n  \"type\": \"ARTICLE\",\n  \"industry\": \"TECHNOLOGY\",\n  \"level\": \"ADVANCED\",\n  \"categoryId\": \"{{category_id}}\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8087/api/resources",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources"]
+            }
+          }
+        },
+        {
+          "name": "PUT /resources/{id} - Update (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.test('Resource updated', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp.title).to.include('Updated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Advanced Kubernetes Guide\",\n  \"description\": \"Master Kubernetes orchestration, deployments, scaling, and service mesh\",\n  \"url\": \"https://kubernetes.io/docs/concepts/\",\n  \"type\": \"ARTICLE\",\n  \"industry\": \"TECHNOLOGY\",\n  \"level\": \"ADVANCED\",\n  \"categoryId\": \"{{category_id}}\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8087/api/resources/{{created_resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "{{created_resource_id}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /resources/{id} - Delete (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204, 200 or 404', function() {",
+                  "  pm.expect([200, 204, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/{{created_resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "{{created_resource_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "GET /categories - List all",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.test('Response is array', function() {",
+                  "  pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "if (pm.response.json().length > 0) {",
+                  "  pm.environment.set('category_id', pm.response.json()[0].id);",
+                  "  console.log('✓ Category ID captured:', pm.environment.get('category_id'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/categories",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "categories"]
+            }
+          }
+        },
+        {
+          "name": "POST /categories - Create (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 400', function() {",
+                  "  pm.expect([201, 400]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Category created', function() {",
+                  "  if (pm.response.code === 201) {",
+                  "    let resp = pm.response.json();",
+                  "    pm.expect(resp).to.have.property('id');",
+                  "    pm.environment.set('new_category_id', resp.id);",
+                  "    console.log('✓ New category created:', resp.id);",
+                  "  } else {",
+                  "    pm.expect(pm.response.code).to.equal(400);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cloud Computing {{$timestamp}}\",\n  \"description\": \"Resources related to cloud platforms and infrastructure\",\n  \"industry\": \"TECHNOLOGY\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8087/api/resources/categories",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookmarks",
+      "item": [
+        {
+          "name": "GET /bookmarks - List my bookmarks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});",
+                  "pm.test('Response is array with nested resources', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp).to.be.an('array');",
+                  "  if (resp.length > 0) {",
+                  "    pm.expect(resp[0]).to.have.property('resource');",
+                  "    console.log('✓ Bookmarks with resources:', resp.length);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/bookmarks",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "bookmarks"]
+            }
+          }
+        },
+        {
+          "name": "POST /bookmarks/{id} - Add bookmark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200, 201 or 409', function() {",
+                  "  pm.expect([200, 201, 409]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Bookmark created', function() {",
+                  "  if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    let resp = pm.response.json();",
+                  "    pm.expect(resp).to.have.property('id');",
+                  "    pm.expect(resp).to.have.property('resourceId');",
+                  "    pm.expect(resp.resourceId).to.equal(pm.environment.get('resource_id'));",
+                  "    pm.environment.set('bookmark_id', resp.id);",
+                  "    console.log('✓ Bookmark created:', resp.id);",
+                  "  } else {",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/bookmarks/{{resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "bookmarks", "{{resource_id}}"]
+            }
+          }
+        },
+        {
+          "name": "POST /bookmarks/{id} - Duplicate bookmark (409 conflict)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 409 (conflict)', function() {",
+                  "  pm.expect(pm.response.code).to.equal(409);",
+                  "});",
+                  "pm.test('Error message indicates duplicate', function() {",
+                  "  let resp = pm.response.json();",
+                  "  pm.expect(resp.message).to.include.string('already exists');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/bookmarks/{{resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "bookmarks", "{{resource_id}}"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /bookmarks/{id} - Remove bookmark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204, 200 or 404', function() {",
+                  "  pm.expect([200, 204, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/bookmarks/{{resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "bookmarks", "{{resource_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Access Control Tests",
+      "item": [
+        {
+          "name": "GET /resources/{id} - Public (no auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (public access)', function() {",
+                  "  pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/{{resource_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "{{resource_id}}"]
+            }
+          }
+        },
+        {
+          "name": "GET /bookmarks - No auth (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 (unauthorized)', function() {",
+                  "  pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "pm.test('Error indicates missing auth', function() {",
+                  "  pm.expect(pm.response.code).to.equal(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8087/api/resources/bookmarks",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8087",
+              "path": ["api", "resources", "bookmarks"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
