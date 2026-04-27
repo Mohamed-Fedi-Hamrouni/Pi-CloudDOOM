@@ -5956,7 +5956,7 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
     if (this.bookmarkPendingIds.has(eng.resourceId)) return;
     this.bookmarkPendingIds.add(eng.resourceId);
     const bookmarkId = this.bookmarkIndexByResourceId.get(eng.resourceId);
-    if (!bookmarkId) { this.bookmarkPendingIds.delete(eng.resourceId); return; }
+    if (!bookmarkId || bookmarkId === '__pending__') { this.bookmarkPendingIds.delete(eng.resourceId); return; }
     this.resourceApi.removeBookmark(bookmarkId).subscribe({
       next: () => {
         this.bookmarkIndexByResourceId.delete(eng.resourceId);
@@ -6529,13 +6529,29 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
       return;
     }
 
-    // Optimistic: mark saved immediately
+    // Optimistic: mark saved immediately + add engagement card right away
     resource.saved = true;
+    this.bookmarkIndexByResourceId.set(resource.id, '__pending__');
+    if (!this.backendEngagements.has(resource.id)) {
+      this.backendEngagements.set(resource.id, {
+        id: '', resourceId: resource.id,
+        resourceTitle: resource.title,
+        resourceUrl: resource.url ?? '',
+        resourceType: (resource.type ?? 'article').toUpperCase(),
+        resourceThumbUrl: resource.thumbnailUrl ?? null,
+        resourceCategoryName: resource.category,
+        status: 'NOT_STARTED', progressPct: 0, openCount: 0,
+        notes: null, firstOpenedAt: null, lastOpenedAt: null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        activityDays: [], streakDays: 0,
+      });
+    }
     this.resourceApi.addBookmark(resource.id).subscribe({
       next: (bookmark: BookmarkApiResponse) => {
         this.bookmarkIndexByResourceId.set(resource.id, bookmark.id);
         this.bookmarkPendingIds.delete(resource.id);
         this.ensureResourceEngagement(resource.id);
+        // Sync real engagement data in background — card is already visible
         this.resourceApi.ensureEngagement(resource.id).subscribe({
           next: (eng: EngagementApiResponse) => this.backendEngagements.set(eng.resourceId, eng),
           error: () => {},
@@ -6553,6 +6569,8 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
         } else {
           // Revert on failure
           resource.saved = false;
+          this.bookmarkIndexByResourceId.delete(resource.id);
+          this.backendEngagements.delete(resource.id);
           this.bookmarkPendingIds.delete(resource.id);
         }
       },
