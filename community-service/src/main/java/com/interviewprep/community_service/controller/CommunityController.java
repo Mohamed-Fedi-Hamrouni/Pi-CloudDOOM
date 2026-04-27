@@ -83,7 +83,6 @@ public class CommunityController {
     public ResponseEntity<Void> deletePost(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
-        boolean isAdmin = jwt.getClaimAsStringList("realm_access") != null; // roles checked in service
         communityService.deletePost(id, jwt.getSubject(), hasAdminRole(jwt));
         return ResponseEntity.noContent().build();
     }
@@ -223,7 +222,7 @@ public class CommunityController {
             Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
             if (realmAccess == null) return false;
             List<String> roles = (List<String>) realmAccess.get("roles");
-            return roles != null && roles.contains("ADMIN");
+            return roles != null && roles.stream().anyMatch(r -> r.equalsIgnoreCase("ADMIN"));
         } catch (Exception e) {
             return false;
         }

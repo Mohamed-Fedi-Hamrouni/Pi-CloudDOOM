@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/community/bookmarks")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class PostBookmarkController {
 

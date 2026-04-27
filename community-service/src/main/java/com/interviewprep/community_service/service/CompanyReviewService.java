@@ -62,6 +62,7 @@ public class CompanyReviewService {
         if (!review.getAuthorKeycloakId().equals(authorKeycloakId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to update this review");
         }
+        String oldNormalizedName = review.getCompanyNameNormalized();
         review.setCompanyNameDisplay(dto.getCompanyNameDisplay());
         review.setCompanyNameNormalized(dto.getCompanyNameDisplay().trim().toLowerCase());
         review.setRoleTitle(dto.getRoleTitle());
@@ -72,7 +73,10 @@ public class CompanyReviewService {
         review.setReviewText(dto.getReviewText());
         review.setProcessDescription(dto.getProcessDescription());
         review.setAnonymous(dto.isAnonymous());
-        return toDTO(reviewRepository.save(review));
+        CompanyReviewResponseDTO result = toDTO(reviewRepository.save(review));
+        summaryService.invalidateSummary(oldNormalizedName);
+        summaryService.invalidateSummary(review.getCompanyNameNormalized());
+        return result;
     }
 
     @Transactional
@@ -82,7 +86,9 @@ public class CompanyReviewService {
         if (!review.getAuthorKeycloakId().equals(authorKeycloakId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to delete this review");
         }
+        String normalizedName = review.getCompanyNameNormalized();
         reviewRepository.delete(review);
+        summaryService.invalidateSummary(normalizedName);
     }
 
     @Transactional(readOnly = true)

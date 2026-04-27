@@ -18,7 +18,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/community/career")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class CareerWizardController {
 
