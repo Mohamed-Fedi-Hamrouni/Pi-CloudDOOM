@@ -22,11 +22,13 @@
         "@fullcalendar/daygrid": "^6.1.20",
         "@fullcalendar/interaction": "^6.1.20",
         "@fullcalendar/timegrid": "^6.1.20",
+        "@mediapipe/tasks-vision": "^0.10.34",
         "@ng-icons/core": "^33.2.0",
         "@ng-icons/heroicons": "^33.2.0",
         "keycloak-angular": "^21.0.0",
         "keycloak-js": "^26.2.3",
         "rxjs": "~7.8.0",
+        "simli-client": "^3.0.1",
         "tslib": "^2.3.0",
         "zone.js": "~0.15.1"
     },
