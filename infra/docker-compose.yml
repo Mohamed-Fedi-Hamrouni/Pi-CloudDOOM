@@ -281,10 +281,13 @@ services:
             MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
             MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
             MINIO_BUCKET: resource-library
-            # AI: ollama (host-installed) with automatic fallback to the enriched stub
-            # if Ollama is unreachable. Override AI_PROVIDER=stub in .env to disable.
-            AI_PROVIDER: ${AI_PROVIDER:-ollama}
+            # AI: groq (fast cloud LLM, OpenAI-compatible) — set GROQ_API_KEY in .env
+            # Falls back to enriched stub instantly when no API key is provided.
+            # Override AI_PROVIDER=ollama or AI_PROVIDER=stub in .env if needed.
+            AI_PROVIDER: ${AI_PROVIDER:-groq}
             AI_FALLBACK_TO_STUB: "true"
+            GROQ_API_KEY: ${GROQ_API_KEY:-}
+            GROQ_MODEL: ${GROQ_MODEL:-llama3-8b-8192}
             OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
             OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3:8b}
             OLLAMA_TIMEOUT_MS: "180000"

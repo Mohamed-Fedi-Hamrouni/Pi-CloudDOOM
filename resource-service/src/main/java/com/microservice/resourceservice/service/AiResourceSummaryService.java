@@ -19,6 +19,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,6 +62,7 @@ public class AiResourceSummaryService {
         return switch (provider) {
             case "ollama" -> summarizeWithOllama(resource, now);
             case "openai" -> summarizeWithOpenAi(resource, now);
+            case "groq" -> summarizeWithGroq(resource, now);
             default -> summarizeStub(resource, now);
         };
     }
@@ -80,8 +89,14 @@ public class AiResourceSummaryService {
         String provider = resolveProvider();
         LocalDateTime now = LocalDateTime.now();
 
-        // If provider is not ollama (stub/openai), fall back to non-streaming path:
-        // send the full response as one "token" event followed by "done".
+        // Groq: real OpenAI-compatible token streaming
+        if ("groq".equals(provider)) {
+            java.util.concurrent.CompletableFuture.runAsync(() ->
+                streamWithGroq(resource, emitter, now));
+            return emitter;
+        }
+
+        // stub / openai: fall back to non-streaming path — send the full response as one "token" + "done"
         if (!"ollama".equals(provider) || !ollamaClient.isAvailable()) {
             java.util.concurrent.CompletableFuture.runAsync(() -> {
                 try {
@@ -90,8 +105,6 @@ public class AiResourceSummaryService {
                         emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
                             .name("token").data(resp.getSummary()));
                     }
-                    // Serialize to JSON string explicitly — SseEmitter.data(Object) without a MediaType
-                    // may not select Jackson when the Accept type is text/event-stream.
                     emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
                         .name("done").data(objectMapper.writeValueAsString(resp)));
                     emitter.complete();
@@ -184,6 +197,138 @@ public class AiResourceSummaryService {
         return parseSummary(r, "openai", content, now);
     }
 
+    private AiResourceSummaryResponse summarizeWithGroq(Resource r, LocalDateTime now) {
+        AiGenerationProperties.Groq groq = props.getGroq();
+        if (groq.getApiKey() == null || groq.getApiKey().isBlank()) {
+            log.warn("Groq API key not configured — falling back to stub");
+            return summarizeStub(r, now);
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", groq.getModel());
+        payload.put("temperature", groq.getTemperature());
+        payload.put("messages", List.of(
+            Map.of("role", "system", "content", "You output ONLY valid JSON (no markdown, no extra text)."),
+            Map.of("role", "user", "content", buildPrompt(r))
+        ));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(groq.getApiKey().trim());
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(groq.getBaseUrl(), entity, String.class);
+            String body = response.getBody();
+            if (body == null || body.isBlank()) {
+                return props.isFallbackToStub() ? summarizeStub(r, now) : null;
+            }
+            String content = extractOpenAiContent(body);
+            return parseSummary(r, "groq", content, now);
+        } catch (Exception e) {
+            log.warn("Groq summarize failed: {} — falling back to stub", e.getMessage());
+            return summarizeStub(r, now);
+        }
+    }
+
+    /**
+     * Streams Groq tokens via OpenAI-compatible SSE format.
+     * Each chunk: data: {"choices":[{"delta":{"content":"token"}}]}
+     * Last chunk: data: [DONE]
+     */
+    private void streamWithGroq(Resource resource,
+                                 org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter,
+                                 LocalDateTime now) {
+        AiGenerationProperties.Groq groq = props.getGroq();
+        if (groq.getApiKey() == null || groq.getApiKey().isBlank()) {
+            log.warn("Groq API key not configured — streaming stub fallback");
+            try {
+                AiResourceSummaryResponse stub = summarizeStub(resource, now);
+                if (stub.getSummary() != null) {
+                    emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                        .name("token").data(stub.getSummary()));
+                }
+                emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                    .name("done").data(objectMapper.writeValueAsString(stub)));
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+            return;
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", groq.getModel());
+        payload.put("temperature", groq.getTemperature());
+        payload.put("stream", true);
+        payload.put("messages", List.of(
+            Map.of("role", "system", "content", "You output ONLY valid JSON (no markdown, no extra text)."),
+            Map.of("role", "user", "content", buildPrompt(resource))
+        ));
+
+        String bodyJson;
+        try {
+            bodyJson = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+            return;
+        }
+
+        HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create(groq.getBaseUrl()))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + groq.getApiKey().trim())
+            .timeout(Duration.ofMillis(groq.getTimeoutMs()))
+            .POST(HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
+            .build();
+
+        StringBuilder full = new StringBuilder();
+        try {
+            HttpResponse<java.io.InputStream> resp = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
+            if (resp.statusCode() / 100 != 2) {
+                throw new IllegalStateException("Groq stream HTTP " + resp.statusCode());
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isEmpty()) continue;
+                    if (!line.startsWith("data:")) continue;
+                    String data = line.substring(5).trim();
+                    if ("[DONE]".equals(data)) break;
+                    try {
+                        JsonNode chunk = objectMapper.readTree(data);
+                        String token = chunk.path("choices").path(0).path("delta").path("content").asText("");
+                        if (!token.isEmpty()) {
+                            full.append(token);
+                            emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                                .name("token").data(token));
+                        }
+                    } catch (Exception parseEx) {
+                        // skip malformed chunk
+                    }
+                }
+            }
+
+            AiResourceSummaryResponse parsed = parseSummary(resource, "groq", full.toString(), now);
+            emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                .name("done").data(objectMapper.writeValueAsString(parsed)));
+            emitter.complete();
+        } catch (Exception e) {
+            log.warn("Groq streaming failed: {} — falling back to stub", e.getMessage());
+            try {
+                AiResourceSummaryResponse fallback = summarizeStub(resource, now);
+                emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                    .name("done").data(objectMapper.writeValueAsString(fallback)));
+                emitter.complete();
+            } catch (Exception e2) {
+                emitter.completeWithError(e2);
+            }
+        }
+    }
+
     private AiResourceSummaryResponse summarizeStub(Resource r, LocalDateTime now) {
         String title = r.getTitle() == null ? "ce sujet" : r.getTitle().trim();
         String description = r.getDescription() == null ? "" : r.getDescription().trim();
@@ -272,7 +417,7 @@ public class AiResourceSummaryService {
 
     private String resolveProvider() {
         String configured = props.getProvider() == null ? "stub" : props.getProvider().trim().toLowerCase(Locale.ROOT);
-        if (!List.of("stub", "ollama", "openai").contains(configured)) {
+        if (!List.of("stub", "ollama", "openai", "groq").contains(configured)) {
             return "stub";
         }
         return configured;

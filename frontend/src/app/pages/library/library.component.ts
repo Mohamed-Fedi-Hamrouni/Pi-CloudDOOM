@@ -1208,7 +1208,7 @@ interface ResourceEngagement {
             <!-- AI provider footer -->
             <div class="ast-provider" *ngIf="summaryProvider">
               <div class="ast-provider-dot"></div>
-              Synthétisé par <strong>{{ summaryProvider === 'ollama' ? 'Ollama (local)' : summaryProvider === 'stub' ? 'Analyse locale' : summaryProvider }}</strong>
+              Synthétisé par <strong>{{ summaryProvider === 'ollama' ? 'Ollama (local)' : summaryProvider === 'stub' ? 'Analyse locale' : summaryProvider === 'groq' ? 'Groq · Llama 3' : summaryProvider }}</strong>
               <span class="ast-provider-time" *ngIf="summaryGeneratedAt">· {{ summaryGeneratedAt }}</span>
               <span class="ast-provider-cache" *ngIf="summaryProvider === 'ollama'" title="Résultat mis en cache 30 min après la première génération">
                 <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
