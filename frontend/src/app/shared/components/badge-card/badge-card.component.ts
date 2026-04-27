@@ -8,14 +8,14 @@ import { Badge } from '../../../core/models/models';
   imports: [CommonModule],
   template: `
     <div class="badge-card" [class.earned]="badge.earned" [class.locked]="!badge.earned">
-      <div class="badge-icon">{{ badge.icon }}</div>
+      <div class="badge-icon" [innerHTML]="badge.icon"></div>
       <div class="badge-name">{{ badge.name }}</div>
       <div class="badge-desc">{{ badge.description }}</div>
       <div class="badge-xp">+{{ badge.xpReward }} XP</div>
       <div class="badge-earned-date" *ngIf="badge.earned && badge.earnedDate">
         Earned {{ badge.earnedDate }}
       </div>
-      <div class="badge-locked-label" *ngIf="!badge.earned">🔒 Locked</div>
+      <div class="badge-locked-label" *ngIf="!badge.earned"><i class="bi bi-lock-fill"></i> Locked</div>
     </div>
   `,
   styles: [`

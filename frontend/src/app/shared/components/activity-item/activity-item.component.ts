@@ -7,7 +7,7 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <div class="activity-item">
-      <div class="activity-icon">{{ icon }}</div>
+      <div class="activity-icon" [innerHTML]="icon"></div>
       <div class="activity-body">
         <div class="activity-text">{{ text }}</div>
         <div class="activity-time">{{ time }}</div>

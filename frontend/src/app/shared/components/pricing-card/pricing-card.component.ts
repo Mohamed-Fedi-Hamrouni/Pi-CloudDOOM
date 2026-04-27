@@ -8,7 +8,7 @@ import { PricingPlan } from '../../../core/models/models';
   imports: [CommonModule],
   template: `
     <div class="pricing-card" [class.recommended]="plan.recommended">
-      <div class="recommended-badge" *ngIf="plan.recommended">⭐ Most Popular</div>
+      <div class="recommended-badge" *ngIf="plan.recommended"><i class="bi bi-star-fill"></i> Most Popular</div>
       <div class="plan-name">{{ plan.name }}</div>
       <div class="plan-price">
         <span class="price-currency" *ngIf="plan.price > 0">$</span>
@@ -21,7 +21,7 @@ import { PricingPlan } from '../../../core/models/models';
       </button>
       <div class="plan-features">
         <div class="feature-item" *ngFor="let f of plan.features" [class.included]="f.included" [class.excluded]="!f.included">
-          <span class="feature-check">{{ f.included ? '✓' : '–' }}</span>
+          <span class="feature-check"><i class="bi" [class.bi-check-lg]="f.included" [class.bi-dash]="!f.included"></i></span>
           <span class="feature-text">{{ f.text }}</span>
         </div>
       </div>

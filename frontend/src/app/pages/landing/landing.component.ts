@@ -27,43 +27,43 @@ export class LandingComponent {
 
     modules = [
         {
-            icon: "🎙️",
+            icon: '<i class="bi bi-mic-fill"></i>',
             title: "Mock Interviews",
             desc: "AI-powered practice sessions with real-time scoring and detailed feedback on every answer.",
             color: "teal",
         },
         {
-            icon: "📝",
+            icon: '<i class="bi bi-pencil-square"></i>',
             title: "Quiz & Assessments",
             desc: "Topic-based quizzes across technical, behavioral, and product thinking domains.",
             color: "cyan",
         },
         {
-            icon: "🚀",
+            icon: '<i class="bi bi-rocket-fill"></i>',
             title: "Training Paths",
             desc: "Gamified learning journeys with XP, streaks, badges, and daily challenges.",
             color: "mint",
         },
         {
-            icon: "📊",
+            icon: '<i class="bi bi-bar-chart-fill"></i>',
             title: "Performance Reports",
             desc: "Deep analytics on your communication, confidence, clarity, and readiness scores.",
             color: "sky",
         },
         {
-            icon: "🤝",
+            icon: '<i class="bi bi-people-fill"></i>',
             title: "Expert Mentors",
             desc: "Book 1:1 sessions with industry professionals from Google, Meta, Stripe, and more.",
             color: "peach",
         },
         {
-            icon: "💬",
+            icon: '<i class="bi bi-chat-fill"></i>',
             title: "Community",
             desc: "Join a vibrant community of candidates sharing tips, success stories, and motivation.",
             color: "purple",
         },
         {
-            icon: "📚",
+            icon: '<i class="bi bi-book-fill"></i>',
             title: "Resource Library",
             desc: "Curated articles, videos, podcasts, templates and exercises for every career stage.",
             color: "sand",
@@ -95,8 +95,8 @@ export class LandingComponent {
 
     faqItems = [
         {
-            q: "How is interV different from other prep platforms?",
-            a: "interV combines AI-powered feedback, structured training paths, live mentorship, and community — all in one platform designed specifically for students and early-career candidates.",
+            q: "How is InterviewPrepTN different from other prep platforms?",
+            a: "InterviewPrepTN combines AI-powered feedback, structured training paths, live mentorship, and community — all in one platform designed specifically for students and early-career candidates.",
         },
         {
             q: "Do I need to pay to start?",

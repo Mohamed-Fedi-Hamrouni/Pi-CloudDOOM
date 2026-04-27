@@ -40,7 +40,7 @@ interface NavItem {
                     (click)="toggleSidebar.emit()"
                     title="Toggle sidebar"
                 >
-                    <span>{{ collapsed ? "→" : "←" }}</span>
+                    <i class="bi" [class.bi-arrow-right]="collapsed" [class.bi-arrow-left]="!collapsed"></i>
                 </button>
             </div>
 
@@ -54,7 +54,7 @@ interface NavItem {
                     class="nav-item"
                     [title]="item.label"
                 >
-                    <span class="nav-icon">{{ item.icon }}</span>
+                    <span class="nav-icon" [innerHTML]="item.icon"></span>
                     <span class="nav-label" *ngIf="!collapsed">{{
                         item.label
                     }}</span>
@@ -72,7 +72,7 @@ interface NavItem {
                     class="nav-item"
                     [title]="item.label"
                 >
-                    <span class="nav-icon">{{ item.icon }}</span>
+                    <span class="nav-icon" [innerHTML]="item.icon"></span>
                     <span class="nav-label" *ngIf="!collapsed">{{
                         item.label
                     }}</span>
@@ -91,7 +91,7 @@ interface NavItem {
                     class="nav-item"
                     [title]="item.label"
                 >
-                    <span class="nav-icon">{{ item.icon }}</span>
+                    <span class="nav-icon" [innerHTML]="item.icon"></span>
                     <span class="nav-label" *ngIf="!collapsed">{{
                         item.label
                     }}</span>
@@ -538,17 +538,17 @@ export class SidebarComponent implements OnChanges {
     }
 
     mainNav: NavItem[] = [
-        { label: "Dashboard", icon: "⊞", route: "/dashboard" },
-        { label: "Interviews", icon: "🎙️", route: "/interviews" },
-        { label: "Quiz & Assess", icon: "📝", route: "/quiz-assessment" },
-        { label: "Training", icon: "🚀", route: "/training-gamification" },
-        { label: "Reports", icon: "📊", route: "/reports" },
-        { label: "Library", icon: "📚", route: "/library" },
+        { label: "Dashboard", icon: '<i class="bi bi-bar-chart-fill"></i>', route: "/dashboard" },
+        { label: "Interviews", icon: '<i class="bi bi-mic-fill"></i>', route: "/interviews" },
+        { label: "Quiz & Assess", icon: '<i class="bi bi-pencil-square"></i>', route: "/quiz-assessment" },
+        { label: "Training", icon: '<i class="bi bi-rocket-fill"></i>', route: "/training-gamification" },
+        { label: "Reports", icon: '<i class="bi bi-bar-chart-fill"></i>', route: "/reports" },
+        { label: "Library", icon: '<i class="bi bi-book-fill"></i>', route: "/library" },
     ];
 
     connectNav: NavItem[] = [
-        { label: "Mentorship", icon: "🤝", route: "/mentorship" },
-        { label: "Community", icon: "💬", route: "/community" },
+        { label: "Mentorship", icon: '<i class="bi bi-people-fill"></i>', route: "/mentorship" },
+        { label: "Community", icon: '<i class="bi bi-chat-fill"></i>', route: "/community" },
     ];
 
     private buildAccountNav(): NavItem[] {

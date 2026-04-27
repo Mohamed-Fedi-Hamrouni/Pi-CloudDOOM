@@ -16,15 +16,15 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
           <h1>Performance Reports</h1>
           <p>Detailed analysis of your interview performance, strengths, and growth areas.</p>
         </div>
-        <button class="btn btn-secondary">⬇ Export PDF</button>
+        <button class="btn btn-secondary"><i class="bi bi-download"></i> Export PDF</button>
       </div>
 
       <!-- Overall Stats -->
       <div class="report-stats">
-        <app-stat-card icon="🎯" value="78%" label="Overall Score"        color="teal" change="vs 71% last session" [changePositive]="true"></app-stat-card>
-        <app-stat-card icon="🎙️" value="23"   label="Sessions Completed"  color="cyan"></app-stat-card>
-        <app-stat-card icon="📈" value="+7%"  label="Improvement (30d)"   color="mint" change="vs previous month" [changePositive]="true"></app-stat-card>
-        <app-stat-card icon="⏱️" value="36h"  label="Total Practice Time" color="sky"></app-stat-card>
+        <app-stat-card icon='<i class="bi bi-bullseye"></i>' value="78%" label="Overall Score"        color="teal" change="vs 71% last session" [changePositive]="true"></app-stat-card>
+        <app-stat-card icon='<i class="bi bi-mic-fill"></i>' value="23"   label="Sessions Completed"  color="cyan"></app-stat-card>
+        <app-stat-card icon='<i class="bi bi-graph-up"></i>' value="+7%"  label="Improvement (30d)"   color="mint" change="vs previous month" [changePositive]="true"></app-stat-card>
+        <app-stat-card icon='<i class="bi bi-stopwatch-fill"></i>' value="36h"  label="Total Practice Time" color="sky"></app-stat-card>
       </div>
 
       <!-- Score Breakdown + Radar -->
@@ -35,7 +35,7 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
             <div class="cat-item" *ngFor="let c of categories">
               <div class="cat-header">
                 <div class="cat-label">
-                  <span>{{ c.icon }}</span>
+                  <span [innerHTML]="c.icon"></span>
                   <span>{{ c.name }}</span>
                 </div>
                 <span class="cat-score" [class.high]="c.score >= 80" [class.mid]="c.score >= 65 && c.score < 80" [class.low]="c.score < 65">{{ c.score }}%</span>
@@ -74,30 +74,30 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
       <!-- Strengths & Weaknesses -->
       <div class="sw-grid">
         <div class="card strengths-card">
-          <app-section-header title="Your Strengths" icon="💪"></app-section-header>
+          <app-section-header title="Your Strengths" icon='<i class="bi bi-lightning-charge-fill"></i>'></app-section-header>
           <div class="sw-list">
             <div class="sw-item strength" *ngFor="let s of report.strengths">
-              <span class="sw-icon">✓</span>
+              <span class="sw-icon"><i class="bi bi-check-lg"></i></span>
               <span>{{ s }}</span>
             </div>
           </div>
         </div>
 
         <div class="card weaknesses-card">
-          <app-section-header title="Growth Areas" icon="🎯"></app-section-header>
+          <app-section-header title="Growth Areas" icon='<i class="bi bi-bullseye"></i>'></app-section-header>
           <div class="sw-list">
             <div class="sw-item weakness" *ngFor="let w of report.weaknesses">
-              <span class="sw-icon">→</span>
+              <span class="sw-icon"><i class="bi bi-arrow-right"></i></span>
               <span>{{ w }}</span>
             </div>
           </div>
         </div>
 
         <div class="card suggestions-card">
-          <app-section-header title="AI Suggestions" icon="🤖"></app-section-header>
+          <app-section-header title="AI Suggestions" icon='<i class="bi bi-robot"></i>'></app-section-header>
           <div class="sw-list">
             <div class="sw-item suggestion" *ngFor="let sg of report.suggestions">
-              <span class="sw-icon">💡</span>
+              <span class="sw-icon"><i class="bi bi-lightbulb-fill"></i></span>
               <span>{{ sg }}</span>
             </div>
           </div>
@@ -106,7 +106,7 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
 
       <!-- Report History -->
       <div class="card">
-        <app-section-header title="Report History" icon="📅" actionLabel="View All"></app-section-header>
+        <app-section-header title="Report History" icon='<i class="bi bi-calendar-fill"></i>' actionLabel="View All"></app-section-header>
         <div class="history-table">
           <div class="ht-header">
             <span>Session</span>
@@ -120,7 +120,7 @@ import { MOCK_REPORTS } from '../../core/data/mock-data';
             <span class="ht-date">{{ r.date }}</span>
             <span><span class="chip chip-teal">Behavioral</span></span>
             <span class="ht-score" [class.high]="r.overallScore >= 80">{{ r.overallScore }}%</span>
-            <button class="btn btn-ghost btn-sm">View →</button>
+            <button class="btn btn-ghost btn-sm">View <i class="bi bi-arrow-right"></i></button>
           </div>
         </div>
       </div>
@@ -185,11 +185,11 @@ export class ReportsComponent {
   report = MOCK_REPORTS[0];
 
   categories = [
-    { name: 'Communication',    icon: '🗣️', score: 88 },
-    { name: 'Confidence',       icon: '💪', score: 80 },
-    { name: 'Clarity',          icon: '🔍', score: 85 },
-    { name: 'Response Structure',icon: '📋', score: 82 },
-    { name: 'Stress Handling',  icon: '🧘', score: 75 },
-    { name: 'Readiness',        icon: '✅', score: 83 },
+    { name: 'Communication',    icon: '<i class="bi bi-chat-fill"></i>', score: 88 },
+    { name: 'Confidence',       icon: '<i class="bi bi-lightning-charge-fill"></i>', score: 80 },
+    { name: 'Clarity',          icon: '<i class="bi bi-eye-fill"></i>', score: 85 },
+    { name: 'Response Structure',icon: '<i class="bi bi-clipboard-fill"></i>', score: 82 },
+    { name: 'Stress Handling',  icon: '<i class="bi bi-heart-fill"></i>', score: 75 },
+    { name: 'Readiness',        icon: '<i class="bi bi-check-circle-fill"></i>', score: 83 },
   ];
 }

@@ -277,6 +277,51 @@ services:
         ports:
             - "${FRONTEND_PORT:-4200}:80"
 
+    communitydb:
+        image: postgres:16-alpine
+        container_name: communitydb
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: communitydb
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-0000}
+        volumes:
+            - communitydb_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d communitydb"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    community-service:
+        build:
+            context: ../community-service
+            dockerfile: Dockerfile
+        container_name: community-service
+        restart: unless-stopped
+        ports:
+            - "8086:8086"
+        environment:
+            DB_HOST: communitydb
+            DB_PORT: 5432
+            DB_NAME: communitydb
+            DB_USERNAME: postgres
+            DB_PASSWORD: ${DB_PASSWORD:-0000}
+            KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
+            KEYCLOAK_REALM: ${KEYCLOAK_REALM:-myapp-realm}
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            GROQ_API_KEY: ${GROQ_API_KEY}
+        depends_on:
+            communitydb:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 60s
+
     training-service:
         build:
             context: ../training-service
@@ -360,13 +405,13 @@ services:
             GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
             GROQ_API_URL: "${GROQ_API_URL:-https://api.groq.com/openai/v1/chat/completions}"
 
-
 volumes:
     pgdata:
     redisdata:
     kafkadata:
     zookeeperdata:
     zookeeperlog:
+    communitydb_data:
     ollamadata:
     uploadsdata:
 
