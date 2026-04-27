@@ -100,9 +100,9 @@ class ResourceControllerTest {
 
     @Test
     void filterResources_returns200() {
-        when(resourceService.filterResources(any(), any(), any())).thenReturn(Page.empty());
+        when(resourceService.filterResources(any(), any(), any(), any(), any())).thenReturn(Page.empty());
         ResponseEntity<Page<ResourceResponse>> response =
-            controller.filterResources(null, null, PageRequest.of(0, 10));
+            controller.filterResources(null, null, null, null, PageRequest.of(0, 10));
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 

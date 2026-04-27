@@ -394,6 +394,7 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
       transition: opacity 160ms ease;
     }
     .rc:hover .rc__admin { opacity: 1; }
+    @media (hover: none) { .rc__admin { opacity: 1; } }
     .rc__admin-btn {
       width: 28px; height: 28px;
       display: inline-flex; align-items: center; justify-content: center;
@@ -522,7 +523,7 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
       padding: 10px 14px 14px;
       margin-top: auto;
     }
-    .rc__footer-r { display: flex; align-items: center; gap: 6px; }
+    .rc__footer-r { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; }
 
     /* ── Translate button ─────────────────────────────── */
     .rc__tr-btn {
@@ -608,18 +609,19 @@ import { ResourceApiService } from '../../../core/services/resource-api.service'
 
     /* Primary CTA */
     .rc__cta {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 0 14px;
-      height: 30px;
-      border-radius: 9px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 0 18px;
+      height: 34px;
+      border-radius: 10px;
       border: none;
       background: #14b8a6;
       color: #fff;
       font-family: inherit;
-      font-size: 0.72rem;
+      font-size: 0.78rem;
       font-weight: 700;
       cursor: pointer;
       letter-spacing: 0.01em;
+      flex-grow: 1;
       transition: background 130ms ease, transform 120ms ease, box-shadow 130ms ease;
       box-shadow: 0 2px 8px rgba(20,184,166,0.30);
     }

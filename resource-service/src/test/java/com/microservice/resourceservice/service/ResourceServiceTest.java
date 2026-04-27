@@ -108,35 +108,35 @@ class ResourceServiceTest {
     // ── filterResources ───────────────────────────────────────────────────────
 
     @Test
-    void filterResources_byIndustryAndLevel() {
+    void filterResources_byTypeAndLevel() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(resourceRepository.findByIndustryAndLevel(IndustryEnum.TECHNOLOGY, ResourceLevelEnum.BEGINNER, pageable))
+        when(resourceRepository.findFiltered(ResourceTypeEnum.VIDEO, ResourceLevelEnum.BEGINNER, null, pageable))
             .thenReturn(Page.empty());
-        resourceService.filterResources(IndustryEnum.TECHNOLOGY, ResourceLevelEnum.BEGINNER, pageable);
-        verify(resourceRepository).findByIndustryAndLevel(IndustryEnum.TECHNOLOGY, ResourceLevelEnum.BEGINNER, pageable);
+        resourceService.filterResources(ResourceTypeEnum.VIDEO, null, ResourceLevelEnum.BEGINNER, null, pageable);
+        verify(resourceRepository).findFiltered(ResourceTypeEnum.VIDEO, ResourceLevelEnum.BEGINNER, null, pageable);
     }
 
     @Test
-    void filterResources_byIndustryOnly() {
+    void filterResources_byTypeOnly() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(resourceRepository.findByIndustry(IndustryEnum.TECHNOLOGY, pageable)).thenReturn(Page.empty());
-        resourceService.filterResources(IndustryEnum.TECHNOLOGY, null, pageable);
-        verify(resourceRepository).findByIndustry(IndustryEnum.TECHNOLOGY, pageable);
+        when(resourceRepository.findFiltered(ResourceTypeEnum.ARTICLE, null, null, pageable)).thenReturn(Page.empty());
+        resourceService.filterResources(ResourceTypeEnum.ARTICLE, null, null, null, pageable);
+        verify(resourceRepository).findFiltered(ResourceTypeEnum.ARTICLE, null, null, pageable);
     }
 
     @Test
     void filterResources_byLevelOnly() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(resourceRepository.findByLevel(ResourceLevelEnum.ADVANCED, pageable)).thenReturn(Page.empty());
-        resourceService.filterResources(null, ResourceLevelEnum.ADVANCED, pageable);
-        verify(resourceRepository).findByLevel(ResourceLevelEnum.ADVANCED, pageable);
+        when(resourceRepository.findFiltered(null, ResourceLevelEnum.ADVANCED, null, pageable)).thenReturn(Page.empty());
+        resourceService.filterResources(null, null, ResourceLevelEnum.ADVANCED, null, pageable);
+        verify(resourceRepository).findFiltered(null, ResourceLevelEnum.ADVANCED, null, pageable);
     }
 
     @Test
     void filterResources_noFiltersCallsGetAll() {
         Pageable pageable = PageRequest.of(0, 10);
         when(resourceRepository.findAll(pageable)).thenReturn(Page.empty());
-        resourceService.filterResources(null, null, pageable);
+        resourceService.filterResources(null, null, null, null, pageable);
         verify(resourceRepository).findAll(pageable);
     }
 

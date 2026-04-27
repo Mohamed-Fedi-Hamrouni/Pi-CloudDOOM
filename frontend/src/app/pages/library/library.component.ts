@@ -168,6 +168,218 @@ interface ResourceEngagement {
         </div>
       </header>
 
+      <!-- ── Progression strip ─────────────────────────────── -->
+      <section *ngIf="authService.isAuthenticated()" class="eng-dash" aria-label="Votre progression">
+
+        <div class="eng-dash-head">
+          <div class="eng-dash-title-group">
+            <div class="eng-dash-kicker">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              VOTRE PROGRESSION
+            </div>
+            <h2 class="eng-dash-title">Reprendre là où vous vous êtes arrêté</h2>
+          </div>
+          <div class="eng-dash-chips">
+            <span class="chip chip-neutral" *ngIf="bookmarkCount > 0">{{ inProgressEngagements.length }} en cours</span>
+            <span *ngIf="engCompletedCount > 0" class="chip chip-success">{{ engCompletedCount }} terminée{{ engCompletedCount !== 1 ? 's' : '' }}</span>
+            <span *ngIf="engMaxStreak > 1" class="chip chip-fire">🔥 {{ engMaxStreak }}j streak</span>
+          </div>
+        </div>
+
+        <!-- Fix 7: Empty state when no bookmarks -->
+        <div *ngIf="!engagementsLoading && bookmarkCount === 0" class="eng-empty">
+          <div class="eng-empty-icon">🔖</div>
+          <div class="eng-empty-text">
+            <strong>Suivez votre progression</strong>
+            <span>Sauvegardez une ressource pour la retrouver ici et mesurer votre avancement</span>
+          </div>
+          <button class="eng-empty-cta" (click)="scrollToGrid()">Parcourir les ressources →</button>
+        </div>
+
+        <!-- Loading skeletons -->
+        <div *ngIf="engagementsLoading" class="eng-scroll">
+          <div class="eng-skel" *ngFor="let i of [1,2,3,4]"></div>
+        </div>
+
+        <!-- Fix 1: Scroll arrows + Fix 6: In-progress strip -->
+        <div *ngIf="!engagementsLoading && inProgressEngagements.length > 0" class="eng-scroll-wrap">
+          <button class="eng-scroll-btn eng-scroll-btn--l" (click)="scrollEng(-1)" aria-label="Précédent">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 13 5 8 10 3"/></svg>
+          </button>
+          <div class="eng-scroll" #engScrollEl>
+          <div class="eng-card eng-card--{{ eng.status.toLowerCase() }}"
+               *ngFor="let eng of inProgressEngagements; trackBy: trackEngById">
+
+            <!-- Thumb / icon area -->
+            <div class="eng-card-thumb eng-card-thumb--{{ eng.resourceType | lowercase }}">
+              <span class="eng-card-thumb-icon">{{ typeIcon(eng.resourceType | lowercase) }}</span>
+              <span class="eng-status-badge eng-status-badge--{{ eng.status.toLowerCase() }}">{{ statusLabel(eng.status) }}</span>
+            </div>
+
+            <!-- Body -->
+            <div class="eng-card-body">
+              <div class="eng-title">{{ eng.resourceTitle }}</div>
+              <div class="eng-meta">
+                <span class="eng-type-pill eng-type-pill--{{ eng.resourceType | lowercase }}">{{ typeLabel(eng.resourceType | lowercase) }}</span>
+                <span *ngIf="eng.resourceCategoryName" class="eng-cat">{{ eng.resourceCategoryName }}</span>
+                <span *ngIf="eng.streakDays > 0" class="eng-streak">🔥 {{ eng.streakDays }}j</span>
+              </div>
+
+              <!-- Progress zone — interactive slider -->
+              <div class="eng-progress-zone">
+                <div class="eng-progress-header">
+                  <span class="eng-progress-label eng-progress-label--{{ eng.status.toLowerCase() }}">
+                    <ng-container *ngIf="eng.status === 'NOT_STARTED'">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      Pas commencé
+                    </ng-container>
+                    <ng-container *ngIf="eng.status === 'IN_PROGRESS'">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                      En cours
+                    </ng-container>
+                    <ng-container *ngIf="eng.status === 'COMPLETED'">
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Terminé
+                    </ng-container>
+                  </span>
+                  <span class="eng-progress-pct" [class.pct--done]="eng.status === 'COMPLETED'">{{ getLocalProgress(eng.resourceId) }}%</span>
+                </div>
+
+                <!-- Draggable slider -->
+                <input type="range" min="0" max="100" step="5"
+                  class="eng-slider eng-slider--{{ eng.status.toLowerCase() }}"
+                  [value]="getLocalProgress(eng.resourceId)"
+                  [style.--pct]="getLocalProgress(eng.resourceId) + '%'"
+                  list="pct-ticks"
+                  (input)="onProgressInput(eng.resourceId, +$any($event.target).value)"
+                  (change)="onProgressChange(eng.resourceId, +$any($event.target).value)"
+                  [attr.aria-label]="'Progression : ' + getLocalProgress(eng.resourceId) + '%'">
+                <datalist id="pct-ticks">
+                  <option value="0"></option>
+                  <option value="25"></option>
+                  <option value="50"></option>
+                  <option value="75"></option>
+                  <option value="100"></option>
+                </datalist>
+
+                <!-- Hints -->
+                <div class="eng-progress-hint" *ngIf="eng.status === 'IN_PROGRESS'">
+                  <span *ngIf="getLocalProgress(eng.resourceId) < 80">Encore {{ 100 - getLocalProgress(eng.resourceId) }}% — presque !</span>
+                  <span *ngIf="getLocalProgress(eng.resourceId) >= 80">Presque fini — encore un effort 💪</span>
+                </div>
+                <div class="eng-completed-banner" *ngIf="eng.status === 'COMPLETED'">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Terminé · Bravo !</span>
+                  <span class="eng-completed-opens" *ngIf="eng.openCount > 0">{{ eng.openCount }}×</span>
+                </div>
+
+                <div class="eng-activity" *ngIf="eng.openCount > 0">
+                  <span class="eng-dot" *ngFor="let d of last7Days" [class.eng-dot--on]="eng.activityDays?.includes(d)" [title]="d"></span>
+                  <span class="eng-activity-label">7j</span>
+                  <span *ngIf="eng.lastOpenedAt" class="eng-last-opened">· {{ formatRelTime(eng.lastOpenedAt) }}</span>
+                </div>
+              </div>
+
+              <!-- Notes inline -->
+              <div class="eng-notes" *ngIf="eng.notes || editingNotesId === eng.resourceId">
+                <textarea *ngIf="editingNotesId === eng.resourceId"
+                  class="eng-notes-input"
+                  [(ngModel)]="editingNotesValue"
+                  placeholder="Ajouter une note…"
+                  maxlength="600" rows="2"
+                  (blur)="saveNotes(eng.resourceId)"
+                  (keydown.escape)="cancelNotes()"></textarea>
+                <div *ngIf="editingNotesId !== eng.resourceId"
+                     class="eng-notes-text"
+                     (click)="startEditNotes(eng.resourceId, eng.notes)">{{ eng.notes }}</div>
+              </div>
+            </div>
+
+            <!-- Footer actions -->
+            <div class="eng-actions">
+              <button class="eng-btn-open eng-btn-open--{{ eng.status.toLowerCase() }}" (click)="openEngagement(eng)">
+                <ng-container *ngIf="eng.status === 'NOT_STARTED'">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Commencer
+                </ng-container>
+                <ng-container *ngIf="eng.status === 'IN_PROGRESS'">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Continuer
+                </ng-container>
+                <ng-container *ngIf="eng.status === 'COMPLETED'">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Revoir
+                </ng-container>
+              </button>
+              <div class="eng-icon-btns">
+                <button class="eng-icon-btn eng-icon-btn--note" [class.on]="!!eng.notes"
+                  (click)="startEditNotes(eng.resourceId, eng.notes)" title="Note">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button *ngIf="eng.status !== 'COMPLETED'" class="eng-icon-btn eng-icon-btn--done"
+                  (click)="markComplete(eng.resourceId)" title="Marquer terminé">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <button class="eng-icon-btn eng-icon-btn--del"
+                  (click)="removeBookmarkByEngagement(eng)"
+                  [disabled]="bookmarkPendingIds.has(eng.resourceId)" title="Retirer">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+          </div>
+          <button class="eng-scroll-btn eng-scroll-btn--r" (click)="scrollEng(1)" aria-label="Suivant">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 3 11 8 6 13"/></svg>
+          </button>
+        </div>
+
+        <!-- Fix 6: Completed section (collapsed) -->
+        <details *ngIf="completedEngagements.length > 0" class="eng-completed-section">
+          <summary class="eng-completed-summary">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ completedEngagements.length }} ressource{{ completedEngagements.length !== 1 ? 's' : '' }} terminée{{ completedEngagements.length !== 1 ? 's' : '' }}
+            <svg class="eng-completed-chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+          </summary>
+          <div class="eng-scroll eng-scroll--completed">
+            <div class="eng-card eng-card--completed"
+                 *ngFor="let eng of completedEngagements; trackBy: trackEngById">
+              <div class="eng-card-thumb eng-card-thumb--{{ eng.resourceType | lowercase }}">
+                <span class="eng-card-thumb-icon">{{ typeIcon(eng.resourceType | lowercase) }}</span>
+                <span class="eng-status-badge eng-status-badge--completed">Terminé</span>
+              </div>
+              <div class="eng-card-body">
+                <div class="eng-title">{{ eng.resourceTitle }}</div>
+                <div class="eng-meta">
+                  <span class="eng-type-pill eng-type-pill--{{ eng.resourceType | lowercase }}">{{ typeLabel(eng.resourceType | lowercase) }}</span>
+                  <span *ngIf="eng.resourceCategoryName" class="eng-cat">{{ eng.resourceCategoryName }}</span>
+                </div>
+                <div class="eng-completed-banner">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Terminé · Bravo !</span>
+                  <span class="eng-completed-opens" *ngIf="eng.openCount > 0">{{ eng.openCount }}×</span>
+                </div>
+              </div>
+              <div class="eng-actions">
+                <button class="eng-btn-open eng-btn-open--completed" (click)="openEngagement(eng)">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  Revoir
+                </button>
+                <div class="eng-icon-btns">
+                  <button class="eng-icon-btn eng-icon-btn--del"
+                    (click)="removeBookmarkByEngagement(eng)"
+                    [disabled]="bookmarkPendingIds.has(eng.resourceId)" title="Retirer">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+      </section>
+
       <section class="admin-bar" *ngIf="isAdmin">
         <div class="admin-bar-left">
           <div class="admin-bar-icon">
@@ -640,9 +852,9 @@ interface ResourceEngagement {
             <span class="lcb-count">
               <strong>{{ displayedResources.length }}</strong> résultat{{ displayedResources.length !== 1 ? 's' : '' }}
             </span>
-            <span *ngIf="activeFilterCount > 0" class="lcb-filter-pill" [title]="activeFilterSummary">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg>
-              {{ activeFilterCount }} filtre{{ activeFilterCount !== 1 ? 's' : '' }} actif{{ activeFilterCount !== 1 ? 's' : '' }}
+            <span *ngIf="activeFilterCount > 0" class="lcb-filter-pill">
+              <svg viewBox="0 0 24 24" width="8" height="8" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>
+              {{ activeFilterSummary }}
             </span>
             <button *ngIf="hasActiveFilters" type="button" class="lcb-clear-btn" (click)="resetFilters()">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -651,135 +863,6 @@ interface ResourceEngagement {
               </svg>
               Effacer
             </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Engagement dashboard -->
-      <div *ngIf="bookmarkCount > 0 || engagementsLoading" class="eng-dash surface-panel">
-        <div class="eng-dash-head">
-          <div class="eng-dash-title-group">
-            <div class="eng-dash-kicker">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden="true">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-              </svg>
-              RESSOURCES SAUVEGARDÉES
-            </div>
-            <h2 class="eng-dash-title">Votre progression</h2>
-          </div>
-          <div class="eng-dash-chips">
-            <span class="chip chip-neutral">{{ bookmarkCount }} ressource{{ bookmarkCount !== 1 ? 's' : '' }}</span>
-            <span *ngIf="engCompletedCount > 0" class="chip chip-success">{{ engCompletedCount }} terminée{{ engCompletedCount !== 1 ? 's' : '' }}</span>
-            <span *ngIf="engMaxStreak > 1" class="chip chip-fire">🔥 {{ engMaxStreak }}j streak</span>
-          </div>
-        </div>
-
-        <div *ngIf="engagementsLoading" class="eng-skeletons">
-          <div class="eng-skel" *ngFor="let i of [1,2,3]"></div>
-        </div>
-
-        <div *ngIf="!engagementsLoading" class="eng-cards">
-          <div class="eng-card eng-card--{{ eng.status.toLowerCase() }}"
-               *ngFor="let eng of savedEngagements; trackBy: trackEngById">
-
-            <!-- Left: type icon -->
-            <div class="eng-icon eng-icon--{{ eng.resourceType | lowercase }}">
-              <span>{{ typeIcon(eng.resourceType | lowercase) }}</span>
-            </div>
-
-            <!-- Center: content -->
-            <div class="eng-body">
-
-              <!-- Row 1: chips -->
-              <div class="eng-chips-row">
-                <span class="eng-type-pill eng-type-pill--{{ eng.resourceType | lowercase }}">{{ typeLabel(eng.resourceType | lowercase) }}</span>
-                <span class="eng-status-badge eng-status-badge--{{ eng.status.toLowerCase() }}">{{ statusLabel(eng.status) }}</span>
-              </div>
-
-              <!-- Title -->
-              <div class="eng-title">{{ eng.resourceTitle }}</div>
-
-              <!-- Meta -->
-              <div class="eng-meta">
-                <span *ngIf="eng.resourceCategoryName" class="eng-cat">{{ eng.resourceCategoryName }}</span>
-                <span *ngIf="eng.openCount > 0" class="eng-opens">
-                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  {{ eng.openCount }}×
-                </span>
-                <span *ngIf="eng.lastOpenedAt" class="eng-last">{{ formatRelTime(eng.lastOpenedAt) }}</span>
-                <span *ngIf="eng.streakDays > 0" class="eng-streak">🔥 {{ eng.streakDays }}j</span>
-              </div>
-
-              <!-- Progress bar -->
-              <div class="eng-bar-wrap">
-                <div class="eng-bar-track">
-                  <div class="eng-bar-fill eng-bar-fill--{{ eng.status.toLowerCase() }}"
-                       [style.width.%]="eng.progressPct"></div>
-                </div>
-                <span class="eng-bar-pct">{{ eng.progressPct }}%</span>
-              </div>
-
-              <!-- Activity dots -->
-              <div class="eng-activity" *ngIf="eng.openCount > 0">
-                <span class="eng-dot" *ngFor="let d of last7Days"
-                  [class.eng-dot--on]="eng.activityDays?.includes(d)"
-                  [title]="d"></span>
-                <span class="eng-activity-label">7 jours</span>
-              </div>
-
-              <!-- Notes -->
-              <div class="eng-notes" *ngIf="eng.notes || editingNotesId === eng.resourceId">
-                <textarea *ngIf="editingNotesId === eng.resourceId"
-                  class="eng-notes-input"
-                  [(ngModel)]="editingNotesValue"
-                  placeholder="Ajouter une note…"
-                  maxlength="600" rows="2"
-                  (blur)="saveNotes(eng.resourceId)"
-                  (keydown.escape)="cancelNotes()"></textarea>
-                <div *ngIf="editingNotesId !== eng.resourceId"
-                     class="eng-notes-text"
-                     (click)="startEditNotes(eng.resourceId, eng.notes)">{{ eng.notes }}</div>
-              </div>
-
-              <!-- Actions -->
-              <div class="eng-actions">
-                <button class="eng-btn-open" (click)="openEngagement(eng)" title="Ouvrir">
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  Ouvrir
-                </button>
-                <div class="eng-icon-btns">
-                  <button class="eng-icon-btn eng-icon-btn--note" [class.on]="!!eng.notes"
-                    (click)="startEditNotes(eng.resourceId, eng.notes)" title="Note">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  </button>
-                  <button *ngIf="eng.status !== 'COMPLETED'" class="eng-icon-btn eng-icon-btn--done"
-                    (click)="markComplete(eng.resourceId)" title="Marquer terminé">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  </button>
-                  <button class="eng-icon-btn eng-icon-btn--del"
-                    (click)="removeBookmarkByEngagement(eng)"
-                    [disabled]="bookmarkPendingIds.has(eng.resourceId)" title="Retirer">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right: progress ring -->
-            <div class="eng-ring-wrap" [title]="eng.progressPct + '% complété'">
-              <svg class="eng-ring" viewBox="0 0 56 56" aria-hidden="true">
-                <circle class="eng-ring-bg" cx="28" cy="28" r="22"/>
-                <circle class="eng-ring-fill" cx="28" cy="28" r="22"
-                  stroke-dasharray="138.2 138.2"
-                  [style.strokeDashoffset]="138.2 * (1 - eng.progressPct / 100)"
-                  [style.stroke]="getRingColor(eng.resourceId)"/>
-              </svg>
-              <div class="eng-ring-label">
-                <span class="eng-ring-pct">{{ eng.progressPct }}</span>
-                <span class="eng-ring-unit">%</span>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
@@ -794,7 +877,7 @@ interface ResourceEngagement {
         [currentPage]="currentPage"
         [totalPages]="totalPages"
         [totalElements]="totalElements"
-        [sectionTitle]="'All ' + activeTabLabel + 's'"
+        [sectionTitle]="sectionTitleFr"
         [summarizingIds]="isSummarizingById"
         [recentlyCreatedIds]="recentlyCreatedSet"
         [progressMap]="resourceProgress"
@@ -2611,79 +2694,172 @@ interface ResourceEngagement {
       border-color: rgba(239, 68, 68, 0.45);
     }
 
-    /* ===== Engagement Dashboard ===== */
-    /* ── Engagement Dashboard ─────────────────────────── */
-    .eng-dash { display: flex; flex-direction: column; gap: 1.25rem; }
+    /* ===== Engagement / Progression Strip ===== */
+    .eng-dash {
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 20px 24px 22px;
+      background: linear-gradient(135deg, #f8f7ff 0%, #f0f9ff 100%);
+      border: 1px solid #e0e7ff;
+      border-radius: 20px;
+      position: relative; overflow: hidden;
+    }
+    .eng-dash::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4);
+      border-radius: 20px 20px 0 0;
+    }
 
     .eng-dash-head {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
     }
     .eng-dash-kicker {
       display: flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 700; letter-spacing: .08em; color: #6366f1; text-transform: uppercase;
+      font-size: 10px; font-weight: 800; letter-spacing: .1em; color: #6366f1; text-transform: uppercase;
     }
-    .eng-dash-title { font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin: 4px 0 0; }
+    .eng-dash-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 4px 0 0; }
     .eng-dash-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .chip-success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
     .chip-fire    { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
 
-    /* Skeletons */
-    .eng-skeletons { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: .75rem; }
+    /* Horizontal scroll strip */
+    .eng-scroll {
+      display: flex; flex-direction: row;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .eng-scroll::-webkit-scrollbar { height: 4px; }
+    .eng-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 2px; }
+    .eng-scroll::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 2px; }
+
+    /* Scroll-arrow wrapper */
+    .eng-scroll-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .eng-scroll-wrap .eng-scroll {
+      flex: 1;
+      min-width: 0;
+      mask-image: linear-gradient(to right, transparent 0%, black 3%, black 97%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 3%, black 97%, transparent 100%);
+    }
+    .eng-scroll-btn {
+      flex-shrink: 0;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid #e0e7ff;
+      background: #fff;
+      color: #6366f1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 150ms, box-shadow 150ms, transform 150ms;
+      z-index: 1;
+    }
+    .eng-scroll-btn:hover { background: #f0f0ff; box-shadow: 0 2px 8px rgba(99,102,241,.2); transform: scale(1.08); }
+    .eng-scroll-btn--l { margin-right: 6px; }
+    .eng-scroll-btn--r { margin-left: 6px; }
+
+    /* Empty state */
+    .eng-empty {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 18px;
+      background: rgba(255,255,255,.7);
+      border: 1.5px dashed #c7d2fe;
+      border-radius: 14px;
+    }
+    .eng-empty-icon { font-size: 1.8rem; flex-shrink: 0; }
+    .eng-empty-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .eng-empty-text strong { font-size: 0.85rem; font-weight: 700; color: #1e293b; }
+    .eng-empty-text span { font-size: 0.75rem; color: #64748b; }
+    .eng-empty-cta {
+      flex-shrink: 0;
+      padding: 8px 14px; border-radius: 9px;
+      background: #6366f1; color: #fff;
+      border: none; cursor: pointer;
+      font-size: 0.75rem; font-weight: 600;
+      transition: background 150ms, transform 150ms;
+    }
+    .eng-empty-cta:hover { background: #4f46e5; transform: translateY(-1px); }
+
+    /* Completed collapsible section */
+    .eng-completed-section { margin-top: 4px; }
+    .eng-completed-summary {
+      list-style: none;
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer;
+      font-size: 0.75rem; font-weight: 600; color: #059669;
+      padding: 6px 2px;
+      user-select: none;
+    }
+    .eng-completed-summary::-webkit-details-marker { display: none; }
+    .eng-completed-chevron { margin-left: auto; color: #94a3b8; transition: transform 200ms; }
+    .eng-completed-section[open] .eng-completed-chevron { transform: rotate(180deg); }
+    .eng-scroll--completed { margin-top: 8px; }
+
+    /* Skeleton cards */
     .eng-skel {
-      height: 110px; border-radius: 14px;
-      background: linear-gradient(90deg, #f1f5f9 25%, #e8edf5 50%, #f1f5f9 75%);
+      flex-shrink: 0; width: 240px; height: 220px; border-radius: 16px;
+      scroll-snap-align: start;
+      background: linear-gradient(90deg, #e8edf5 25%, #f1f5f9 50%, #e8edf5 75%);
       background-size: 300% 100%;
       animation: shimmer 1.3s ease-in-out infinite;
     }
 
-    /* Grid */
-    .eng-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: .75rem;
-    }
-
-    /* Card shell */
+    /* Card shell — fixed-width vertical card for horizontal strip */
     .eng-card {
+      flex-shrink: 0;
+      width: 248px;
       display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      padding: 14px 16px;
-      border-radius: 14px;
+      flex-direction: column;
+      border-radius: 16px;
       background: #fff;
-      border: 1.5px solid #f1f5f9;
-      border-left: 3px solid #e2e8f0;
-      box-shadow: 0 1px 4px rgba(30,41,59,.04);
-      transition: box-shadow .15s, transform .15s, border-color .15s;
+      border: 1.5px solid #e8edf5;
+      box-shadow: 0 2px 8px rgba(30,41,59,.06);
+      transition: box-shadow .18s, transform .18s;
+      overflow: hidden;
+      scroll-snap-align: start;
     }
     .eng-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 18px rgba(30,41,59,.08);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(30,41,59,.11);
     }
-    .eng-card--in_progress  { border-left-color: #6366f1; }
-    .eng-card--completed    { border-left-color: #10b981; }
-    .eng-card--not_started  { border-left-color: #e2e8f0; }
 
-    /* Type icon box */
-    .eng-icon {
-      width: 44px; height: 44px; flex-shrink: 0;
-      border-radius: 12px;
+    /* Thumb area — colored banner at top */
+    .eng-card-thumb {
+      position: relative;
+      height: 72px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem;
       background: linear-gradient(135deg, #14b8a6, #22d3ee);
     }
-    .eng-icon--video    { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
-    .eng-icon--podcast  { background: linear-gradient(135deg, #ea580c, #f97316); }
-    .eng-icon--exercise { background: linear-gradient(135deg, #db2777, #ec4899); }
-    .eng-icon--template { background: linear-gradient(135deg, #0284c7, #06b6d4); }
+    .eng-card-thumb--video    { background: linear-gradient(135deg, #6d28d9, #8b5cf6); }
+    .eng-card-thumb--podcast  { background: linear-gradient(135deg, #c2410c, #f97316); }
+    .eng-card-thumb--exercise { background: linear-gradient(135deg, #be185d, #ec4899); }
+    .eng-card-thumb--template { background: linear-gradient(135deg, #0369a1, #06b6d4); }
+    .eng-card-thumb-icon { font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
 
-    /* Body */
-    .eng-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .eng-status-badge {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 0.58rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 999px; border: 1px solid rgba(255,255,255,.4);
+      backdrop-filter: blur(4px);
+    }
+    .eng-status-badge--not_started { background: rgba(255,255,255,.85); color: #64748b; }
+    .eng-status-badge--in_progress { background: rgba(99,102,241,.9); color: #fff; border-color: rgba(255,255,255,.3); }
+    .eng-status-badge--completed   { background: rgba(16,185,129,.9); color: #fff; border-color: rgba(255,255,255,.3); }
 
-    .eng-chips-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    /* Card body */
+    .eng-card-body {
+      flex: 1; display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 14px 4px;
+    }
 
     .eng-type-pill {
-      font-size: 0.62rem; font-weight: 700; padding: 2px 8px;
+      font-size: 0.6rem; font-weight: 700; padding: 2px 7px;
       border-radius: 999px; border: 1px solid transparent;
     }
     .eng-type-pill--article  { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
@@ -2691,14 +2867,6 @@ interface ResourceEngagement {
     .eng-type-pill--podcast  { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
     .eng-type-pill--exercise { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
     .eng-type-pill--template { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
-
-    .eng-status-badge {
-      margin-left: auto; font-size: 0.62rem; font-weight: 700; padding: 2px 9px;
-      border-radius: 999px; border: 1px solid transparent;
-    }
-    .eng-status-badge--not_started { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
-    .eng-status-badge--in_progress { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
-    .eng-status-badge--completed   { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
 
     .eng-title {
       font-size: .875rem; font-weight: 700; color: #0f172a;
@@ -2710,35 +2878,118 @@ interface ResourceEngagement {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       font-size: 0.7rem; color: #94a3b8;
     }
-    .eng-cat  { color: #64748b; font-weight: 500; }
-    .eng-opens { display: flex; align-items: center; gap: 3px; }
-    .eng-last  { color: #94a3b8; }
+    .eng-cat    { color: #64748b; font-weight: 500; }
     .eng-streak { font-size: 0.68rem; font-weight: 700; color: #ea580c; }
 
-    /* Progress bar */
-    .eng-bar-wrap { display: flex; align-items: center; gap: 8px; }
-    .eng-bar-track {
-      flex: 1; height: 6px; border-radius: 999px;
-      background: #f1f5f9; overflow: hidden;
+    /* Progress zone — contextual section */
+    .eng-progress-zone { display: flex; flex-direction: column; gap: 6px; }
+
+    /* Suggestion line — NOT_STARTED */
+    .eng-suggestion {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; font-weight: 500;
+      padding: 6px 10px; border-radius: 8px;
     }
-    .eng-bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
-    .eng-bar-fill--not_started { background: #e2e8f0; }
-    .eng-bar-fill--in_progress { background: linear-gradient(90deg, #6366f1, #818cf8); }
-    .eng-bar-fill--completed   { background: linear-gradient(90deg, #10b981, #34d399); }
-    .eng-bar-pct { font-size: 0.65rem; font-weight: 700; color: #64748b; flex-shrink: 0; min-width: 28px; }
+    .eng-suggestion--start {
+      background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0;
+    }
+    .eng-suggestion--continue {
+      background: #eef2ff; color: #4338ca; border: 1px dashed #c7d2fe;
+    }
+    .eng-suggestion--almost {
+      background: #fef3c7; color: #92400e; border: 1px dashed #fde68a;
+    }
+
+    /* Progress block — IN_PROGRESS */
+    .eng-progress-block { display: flex; flex-direction: column; gap: 5px; }
+    .eng-progress-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .eng-progress-label {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 0.7rem; font-weight: 600; color: #6366f1;
+    }
+    .eng-progress-pct {
+      font-size: 0.72rem; font-weight: 800; color: #4338ca;
+    }
+
+    /* Progress label variants */
+    .eng-progress-label { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 600; }
+    .eng-progress-label--not_started { color: #94a3b8; }
+    .eng-progress-label--in_progress { color: #6366f1; }
+    .eng-progress-label--completed   { color: #059669; }
+
+    .eng-progress-pct { font-size: 0.75rem; font-weight: 800; color: #475569; }
+    .pct--done { color: #059669; }
+
+    /* Draggable range slider */
+    .eng-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: linear-gradient(to right, var(--fill-color, #6366f1) var(--pct, 0%), #e2e8f0 var(--pct, 0%));
+      cursor: pointer;
+      outline: none;
+      transition: height .15s;
+    }
+    .eng-slider:hover { height: 7px; }
+    .eng-slider--not_started { --fill-color: #94a3b8; }
+    .eng-slider--in_progress { --fill-color: #6366f1; }
+    .eng-slider--completed   { --fill-color: #10b981; }
+
+    .eng-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2.5px solid var(--fill-color, #6366f1);
+      box-shadow: 0 1px 6px rgba(0,0,0,.15);
+      cursor: grab;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .eng-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.25); box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+    .eng-slider::-moz-range-thumb {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2.5px solid var(--fill-color, #6366f1);
+      box-shadow: 0 1px 6px rgba(0,0,0,.15);
+      cursor: grab;
+    }
+
+    /* Hint line */
+    .eng-progress-hint {
+      font-size: 0.65rem; color: #6366f1; font-weight: 500;
+    }
+
+    /* Completed banner */
+    .eng-completed-banner {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; font-weight: 700; color: #065f46;
+      background: #d1fae5; border: 1px solid #a7f3d0;
+      padding: 6px 10px; border-radius: 8px;
+    }
+    .eng-completed-opens {
+      font-size: 0.68rem; font-weight: 500; color: #059669;
+    }
 
     /* Activity dots */
-    .eng-activity { display: flex; align-items: center; gap: 3px; }
+    .eng-activity {
+      display: flex; align-items: center; gap: 3px; padding-top: 2px;
+    }
     .eng-dot { width: 8px; height: 8px; border-radius: 2px; background: #e8edf5; transition: background .2s; }
     .eng-dot--on { background: #6366f1; }
     .eng-activity-label { font-size: 0.63rem; color: #94a3b8; margin-left: 3px; }
+    .eng-last-opened { font-size: 0.63rem; color: #94a3b8; margin-left: 4px; }
 
     /* Notes */
-    .eng-notes { margin-top: 2px; }
+    .eng-notes { margin-top: -2px; }
     .eng-notes-input {
       width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 7px;
       border: 1px solid #c7d2fe; background: #f5f3ff; resize: none; outline: none;
-      font-family: inherit; color: #1e293b;
+      font-family: inherit; color: #1e293b; box-sizing: border-box;
     }
     .eng-notes-input:focus { border-color: #6366f1; }
     .eng-notes-text {
@@ -2747,46 +2998,52 @@ interface ResourceEngagement {
     }
     .eng-notes-text:hover { border-color: #a5b4fc; background: #f5f3ff; }
 
-    /* Actions */
-    .eng-actions { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+    /* Actions footer — flush bottom */
+    .eng-actions {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px 12px;
+      border-top: 1px solid #f1f5f9;
+      margin-top: auto;
+    }
+
+    /* CTA button — base */
     .eng-btn-open {
       display: inline-flex; align-items: center; gap: 5px;
-      padding: 5px 14px; height: 30px;
+      padding: 6px 14px; height: 32px;
       font-size: 0.72rem; font-weight: 700;
-      border-radius: 8px; border: none;
-      background: linear-gradient(135deg, #6366f1, #818cf8);
-      color: #fff; cursor: pointer; font-family: inherit;
-      box-shadow: 0 2px 8px rgba(99,102,241,.3);
+      border-radius: 9px; border: none;
+      cursor: pointer; font-family: inherit;
       transition: box-shadow .15s, transform .15s;
+      flex: 1;
     }
-    .eng-btn-open:hover { box-shadow: 0 4px 14px rgba(99,102,241,.45); transform: translateY(-1px); }
-    .eng-btn-open:active { transform: scale(0.96); }
+    .eng-btn-open:active { transform: scale(0.97); }
 
-    .eng-icon-btns { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+    .eng-btn-open--not_started {
+      background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0;
+    }
+    .eng-btn-open--not_started:hover { background: #e2e8f0; color: #1e293b; }
+    .eng-btn-open--in_progress {
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.3);
+    }
+    .eng-btn-open--in_progress:hover { box-shadow: 0 4px 14px rgba(99,102,241,.45); transform: translateY(-1px); }
+    .eng-btn-open--completed {
+      background: linear-gradient(135deg, #059669, #34d399);
+      color: #fff; box-shadow: 0 2px 8px rgba(16,185,129,.25);
+    }
+    .eng-btn-open--completed:hover { box-shadow: 0 4px 14px rgba(16,185,129,.4); transform: translateY(-1px); }
+
+    .eng-icon-btns { display: flex; align-items: center; gap: 3px; }
     .eng-icon-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; border-radius: 8px;
-      border: 1.5px solid transparent; background: #f8fafc;
+      width: 28px; height: 28px; border-radius: 7px;
+      border: 1.5px solid transparent; background: transparent;
       color: #94a3b8; cursor: pointer; transition: all .14s;
     }
     .eng-icon-btn--note:hover, .eng-icon-btn--note.on { background: #eef2ff; color: #6366f1; border-color: #c7d2fe; }
     .eng-icon-btn--done:hover { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
     .eng-icon-btn--del:hover  { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
     .eng-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-    /* Ring (right side) */
-    .eng-ring-wrap {
-      position: relative; width: 56px; height: 56px; flex-shrink: 0;
-    }
-    .eng-ring { width: 56px; height: 56px; transform: rotate(-90deg); }
-    .eng-ring-bg   { fill: none; stroke: #e8edf5; stroke-width: 6; }
-    .eng-ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
-    .eng-ring-label {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
-    }
-    .eng-ring-pct  { font-size: 12px; font-weight: 800; color: #1e293b; line-height: 1; }
-    .eng-ring-unit { font-size: 8px;  font-weight: 700; color: #94a3b8; }
 
     .btn-xs { padding: 4px 8px; font-size: 11px; line-height: 1; }
 
@@ -5682,16 +5939,18 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
   private readonly resourceApi = inject(ResourceApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly authService = inject(AuthService);
+  protected readonly authService = inject(AuthService);
   private readonly userApi = inject(UserApiService);
 
   resources: Resource[] = [];
   bookmarkIndexByResourceId = new Map<string, string>();
+  bookmarkDataByResourceId = new Map<string, BookmarkApiResponse>();
   bookmarkPendingIds = new Set<string>();
   backendEngagements = new Map<string, EngagementApiResponse>();
   engagementsLoading = false;
   editingNotesId: string | null = null;
   editingNotesValue = '';
+  localProgress = new Map<string, number>();
   isAdmin = false;
   isAiGenerating = false;
   isSummarizingById: Record<string, boolean> = {};
@@ -5765,6 +6024,7 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
     'cybersécurité',
   ];
   @ViewChild('searchInput') searchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('engScrollEl') engScrollRef?: ElementRef<HTMLElement>;
 
   get isMac(): boolean {
     try { return /(Mac|iPhone|iPad)/i.test(navigator.platform || navigator.userAgent); }
@@ -6040,11 +6300,53 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
 
   get savedEngagements(): EngagementApiResponse[] {
     const result: EngagementApiResponse[] = [];
+    const now = new Date().toISOString();
     for (const [resourceId] of this.bookmarkIndexByResourceId) {
       const eng = this.backendEngagements.get(resourceId);
-      if (eng) result.push(eng);
+      if (eng) {
+        result.push(eng);
+      } else {
+        const bk = this.bookmarkDataByResourceId.get(resourceId);
+        if (bk?.resource) {
+          result.push({
+            id: '', resourceId,
+            resourceTitle: bk.resource.title,
+            resourceUrl: bk.resource.url ?? '',
+            resourceType: bk.resource.type,
+            resourceThumbUrl: bk.resource.thumbUrl ?? null,
+            resourceCategoryName: bk.resource.categoryName ?? null,
+            status: 'NOT_STARTED',
+            progressPct: 0, openCount: 0, notes: null,
+            firstOpenedAt: null, lastOpenedAt: null,
+            createdAt: now, updatedAt: now,
+            activityDays: [], streakDays: 0,
+          } as EngagementApiResponse);
+        }
+      }
     }
+    // Fix 3: IN_PROGRESS first, NOT_STARTED second, COMPLETED last
+    const priority: Record<string, number> = { IN_PROGRESS: 0, NOT_STARTED: 1, COMPLETED: 2 };
+    result.sort((a, b) => (priority[a.status] ?? 1) - (priority[b.status] ?? 1));
     return result;
+  }
+
+  get inProgressEngagements(): EngagementApiResponse[] {
+    return this.savedEngagements.filter(e => e.status !== 'COMPLETED');
+  }
+
+  get completedEngagements(): EngagementApiResponse[] {
+    return this.savedEngagements.filter(e => e.status === 'COMPLETED');
+  }
+
+  scrollEng(dir: number): void {
+    const el = this.engScrollRef?.nativeElement;
+    if (!el) return;
+    el.scrollBy({ left: dir * 260, behavior: 'smooth' });
+  }
+
+  scrollToGrid(): void {
+    const el = document.querySelector('.lib-cmdbar') as HTMLElement | null;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   trackEngById = (_: number, e: EngagementApiResponse) => e.resourceId;
@@ -6059,10 +6361,35 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
       return;
     }
     window.open(eng.resourceUrl, '_blank', 'noopener,noreferrer');
-    this.resourceApi.recordOpen(eng.resourceId).subscribe({
-      next: (updated: EngagementApiResponse) => this.backendEngagements.set(updated.resourceId, updated),
-      error: () => {},
-    });
+
+    const doOpen = () => {
+      this.resourceApi.recordOpen(eng.resourceId).subscribe({
+        next: (updated: EngagementApiResponse) => {
+          // Auto-advance: each session = +20%, capped at 90% until manually marked complete
+          const autoPct = Math.min(90, updated.openCount * 20);
+          if (autoPct > (updated.progressPct ?? 0)) {
+            const status = autoPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED';
+            this.resourceApi.updateEngagement(eng.resourceId, { progressPct: autoPct, status }).subscribe({
+              next: (final: EngagementApiResponse) => this.backendEngagements.set(final.resourceId, final),
+              error: () => this.backendEngagements.set(updated.resourceId, updated),
+            });
+          } else {
+            this.backendEngagements.set(updated.resourceId, updated);
+          }
+        },
+        error: () => {},
+      });
+    };
+
+    // If placeholder (no real engagement record yet), ensure first
+    if (!eng.id) {
+      this.resourceApi.ensureEngagement(eng.resourceId).subscribe({
+        next: (created: EngagementApiResponse) => { this.backendEngagements.set(created.resourceId, created); doOpen(); },
+        error: () => doOpen(),
+      });
+    } else {
+      doOpen();
+    }
   }
 
   removeBookmarkByEngagement(eng: EngagementApiResponse): void {
@@ -6096,12 +6423,28 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
   }
 
   get activeFilterSummary(): string {
+    const tabFr: Record<string, string> = {
+      all: 'Tout', article: 'Articles', video: 'Vidéos',
+      podcast: 'Podcasts', exercise: 'Exercices', template: 'Templates',
+    };
+    const levelFr: Record<string, string> = {
+      BEGINNER: 'Débutant', INTERMEDIATE: 'Intermédiaire', ADVANCED: 'Avancé',
+    };
     const parts: string[] = [];
-    if (this.activeTab() !== 'all') parts.push(`Type: ${this.activeTab()}`);
-    if (this.activeCat().id !== 'all') parts.push(`Catégorie: ${this.activeCat().name}`);
-    if (this.activeLevel() !== 'ALL') parts.push(`Niveau: ${this.activeLevel()}`);
-    if (this.searchQuery.trim().length > 0) parts.push(`Recherche: "${this.searchQuery.trim()}"`);
+    if (this.activeTab() !== 'all') parts.push(tabFr[this.activeTab()] ?? this.activeTab());
+    if (this.activeCat().id !== 'all') parts.push(this.activeCat().name);
+    if (this.activeLevel() !== 'ALL') parts.push(levelFr[this.activeLevel()] ?? this.activeLevel());
+    if (this.searchQuery.trim().length > 0) parts.push(`"${this.searchQuery.trim()}"`);
     return parts.join(' · ');
+  }
+
+  get sectionTitleFr(): string {
+    const map: Record<string, string> = {
+      all: 'Toutes les ressources', article: 'Articles', video: 'Vidéos',
+      podcast: 'Podcasts', exercise: 'Exercices', template: 'Templates',
+    };
+    const base = map[this.activeTab()] ?? 'Ressources';
+    return this.activeCat().id !== 'all' ? `${base} · ${this.activeCat().name}` : base;
   }
 
   retryLoad(): void {
@@ -6140,11 +6483,11 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
       });
     }
 
-    if (this.activeTab() !== 'all') res = res.filter(r => r.type === this.activeTab());
-    if (this.activeCat().id !== 'all') res = res.filter(r => r.category === this.activeCat().name);
-    if (this.activeLevel() !== 'ALL') {
-      const level = this.activeLevel().toLowerCase();
-      res = res.filter(r => r.level === level);
+    // Tab/category/level are now backend-filtered; only apply client-side for saved-only view
+    if (this.showSavedOnly) {
+      if (this.activeTab() !== 'all') res = res.filter(r => r.type === this.activeTab());
+      if (this.activeCat().id !== 'all') res = res.filter(r => r.category === this.activeCat().name);
+      if (this.activeLevel() !== 'ALL') res = res.filter(r => r.level === this.activeLevel().toLowerCase());
     }
 
     const sortKey = this.sortBy();
@@ -6308,18 +6651,30 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
     });
   }
 
+  private _loadingTimer?: ReturnType<typeof setTimeout>;
   reloadResources(): void {
-    this.isLoading = true;
+    clearTimeout(this._loadingTimer);
+    this._loadingTimer = setTimeout(() => { this.isLoading = true; }, 150);
     this.loadError = '';
 
     const trimmedQuery = this.searchQuery.trim();
     const activeLevel = this.activeLevel();
     const emptyPage: PageResponse<ResourceApiResponse> = { content: [], totalElements: 0, totalPages: 1 };
 
+    const activeTab = this.activeTab();
+    const activeCatId = this.activeCat().id;
+    const hasFilters = activeTab !== 'all' || activeCatId !== 'all' || activeLevel !== 'ALL';
+
     const resources$ = trimmedQuery.length > 0
       ? this.resourceApi.searchResources(trimmedQuery, this.currentPage, this.pageSize).pipe(catchError(() => of(emptyPage)))
-      : (activeLevel !== 'ALL'
-        ? this.resourceApi.filterResources(undefined, activeLevel, this.currentPage, this.pageSize).pipe(catchError(() => of(emptyPage)))
+      : (hasFilters
+        ? this.resourceApi.filterResources(
+            activeTab !== 'all' ? activeTab : undefined,
+            undefined,
+            activeLevel !== 'ALL' ? activeLevel : undefined,
+            activeCatId !== 'all' ? activeCatId : undefined,
+            this.currentPage, this.pageSize
+          ).pipe(catchError(() => of(emptyPage)))
         : this.resourceApi.getResources(this.currentPage, this.pageSize).pipe(catchError(() => of(emptyPage))));
 
     const categories$ = this._categoriesLoaded
@@ -6346,7 +6701,7 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
           this.loadError = 'Unable to load resources. Check your connection.';
           return of({ resources: emptyPage, categories: [] as CategoryApiResponse[], bookmarks: [] as BookmarkApiResponse[], engagements: [] as EngagementApiResponse[] });
         }),
-        finalize(() => (this.isLoading = false))
+        finalize(() => { clearTimeout(this._loadingTimer); this.isLoading = false; })
       )
       .subscribe({
         next: ({ resources, categories, bookmarks, engagements }: {
@@ -6357,6 +6712,9 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
         }) => {
           this.bookmarkIndexByResourceId = new Map(
             bookmarks.map((bookmark: BookmarkApiResponse) => [bookmark.resourceId, bookmark.id])
+          );
+          this.bookmarkDataByResourceId = new Map(
+            bookmarks.map((bookmark: BookmarkApiResponse) => [bookmark.resourceId, bookmark])
           );
           this.backendEngagements = new Map(
             (engagements || []).map((e: EngagementApiResponse) => [e.resourceId, e])
@@ -6525,12 +6883,16 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
 
   setTab(key: string): void {
     this.activeTab.set(key);
+    this.currentPage = 0;
     this.syncUrlFromState();
+    this.reloadResources();
   }
 
   setCat(c: { id: string; name: string }): void {
     this.activeCat.set(c);
+    this.currentPage = 0;
     this.syncUrlFromState();
+    this.reloadResources();
   }
 
   setSort(sort: 'relevance' | 'title-asc' | 'title-desc' | 'rating-desc'): void {
@@ -7537,6 +7899,50 @@ export class LibraryComponent implements OnInit, OnDestroy, DoCheck {
       next: (eng: EngagementApiResponse) => this.backendEngagements.set(eng.resourceId, eng),
       error: () => {},
     });
+  }
+
+  getLocalProgress(resourceId: string): number {
+    if (this.localProgress.has(resourceId)) return this.localProgress.get(resourceId)!;
+    const eng = this.backendEngagements.get(resourceId);
+    if (!eng) return 0;
+    if (eng.status === 'COMPLETED') return 100;
+    // If manually set, use stored value; otherwise derive from openCount
+    if (eng.progressPct > 0) return eng.progressPct;
+    return Math.min(90, eng.openCount * 20);
+  }
+
+  onProgressInput(resourceId: string, value: number): void {
+    this.localProgress.set(resourceId, value);
+  }
+
+  onProgressChange(resourceId: string, value: number): void {
+    this.localProgress.set(resourceId, value);
+    const status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' =
+      value === 0 ? 'NOT_STARTED' : value === 100 ? 'COMPLETED' : 'IN_PROGRESS';
+
+    const doUpdate = () => {
+      const existing = this.backendEngagements.get(resourceId);
+      if (existing) {
+        this.backendEngagements.set(resourceId, { ...existing, progressPct: value, status });
+      }
+      this.resourceApi.updateEngagement(resourceId, { progressPct: value, status }).subscribe({
+        next: (eng: EngagementApiResponse) => {
+          this.backendEngagements.set(eng.resourceId, eng);
+          this.localProgress.delete(eng.resourceId);
+        },
+        error: () => this.localProgress.delete(resourceId),
+      });
+    };
+
+    const existing = this.backendEngagements.get(resourceId);
+    if (!existing?.id) {
+      this.resourceApi.ensureEngagement(resourceId).subscribe({
+        next: (eng: EngagementApiResponse) => { this.backendEngagements.set(eng.resourceId, eng); doUpdate(); },
+        error: () => this.localProgress.delete(resourceId),
+      });
+    } else {
+      doUpdate();
+    }
   }
 
   getResourceEngagementLabel(resourceId: string): string {

@@ -53,6 +53,17 @@ public interface ResourceRepository extends JpaRepository<Resource, UUID> {
     @Query("SELECT r FROM Resource r ORDER BY r.createdAt DESC")
     List<Resource> findTopActive(Pageable pageable);
 
+    // Dynamic multi-criteria filter (all params optional)
+    @Query("SELECT r FROM Resource r WHERE " +
+        "(:type IS NULL OR r.type = :type) AND " +
+        "(:level IS NULL OR r.level = :level) AND " +
+        "(:categoryId IS NULL OR r.category.id = :categoryId)")
+    Page<Resource> findFiltered(
+        @Param("type") ResourceTypeEnum type,
+        @Param("level") ResourceLevelEnum level,
+        @Param("categoryId") UUID categoryId,
+        Pageable pageable);
+
     // --- Stats helpers (used by ResourceService.getStats()) ---
     long countByType(ResourceTypeEnum type);
 

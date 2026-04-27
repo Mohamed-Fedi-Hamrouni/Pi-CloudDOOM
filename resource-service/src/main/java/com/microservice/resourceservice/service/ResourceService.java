@@ -82,20 +82,13 @@ public class ResourceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ResourceResponse> filterResources(IndustryEnum industry, ResourceLevelEnum level, Pageable pageable) {
-        if (industry != null && level != null) {
-            return resourceRepository.findByIndustryAndLevel(industry, level, pageable)
-                .map(resourceMapper::toResponse);
+    public Page<ResourceResponse> filterResources(
+            ResourceTypeEnum type, IndustryEnum industry, ResourceLevelEnum level, UUID categoryId, Pageable pageable) {
+        if (type == null && level == null && categoryId == null) {
+            return getAllResources(pageable);
         }
-        if (industry != null) {
-            return resourceRepository.findByIndustry(industry, pageable)
-                .map(resourceMapper::toResponse);
-        }
-        if (level != null) {
-            return resourceRepository.findByLevel(level, pageable)
-                .map(resourceMapper::toResponse);
-        }
-        return getAllResources(pageable);
+        return resourceRepository.findFiltered(type, level, categoryId, pageable)
+            .map(resourceMapper::toResponse);
     }
 
     @Transactional

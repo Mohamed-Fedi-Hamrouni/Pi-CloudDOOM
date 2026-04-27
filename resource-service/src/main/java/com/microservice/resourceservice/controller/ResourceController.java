@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.microservice.resourceservice.enums.IndustryEnum;
 import com.microservice.resourceservice.enums.ResourceLevelEnum;
+import com.microservice.resourceservice.enums.ResourceTypeEnum;
 import com.microservice.resourceservice.security.ResourceAccessControlService;
 import com.microservice.resourceservice.service.AiRelatedResourcesService;
 import com.microservice.resourceservice.service.AiRelatedResourcesService.ScoredResource;
@@ -196,11 +197,13 @@ public class ResourceController {
 
     @GetMapping("/filter")
     public ResponseEntity<Page<ResourceResponse>> filterResources(
+        @RequestParam(required = false) ResourceTypeEnum type,
         @RequestParam(required = false) IndustryEnum industry,
         @RequestParam(required = false) ResourceLevelEnum level,
+        @RequestParam(required = false) UUID categoryId,
         @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return ResponseEntity.ok(resourceService.filterResources(industry, level, pageable));
+        return ResponseEntity.ok(resourceService.filterResources(type, industry, level, categoryId, pageable));
     }
 
     @PostMapping

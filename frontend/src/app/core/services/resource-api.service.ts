@@ -175,14 +175,12 @@ export class ResourceApiService {
     return this.http.get<PageResponse<ResourceApiResponse>>(`${this.apiUrl}/api/resources/search`, { params });
   }
 
-  filterResources(industry?: string, level?: string, page = 0, size = 10): Observable<PageResponse<ResourceApiResponse>> {
+  filterResources(type?: string, industry?: string, level?: string, categoryId?: string, page = 0, size = 12): Observable<PageResponse<ResourceApiResponse>> {
     let params = new HttpParams().set('page', page).set('size', size);
-    if (industry && industry !== 'ALL') {
-      params = params.set('industry', industry);
-    }
-    if (level && level !== 'ALL') {
-      params = params.set('level', level);
-    }
+    if (type && type !== 'all') params = params.set('type', type.toUpperCase());
+    if (industry && industry !== 'ALL') params = params.set('industry', industry);
+    if (level && level !== 'ALL') params = params.set('level', level);
+    if (categoryId && categoryId !== 'all') params = params.set('categoryId', categoryId);
     return this.http.get<PageResponse<ResourceApiResponse>>(`${this.apiUrl}/api/resources/filter`, { params });
   }
 
