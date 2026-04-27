@@ -2,6 +2,7 @@ package com.microservice.interviewservice.dto.request;
 
 import com.microservice.interviewservice.ennum.CareerLevelEnum;
 import com.microservice.interviewservice.ennum.IndustryEnum;
+import com.microservice.interviewservice.ennum.InterviewLanguage;
 import com.microservice.interviewservice.ennum.InterviewTypeEnum;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -39,4 +40,10 @@ public class CreateInterviewSessionRequest {
 
     @NotNull(message = "consentGiven flag is required.")
     private Boolean consentGiven;
+
+    /**
+     * Interview language. Optional — defaults to EN in the mapper if null.
+     * Controls which Vosk acoustic model is used for speech-to-text on this session.
+     */
+    private InterviewLanguage language;
 }

@@ -4,5 +4,5 @@ public enum QuestionTypeEnum {
     BEHAVIORAL,
     TECHNICAL,
     SITUATIONAL,
-    CASE_STUDY
+    CASE_STUDY   
 }

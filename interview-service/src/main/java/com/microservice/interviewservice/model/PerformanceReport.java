@@ -4,26 +4,16 @@ import java.time.LocalDateTime;
 
 import com.microservice.interviewservice.ennum.PreparationLevelEnum;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "performance_reports")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class PerformanceReport {
 
     @Id
@@ -40,6 +30,12 @@ public class PerformanceReport {
     private Double stressManagementScore;
     private Double confidenceScore;
 
+    @Column(name = "hesitation_score")
+    private Double hesitationScore;
+
+    @Column(name = "stress_proxy_score")
+    private Double stressProxyScore;
+
     @Enumerated(EnumType.STRING)
     private PreparationLevelEnum preparationLevel;
 
@@ -51,6 +47,18 @@ public class PerformanceReport {
 
     @Column(columnDefinition = "TEXT")
     private String actionableRecommendations;
+
+    @Column(name = "behavioral_summary", columnDefinition = "TEXT")
+    private String behavioralSummary;
+
+    @Column(name = "communication_summary", columnDefinition = "TEXT")
+    private String communicationSummary;
+
+    @Column(name = "stress_proxy_summary", columnDefinition = "TEXT")
+    private String stressProxySummary;
+
+    @Column(name = "stress_timeline_json", columnDefinition = "TEXT")
+    private String stressTimelineJson;
 
     private Integer estimatedSessionsToNextLevel;
 

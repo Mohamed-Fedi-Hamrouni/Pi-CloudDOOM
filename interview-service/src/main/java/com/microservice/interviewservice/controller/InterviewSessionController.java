@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 import com.microservice.interviewservice.dto.request.CreateInterviewSessionRequest;
 import com.microservice.interviewservice.dto.request.SubmitResponseRequest;
 import com.microservice.interviewservice.dto.request.UpdateInterviewSessionRequest;

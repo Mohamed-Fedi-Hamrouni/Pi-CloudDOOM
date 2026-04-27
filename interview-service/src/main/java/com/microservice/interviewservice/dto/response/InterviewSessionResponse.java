@@ -2,6 +2,7 @@ package com.microservice.interviewservice.dto.response;
 
 import com.microservice.interviewservice.ennum.CareerLevelEnum;
 import com.microservice.interviewservice.ennum.IndustryEnum;
+import com.microservice.interviewservice.ennum.InterviewLanguage;
 import com.microservice.interviewservice.ennum.InterviewTypeEnum;
 import com.microservice.interviewservice.ennum.SessionStatusEnum;
 import lombok.*;
@@ -21,6 +22,7 @@ public class InterviewSessionResponse {
     private IndustryEnum      industry;
     private CareerLevelEnum   targetLevel;
     private SessionStatusEnum status;
+    private InterviewLanguage language;
     private Integer           durationMinutes;
     private Integer           difficultyLevel;
     private Boolean           isRecorded;
