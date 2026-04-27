@@ -307,11 +307,15 @@ services:
             DB_NAME: communitydb
             DB_USERNAME: postgres
             DB_PASSWORD: ${DB_PASSWORD:-0000}
-            KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
-            KEYCLOAK_REALM: ${KEYCLOAK_REALM:-myapp-realm}
+            KEYCLOAK_URL: http://localhost:8080
+            KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
             REDIS_HOST: redis
             REDIS_PORT: 6379
-            GROQ_API_KEY: ${GROQ_API_KEY}
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+            SPRING_DATA_REDIS_HOST: redis
+            SPRING_DATA_REDIS_PORT: 6379
+            SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+            GROQ_API_KEY: ${GROQ_API_KEY:-}
         depends_on:
             communitydb:
                 condition: service_healthy

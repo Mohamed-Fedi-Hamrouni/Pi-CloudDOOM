@@ -1,11 +1,11 @@
 server:
-  port: 8084
+  port: ${SERVER_PORT:8084}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/mentorship_db
-    username: postgres
-    password: 0000
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mentorship_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:devpassword}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -17,8 +17,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8080/realms/myapp-realm
-          jwk-set-uri: http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:http://localhost:8080/realms/myapp-realm}
+          jwk-set-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI:http://localhost:8080/realms/myapp-realm/protocol/openid-connect/certs}
 
   mail:
     host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
