@@ -109,6 +109,20 @@ export const routes: Routes = [
                         (m) => m.SettingsComponent,
                     ),
             },
+            {
+                path: "ai-report",
+                loadComponent: () =>
+                    import("./pages/quiz/quiz-evaluation-report.component").then(
+                        (m) => m.QuizEvaluationReportComponent,
+                    ),
+            },
+            {
+                path: "admin",
+                loadComponent: () =>
+                    import("./pages/admin/admin-dashboard.component").then(
+                        (m) => m.AdminDashboardComponent,
+                    ),
+            },
         ],
     },
     {

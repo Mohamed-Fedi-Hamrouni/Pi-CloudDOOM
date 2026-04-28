@@ -11,5 +11,6 @@ public class CvExperienceDto {
     private String company;
     private String startDate;
     private String endDate;
+    private Boolean current;
     private String description;
 }

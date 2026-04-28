@@ -70,10 +70,12 @@ public class CvProfileEnrichmentService {
                     mapped.setEmploymentType(null);
 
                     DateRange range = DateRangeParser.parse(item.getStartDate(), item.getEndDate());
-
                     mapped.setStartDate(range.startDate());
-                    mapped.setEndDate(range.endDate());
-                    mapped.setCurrent(range.current());
+
+                    // Trust the model's explicit current flag first; fall back to DateRangeParser
+                    boolean isCurrent = item.getCurrent() != null ? item.getCurrent() : range.current();
+                    mapped.setCurrent(isCurrent);
+                    mapped.setEndDate(isCurrent ? null : range.endDate());
                     mapped.setDescription(clean(item.getDescription()));
 
                     return mapped;
@@ -94,10 +96,11 @@ public class CvProfileEnrichmentService {
                     mapped.setFieldOfStudy(clean(item.getDescription()));
 
                     DateRange range = DateRangeParser.parse(item.getStartDate(), item.getEndDate());
-
                     mapped.setStartDate(range.startDate());
-                    mapped.setEndDate(range.endDate());
-                    mapped.setCurrent(range.current());
+
+                    boolean isCurrent = item.getCurrent() != null ? item.getCurrent() : range.current();
+                    mapped.setCurrent(isCurrent);
+                    mapped.setEndDate(isCurrent ? null : range.endDate());
                     mapped.setDescription(null);
 
                     return mapped;

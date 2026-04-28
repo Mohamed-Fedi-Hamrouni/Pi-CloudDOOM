@@ -11,5 +11,6 @@ public class CvEducationDto {
     private String institution;
     private String startDate;
     private String endDate;
+    private Boolean current;
     private String description;
 }

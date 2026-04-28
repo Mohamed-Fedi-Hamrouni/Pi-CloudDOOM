@@ -33,6 +33,7 @@ export interface UserProfile {
     profileVisible?: boolean;
     createdAt: string;
     updatedAt: string;
+    cvParsingApplied?: boolean | null;
 }
 
 @Injectable({ providedIn: "root" })

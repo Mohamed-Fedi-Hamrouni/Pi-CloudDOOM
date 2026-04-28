@@ -1,6 +1,6 @@
 import { Injectable, inject } from "@angular/core";
 import { HttpClient, HttpErrorResponse } from "@angular/common/http";
-import { Observable, catchError, throwError } from "rxjs";
+import { Observable, catchError, map, throwError } from "rxjs";
 import { environment } from "../../../environments/environment";
 import {
     BadgeResponse,
@@ -141,6 +141,25 @@ export class TrainingApiService {
     getUserBadges(userId: string): Observable<UserBadgeResponse[]> {
         return this.http.get<UserBadgeResponse[]>(
             `${this.baseUrl}/api/v1/training/user-badges/user/${encodeURIComponent(userId)}`,
+        );
+    }
+
+    getAllTrainingModules(): Observable<TrainingModuleResponse[]> {
+        return this.http.get<TrainingModuleResponse[]>(
+            `${this.baseUrl}/api/v1/admin/training/modules`,
+        ).pipe(
+            catchError(() =>
+                this.http.get<TrainingPathResponse[]>(
+                    `${this.baseUrl}/api/v1/training/paths/me/history`,
+                ).pipe(
+                    map((paths: TrainingPathResponse[]) => {
+                        const seen = new Set<number>();
+                        return paths
+                            .flatMap(p => p.modules ?? [])
+                            .filter(m => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
+                    }),
+                )
+            )
         );
     }
 }

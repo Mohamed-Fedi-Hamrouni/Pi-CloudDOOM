@@ -68,51 +68,40 @@ private String buildPrompt(String cvText) {
     return """
             You are a professional CV parser.
 
-            Return ONLY one valid JSON object.
-            Do not explain.
-            Do not write code.
-            Do not add markdown.
-            Do not add any text before or after the JSON.
+            Return ONLY one valid JSON object. Nothing else.
+            Do not explain. Do not write code. Do not add markdown. Do not add any text before or after the JSON.
             Do not include any fields other than: bio, skills, educations, experiences.
-            Do not include name.
-            Never invent facts.
+            Do not include name. Never invent facts.
             If a field is missing or unclear, use null.
             All list fields must always be arrays, never null.
+
             Skills may be extracted from anywhere in the CV, even if there is no dedicated skills section.
             Extract bio only if a clear summary, profile, about, or objective section exists.
             Preserve the original language of extracted values where possible.
-            Dates must be returned separately as startDate and endDate.
-            Use YYYY-MM format whenever possible.
+
+            Dates must be returned separately as startDate and endDate. Use YYYY-MM format whenever possible.
             If only a year is known, use YYYY-01.
-            If the CV says Present, Current, or Présent, set endDate to null.
-            For experiences, extract the employer/company name explicitly into company.
-            For education, extract the school/university name explicitly into institution.
-            Do not merge degree and institution into one field.
-            Do not merge company and job title into one field.
-            Do not merge date ranges into a single field.
-            If a date range is written in one string, split it into startDate and endDate.
-            If an experience has no explicit company but clearly names an employer or organization, use that as company.
-            If an education entry has no explicit institution label but clearly names a school or university, use that as institution.
-            Keep descriptions concise, ideally 1 to 3 sentences maximum.
-            Extract skills aggressively when they are clearly listed in a skills, competencies, technologies, tools, projects, or technical environment section.
-            If at least one clear skill is present, skills must not be empty.
-            Extract bio from any clear summary, profile, about, introduction, or objective section near the top of the CV.
-            If a short introductory paragraph describes the candidate, use it as bio.
+            If the CV says Present, Current, Présent, or en cours: set endDate to null AND set current to true.
+            If a position has ended (has an explicit end date or year): set current to false.
+            If endDate is unknown for a past position, set endDate to null and current to false.
+
+            For experiences:
+            - jobTitle should contain the role title
+            - company should contain the employer/organization name
+            - description should summarize missions, responsibilities, or achievements (1 to 3 sentences max)
             For education:
             - degree should contain the diploma/program name
             - institution should contain the school/university name
             - description may contain specialization, honors, or additional study details if clearly present
-            For experience:
-            - jobTitle should contain the role title
-            - company should contain the employer name
-            - description should summarize the missions, responsibilities, or achievements
+
+            Do not merge any two fields into one. Split date ranges into startDate and endDate.
 
             The CV may be in English or French.
             Recognize headings and synonyms such as:
-            - Skills / Skill Set / Technical Skills / Competencies / Compétences / Technologies / Outils
-            - Education / Academic Background / Formation / Études / Diplômes
-            - Experience / Work Experience / Professional Experience / Expérience professionnelle / Parcours professionnel
-            - Profile / Summary / About / Professional Summary / Profil / À propos / Objectif
+            - Skills / Competencies / Compétences / Technologies / Outils
+            - Education / Formation / Études / Diplômes
+            - Experience / Expérience / Parcours professionnel
+            - Profile / Summary / Profil / À propos / Objectif
 
             Required JSON schema:
             {
@@ -124,6 +113,7 @@ private String buildPrompt(String cvText) {
                   "institution": "string or null",
                   "startDate": "YYYY-MM or null",
                   "endDate": "YYYY-MM or null",
+                  "current": true or false,
                   "description": "string or null"
                 }
               ],
@@ -133,6 +123,7 @@ private String buildPrompt(String cvText) {
                   "company": "string or null",
                   "startDate": "YYYY-MM or null",
                   "endDate": "YYYY-MM or null",
+                  "current": true or false,
                   "description": "string or null"
                 }
               ]
@@ -155,6 +146,7 @@ private String buildPrompt(String cvText) {
                   "company": "HYDATIS",
                   "startDate": "2025-06",
                   "endDate": "2025-08",
+                  "current": false,
                   "description": "Migrated mapping services from Google Maps to OpenStreetMap."
                 }
               ]
@@ -176,6 +168,7 @@ private String buildPrompt(String cvText) {
                   "institution": "ESPRIT",
                   "startDate": "2022-01",
                   "endDate": null,
+                  "current": true,
                   "description": "Specialization: Cloud Computing"
                 }
               ],
@@ -241,16 +234,25 @@ private String buildPrompt(String cvText) {
             JsonNode responseNode = root.path("response");
 
             if (responseNode.isMissingNode() || responseNode.isNull() || responseNode.asText().isBlank()) {
+                log.error("Ollama response missing 'response' field. Raw body: {}", truncateForLog(ollamaResponseBody));
                 throw new CvParsingException("Could not locate valid response text in Ollama response.");
             }
 
             String jsonText = responseNode.asText().trim();
+            log.debug("Raw Ollama model output ({} chars): {}", jsonText.length(), truncateForLog(jsonText));
 
+            // Strip markdown code blocks if present
             if (jsonText.startsWith("```")) {
                 jsonText = jsonText
                         .replaceAll("^```(?:json)?\\s*", "")
                         .replaceAll("```\\s*$", "")
                         .trim();
+            }
+
+            // Extract the first complete JSON object from the text — handles prose before/after JSON
+            String extracted = findFirstJsonObject(jsonText);
+            if (extracted != null) {
+                jsonText = extracted;
             }
 
             ParsedCvDto dto = objectMapper.readValue(jsonText, ParsedCvDto.class);
@@ -274,6 +276,53 @@ private String buildPrompt(String cvText) {
             throw new CvParsingException(
                     "Ollama returned invalid JSON for CV parsing: " + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Scans {@code text} character-by-character to find the first complete, balanced JSON
+     * object ({...}). Handles nested objects, arrays, and strings (including escaped quotes).
+     * Returns {@code null} if no complete object is found.
+     */
+    private String findFirstJsonObject(String text) {
+        int start = -1;
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+
+            if (c == '{') {
+                if (depth == 0) start = i;
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0 && start >= 0) {
+                    return text.substring(start, i + 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String truncateForLog(String text) {
+        if (text == null) return "<null>";
+        return text.length() <= 300 ? text : text.substring(0, 300) + "…";
     }
 
     public static class CvParsingException extends RuntimeException {

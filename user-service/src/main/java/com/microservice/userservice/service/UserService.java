@@ -187,30 +187,38 @@ public UserResponse uploadCv(String keycloakId, MultipartFile file) {
 
     user.setCvUrl(currentCvUrl);
 
+    boolean parsingApplied = false;
+
     try {
         // ── Step 1: Extract text from PDF
         var extraction = pdfTextExtractorService.extractText(currentCvUrl);
 
         if (!extraction.isUsable()) {
-            log.warn("CV extraction is low quality, skipping AI parsing for user {}", user.getId());
+            log.warn("CV text extraction too short or image-based — skipping AI parsing for user {}", user.getId());
         } else {
             String text = extraction.text();
 
-            // ── Step 2: AI parsing
+            // ── Step 2: AI parsing via Ollama
             var parsed = cvAiParsingService.parse(text);
 
             // ── Step 3: Normalize
             var normalized = cvNormalizationService.normalize(parsed);
 
-            // ── Step 4: Apply to user
+            // ── Step 4: Apply to user profile
             cvProfileEnrichmentService.applyToUser(user, normalized);
 
-            log.info("CV successfully parsed and applied for user {}", user.getId());
+            parsingApplied = true;
+            log.info("CV parsed and applied for user {} — skills={}, experiences={}, educations={}",
+                user.getId(),
+                normalized.getSkills().size(),
+                normalized.getExperiences().size(),
+                normalized.getEducations().size());
         }
 
     } catch (Exception ex) {
-        // IMPORTANT: CV upload must NOT fail if AI fails
-        log.error("CV parsing failed for user {}: {}", user.getId(), ex.getMessage());
+        // CV upload must NOT fail when AI parsing fails — log the full cause for debugging
+        log.error("CV AI parsing failed for user {} — profile was not enriched: {}",
+            user.getId(), ex.getMessage(), ex);
     }
 
     // ── Step 5: Save user
@@ -222,7 +230,9 @@ public UserResponse uploadCv(String keycloakId, MultipartFile file) {
     // ── Step 7: Emit event
     eventProducer.publishUserUpdated(saved);
 
-    return toResponseWithSkills(saved);
+    UserResponse response = toResponseWithSkills(saved);
+    response.setCvParsingApplied(parsingApplied);
+    return response;
 }
 
     @Transactional

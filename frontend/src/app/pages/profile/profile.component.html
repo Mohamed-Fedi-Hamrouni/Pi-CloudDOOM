@@ -970,10 +970,13 @@
                     </label>
 
                     <div class="cva-sub" *ngIf="cvUploadLoading">
-                        Uploading CV...
+                        Uploading and analysing CV…
                     </div>
                     <div class="save-error" *ngIf="cvUploadError">
                         {{ cvUploadError }}
+                    </div>
+                    <div class="save-success" *ngIf="cvUploadSuccess">
+                        {{ cvUploadSuccess }}
                     </div>
                 </div>
             </div>

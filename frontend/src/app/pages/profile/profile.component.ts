@@ -97,6 +97,7 @@ export class ProfileComponent implements OnInit {
     activeEditSection: ActiveEditSection = null;
     cvUploadLoading = false;
     cvUploadError = "";
+    cvUploadSuccess = "";
     selectedCvFileName = "";
     cvLink = "";
     cvFileName = "";
@@ -939,6 +940,7 @@ export class ProfileComponent implements OnInit {
     private uploadCv(file: File): void {
         this.cvUploadLoading = true;
         this.cvUploadError = "";
+        this.cvUploadSuccess = "";
 
         this.userApi.uploadCv(file).subscribe({
             next: (updated) => {
@@ -949,13 +951,14 @@ export class ProfileComponent implements OnInit {
                 this.selectedSkills = [...updated.skills];
                 this.editForm.skills = [...updated.skills];
 
-                this.experiences = this.parseExperiences(
-                    updated.experiencesJson,
-                );
+                this.experiences = this.parseExperiences(updated.experiencesJson);
                 this.educations = this.parseEducations(updated.educationsJson);
 
-                if (this.editing) {
-                    this.editForm.bio = updated.bio || "";
+                // Always sync bio regardless of edit mode
+                if (updated.bio) {
+                    if (this.editing) {
+                        this.editForm.bio = updated.bio;
+                    }
                 }
 
                 this.selectedCvFileName = this.extractFileNameFromUrl(
@@ -964,6 +967,22 @@ export class ProfileComponent implements OnInit {
 
                 this.cvUploadLoading = false;
                 this.cvUploadError = "";
+
+                if (updated.cvParsingApplied === true) {
+                    this.cvUploadSuccess =
+                        "CV uploaded and profile auto-filled from your CV.";
+                } else if (updated.cvParsingApplied === false) {
+                    this.cvUploadSuccess =
+                        "CV uploaded. Profile auto-fill is unavailable right now — you can fill in your details manually.";
+                } else {
+                    this.cvUploadSuccess = "CV uploaded successfully.";
+                }
+
+                setTimeout(() => {
+                    this.cvUploadSuccess = "";
+                    this.cdr.detectChanges();
+                }, 6000);
+
                 this.refreshDerivedFields();
                 this.refreshCompletion();
                 this.syncPreferences();

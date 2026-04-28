@@ -121,6 +121,9 @@ services:
       kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.created --partitions 2 --replication-factor 1
       kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic training.path.updated --partitions 2 --replication-factor 1
       kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic user.badge.earned --partitions 2 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.created --partitions 2 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.updated --partitions 2 --replication-factor 1
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --topic resource.deleted --partitions 2 --replication-factor 1
       echo 'Topics créés :'
       kafka-topics --list --bootstrap-server kafka:29092
       "
@@ -170,6 +173,8 @@ services:
     image: ollama/ollama:latest
     container_name: userservice-ollama
     restart: unless-stopped
+    ports:
+      - "11434:11434"
     volumes:
       - ollamadata:/root/.ollama
     healthcheck:
@@ -296,6 +301,46 @@ services:
       KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
       KEYCLOAK_CLIENT_ID: interview-service
       KEYCLOAK_CLIENT_SECRET: interview-service-secret-change-in-prod
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GROQ_BASE_URL: ${GROQ_BASE_URL:-https://api.groq.com}
+      APP_TTS_KOKORO_BASE_URL: http://kokoro:8880
+      WHISPER_BASE_URL: http://whisper:8000
+
+  quiz-service:
+    build:
+      context: ../quiz-service
+      dockerfile: Dockerfile
+    container_name: userservice-quiz-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    ports:
+      - "8085:8085"
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/quizdb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      USER_SERVICE_BASE_URL: http://user-service:8081
+    dns:
+      - "8.8.8.8"
+      - "8.8.4.4"
 
   frontend:
     build:
@@ -355,6 +400,102 @@ services:
     ports:
       - "8001:8000"
 
+  community-service:
+    build:
+      context: ../community-service
+      dockerfile: Dockerfile
+    container_name: userservice-community-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    ports:
+      - "${COMMUNITY_SERVICE_PORT:-8086}:8086"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: communitydb
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    dns:
+      - "8.8.8.8"
+      - "8.8.4.4"
+
+  minio:
+    image: minio/minio:latest
+    container_name: userservice-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  resource-service:
+    build:
+      context: ../resource-service
+      dockerfile: Dockerfile
+    container_name: userservice-resource-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "${RESOURCE_SERVICE_PORT:-8087}:8087"
+    environment:
+      SERVER_PORT: 8087
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/resourcedb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: resource-library
+      USER_SERVICE_BASE_URL: http://user-service:8081
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama3-8b-8192}
+      AI_PROVIDER: ${AI_PROVIDER:-stub}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+    dns:
+      - "8.8.8.8"
+      - "8.8.4.4"
+
   mentorship-service:
     build:
       context: ../mentorship-service
@@ -404,6 +545,7 @@ volumes:
   uploadsdata:
   whisperdata:
   kokorodata:
+  miniodata:
 networks:
   default:
     name: userservice-network

@@ -48,4 +48,7 @@ public class UserResponse {
     // ── Passkey (informational only — auth truth lives in Keycloak) ──
     private Boolean passkeyRegistered;
     private LocalDateTime passkeyRegisteredAt;
+
+    // ── CV parsing (set only on /me/cv upload response, null otherwise) ──
+    private Boolean cvParsingApplied;
 }

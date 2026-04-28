@@ -79,15 +79,19 @@ export interface MentorScoreDTO {
 export interface Resource {
   id: string;
   title: string;
-  type: 'article' | 'video' | 'podcast' | 'exercise' | 'template';
+  type: 'article' | 'video' | 'podcast' | 'exercise' | 'template' | string;
   category: string;
   duration: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
+  level: 'beginner' | 'intermediate' | 'advanced' | string;
   tags: string[];
   saved: boolean;
   views: number;
   rating: number;
   description: string;
+  url?: string;
+  thumbnailUrl?: string;
+  industry?: string;
+  categoryId?: string;
 }
 
 // Quiz model

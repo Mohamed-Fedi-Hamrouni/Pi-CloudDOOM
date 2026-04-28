@@ -8,6 +8,7 @@ import {
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HttpClient } from "@angular/common/http";
+import { finalize } from "rxjs";
 import { AuthService } from "../../core/auth/auth.service";
 import { environment } from "../../../environments/environment";
 import { InterviewApiService } from "../../core/services/interview-api.service";
@@ -25,7 +26,6 @@ import {
     UserBadgeResponse,
     UserXPTrackerResponse,
 } from "../../core/models/training.models";
-import { AdminViewComponent } from "../mentorship/admin-mentorship/admin-view.component";
 
 interface GenerateMissingLessonsResponse {
     category: string;
@@ -66,13 +66,13 @@ interface UserIdentityItem {
     lastName: string;
 }
 
-type AdminTab = "users" | "interviews" | "training" | "mentorship";
+type AdminTab = "users" | "interviews" | "training";
 
 @Component({
     selector: "app-admin-dashboard",
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [CommonModule, FormsModule, AdminViewComponent],
+    imports: [CommonModule, FormsModule],
     template: `
         <div class="admin-panel">
             <!-- Tab switcher -->
@@ -97,13 +97,6 @@ type AdminTab = "users" | "interviews" | "training" | "mentorship";
                     (click)="setTab('training')"
                 >
                     🎯 Training
-                </button>
-                <button
-                    class="adm-tab"
-                    [class.active]="activeTab === 'mentorship'"
-                    (click)="setTab('mentorship')"
-                >
-                    🤝 Mentorship
                 </button>
             </div>
 
@@ -791,11 +784,6 @@ type AdminTab = "users" | "interviews" | "training" | "mentorship";
                 </ng-container>
             </ng-container>
 
-            <!-- ════════════════════ MENTORSHIP TAB ════════════════════ -->
-            <ng-container *ngIf="activeTab === 'mentorship'">
-                <app-admin-mentorship-view></app-admin-mentorship-view>
-            </ng-container>
-
             <!-- ════════════════════ TRAINING TAB ════════════════════ -->
             <ng-container *ngIf="activeTab === 'training'">
                 <div class="training-head">
@@ -1087,6 +1075,9 @@ type AdminTab = "users" | "interviews" | "training" | "mentorship";
                 <!-- Lessons CRUD -->
                 <ng-container *ngIf="trainingView === 'lessons'">
                     <div class="crud-card">
+                        <div *ngIf="aiGenerating" style="margin-bottom:12px;padding:10px 14px;background:#1a3a2a;border:1px solid #2a6a4a;border-radius:8px;color:#5dba87;font-size:13px;">
+                            ⏳ {{ aiGeneratingMsg }}
+                        </div>
                         <div class="crud-head">
                             <strong>AI: Generate missing draft lessons</strong>
                         </div>
@@ -2950,6 +2941,8 @@ export class AdminDashboardComponent implements OnInit {
         | "user-badges" = "badges";
     trainingLoading = false;
     trainingError: string | null = null;
+    aiGenerating = false;
+    aiGeneratingMsg = '';
 
     adminBadges: BadgeResponse[] = [];
     adminPaths: TrainingPathResponse[] = [];
@@ -3749,14 +3742,16 @@ export class AdminDashboardComponent implements OnInit {
 
     loadLessons(): void {
         this.setTrainingBusy(true, null);
-        this.http.get<TrainingLessonResponse[]>(`${this.trainingAdminBase()}/lessons`).subscribe({
+        this.http.get<TrainingLessonResponse[]>(`${this.trainingAdminBase()}/lessons`)
+            .pipe(finalize(() => this.setTrainingBusy(false, null)))
+            .subscribe({
             next: (res) => {
                 this.adminLessons = res || [];
-                this.refreshTrainingTable();
-                this.setTrainingBusy(false, null);
+                try { this.refreshTrainingTable(); } catch (e) { console.error('refreshTrainingTable error:', e); }
             },
             error: (err) => {
-                this.setTrainingBusy(false, this.formatTrainingError(err));
+                this.trainingError = this.formatTrainingError(err);
+                this.cdr.markForCheck();
             },
         });
     }
@@ -3796,33 +3791,31 @@ export class AdminDashboardComponent implements OnInit {
             confirmText: "Generate",
             cancelText: "Cancel",
             onConfirm: () => {
-                this.setTrainingBusy(true, null);
+                this.aiGenerating = true;
+                this.aiGeneratingMsg = `Generating lessons with Ollama… this may take several minutes.`;
+                this.trainingError = null;
+                this.cdr.markForCheck();
                 this.http
                     .post<GenerateMissingLessonsResponse>(
                         `${this.trainingAdminBase()}/lessons/generate-missing`,
                         payload,
                     )
+                    .pipe(finalize(() => { this.aiGenerating = false; this.aiGeneratingMsg = ''; this.cdr.markForCheck(); }))
                     .subscribe({
                         next: (res) => {
-                            this.setTrainingBusy(false, null);
-                            // Refresh list to show new INACTIVE lessons
                             this.loadLessons();
                             const generated = res?.generatedCount ?? 0;
                             const existingActive = res?.existingActiveCount ?? 0;
                             const missing = res?.missingCount ?? 0;
-                            const targetCount =
-                                res?.targetActiveCount ?? target;
-
+                            const targetCount = res?.targetActiveCount ?? target;
                             this.showNotice(
                                 "success",
                                 `Generated ${generated} draft lessons (INACTIVE).\n\nExisting ACTIVE: ${existingActive}\nTarget ACTIVE: ${targetCount}\nMissing: ${missing}\n\nReview them in the Lessons list (INACTIVE).`,
                             );
                         },
                         error: (err) => {
-                            this.setTrainingBusy(
-                                false,
-                                this.formatTrainingError(err),
-                            );
+                            this.trainingError = this.formatTrainingError(err);
+                            this.cdr.markForCheck();
                         },
                     });
             },
