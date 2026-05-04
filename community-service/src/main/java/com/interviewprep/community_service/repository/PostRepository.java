@@ -30,4 +30,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findByAuthorKeycloakId(String authorKeycloakId, Pageable pageable);
 
     Page<Post> findByIndustryIgnoreCase(String industry, Pageable pageable);
+
+    @Query("SELECT p FROM Post p WHERE p.authorKeycloakId IN " +
+           "(SELECT f.followingKeycloakId FROM Follow f WHERE f.followerKeycloakId = :userId)")
+    Page<Post> findFeedByFollowee(@Param("userId") String userId, Pageable pageable);
 }

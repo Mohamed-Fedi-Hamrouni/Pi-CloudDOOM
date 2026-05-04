@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -102,14 +103,38 @@ public class AttemptService {
             throw new QuizAlreadySubmittedException("Cette tentative a déjà été soumise");
         }
 
+        // Batch-fetch all questions and answers referenced in the submission to avoid N+1 queries
+        Set<UUID> questionIds = request.getAnswers().stream()
+                .map(com.quizservice.dto.request.SubmitAttemptRequest.UserAnswerRequest::getQuestionId)
+                .collect(Collectors.toSet());
+        Map<UUID, Question> questionMap = questionRepository.findAllById(questionIds)
+                .stream().collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        Set<UUID> selectedAnswerIds = request.getAnswers().stream()
+                .filter(r -> r.getSelectedAnswerIds() != null)
+                .flatMap(r -> r.getSelectedAnswerIds().stream())
+                .collect(Collectors.toSet());
+        Map<UUID, Answer> answerMap = selectedAnswerIds.isEmpty()
+                ? Collections.emptyMap()
+                : answerRepository.findAllById(selectedAnswerIds)
+                        .stream().collect(Collectors.toMap(Answer::getId, Function.identity()));
+
         List<UserAnswer> userAnswers = request.getAnswers().stream()
                 .map(answerReq -> {
-                    Question question = questionRepository.findById(answerReq.getQuestionId())
-                            .orElseThrow(() -> new QuizNotFoundException("Question non trouvée"));
+                    Question question = questionMap.get(answerReq.getQuestionId());
+                    if (question == null) {
+                        throw new QuizNotFoundException("Question non trouvée: " + answerReq.getQuestionId());
+                    }
                     List<Answer> selected = answerReq.getSelectedAnswerIds() == null
                             ? new ArrayList<>()
                             : answerReq.getSelectedAnswerIds().stream()
-                            .map(id -> answerRepository.findById(id).orElseThrow())
+                            .map(id -> {
+                                Answer a = answerMap.get(id);
+                                if (a == null) {
+                                    throw new QuizNotFoundException("Answer non trouvée: " + id);
+                                }
+                                return a;
+                            })
                             .collect(Collectors.toList());
                     return UserAnswer.builder()
                             .attempt(attempt)

@@ -171,13 +171,19 @@ public class CommunityController {
     }
 
     @GetMapping("/follow/followers")
-    public ResponseEntity<List<FollowResponse>> getFollowers(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(communityService.getFollowers(jwt.getSubject()));
+    public ResponseEntity<PageResponse<FollowResponse>> getFollowers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(communityService.getFollowers(jwt.getSubject(), page, size));
     }
 
     @GetMapping("/follow/following")
-    public ResponseEntity<List<FollowResponse>> getFollowing(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(communityService.getFollowing(jwt.getSubject()));
+    public ResponseEntity<PageResponse<FollowResponse>> getFollowing(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(communityService.getFollowing(jwt.getSubject(), page, size));
     }
 
     // ─── Karma ────────────────────────────────────────────────────────────────
