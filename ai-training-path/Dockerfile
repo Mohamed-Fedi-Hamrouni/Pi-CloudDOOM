@@ -2,13 +2,16 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --timeout 120 --retries 5 --prefer-binary -r requirements.txt
 
 COPY . .
 
-# Ensure model is trained if not exists (although it should be mapped or pre-trained)
-# RUN python dataset_generator.py && python train.py
+RUN python dataset_generator.py && python train.py
 
 EXPOSE 8000
 

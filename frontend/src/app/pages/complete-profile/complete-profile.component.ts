@@ -16,11 +16,11 @@ import { environment } from "../../../environments/environment";
             <div class="cp-card">
                 <div class="cp-logo">
                     <div class="logo-icon">i</div>
-                    <span>inter<strong>V</strong></span>
+                    <span>InterviewPrepTN</span>
                 </div>
 
                 <div class="cp-header">
-                    <h1>Welcome to interV! 🎉</h1>
+                    <h1>Welcome to InterviewPrepTN! 🎉</h1>
                     <p>
                         Complete your profile to get started. This takes less
                         than a minute.

@@ -89,6 +89,13 @@ export const routes: Routes = [
                     ),
             },
             {
+                path: "profile/:keycloakId",
+                loadComponent: () =>
+                    import("./pages/user-profile/user-profile.component").then(
+                        (m) => m.UserProfileComponent,
+                    ),
+            },
+            {
                 path: "library",
                 loadComponent: () =>
                     import("./pages/library/library.component").then(
@@ -107,6 +114,20 @@ export const routes: Routes = [
                 loadComponent: () =>
                     import("./pages/settings/settings.component").then(
                         (m) => m.SettingsComponent,
+                    ),
+            },
+            {
+                path: "community/career",
+                loadComponent: () =>
+                    import("./pages/community/career-wizard/career-wizard.component").then(
+                        (m) => m.CareerWizardComponent,
+                    ),
+            },
+            {
+                path: "community/jobs",
+                loadComponent: () =>
+                    import("./pages/community/jobs/jobs.component").then(
+                        (m) => m.JobsComponent,
                     ),
             },
         ],

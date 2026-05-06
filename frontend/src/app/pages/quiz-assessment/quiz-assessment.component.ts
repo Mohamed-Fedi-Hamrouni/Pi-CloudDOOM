@@ -16,15 +16,15 @@ import { Quiz } from '../../core/models/models';
           <p>Test your knowledge across behavioral, technical, and product domains.</p>
         </div>
         <div class="quiz-header-stats">
-          <span class="chip chip-teal">🏆 14 Completed</span>
-          <span class="chip chip-mint">📊 Avg 78%</span>
+          <span class="chip chip-teal"><i class="bi bi-trophy-fill"></i> 14 Completed</span>
+          <span class="chip chip-mint"><i class="bi bi-bar-chart-fill"></i> Avg 78%</span>
         </div>
       </div>
 
       <!-- Search + Filters -->
       <div class="quiz-filters">
         <div class="input-icon-wrap" style="flex:1; max-width:400px;">
-          <span class="icon">🔍</span>
+          <span class="icon"><i class="bi bi-search"></i></span>
           <input class="input" placeholder="Search quizzes...">
         </div>
         <div class="filter-chips">
@@ -55,8 +55,8 @@ import { Quiz } from '../../core/models/models';
             <h3 class="qci-title">{{ quiz.title }}</h3>
             <p class="qci-desc">{{ quiz.description }}</p>
             <div class="qci-meta">
-              <span>❓ {{ quiz.questions }} questions</span>
-              <span>⏱️ {{ quiz.duration }}</span>
+              <span><i class="bi bi-question-circle-fill"></i> {{ quiz.questions }} questions</span>
+              <span><i class="bi bi-stopwatch-fill"></i> {{ quiz.duration }}</span>
             </div>
             <div class="qci-popularity">
               <div class="progress-bar" style="height:4px;">
@@ -104,13 +104,13 @@ import { Quiz } from '../../core/models/models';
 
             <!-- Sample question preview -->
             <div class="card">
-              <app-section-header title="Sample Question" icon="👀"></app-section-header>
+              <app-section-header title="Sample Question" icon='<i class="bi bi-eye-fill"></i>'></app-section-header>
               <div class="sq-text">{{ sampleQuestion.text }}</div>
               <div class="sq-options">
                 <div class="sq-option" *ngFor="let opt of sampleQuestion.options; let i = index" [class.correct]="i === sampleQuestion.correct">
                   <span class="sq-opt-letter">{{ letters[i] }}</span>
                   <span class="sq-opt-text">{{ opt }}</span>
-                  <span *ngIf="i === sampleQuestion.correct" class="sq-correct-mark">✓</span>
+                  <span *ngIf="i === sampleQuestion.correct" class="sq-correct-mark"><i class="bi bi-check-lg"></i></span>
                 </div>
               </div>
             </div>
@@ -122,7 +122,7 @@ import { Quiz } from '../../core/models/models';
               <div class="aq-progress-bar">
                 <div class="aq-prog-label">
                   <span>Question {{ currentQuestion() + 1 }} of {{ quizQuestions.length }}</span>
-                  <span class="aq-timer">⏱ 12:43</span>
+                  <span class="aq-timer"><i class="bi bi-stopwatch-fill"></i> 12:43</span>
                 </div>
                 <div class="progress-bar" style="height:6px;">
                   <div class="progress-fill" [style.width]="((currentQuestion() + 1)/quizQuestions.length*100) + '%'"></div>
@@ -144,14 +144,15 @@ import { Quiz } from '../../core/models/models';
               </div>
 
               <div class="aq-explanation" *ngIf="answered()">
-                <div class="aqe-label">💡 Explanation</div>
+                <div class="aqe-label"><i class="bi bi-lightbulb-fill"></i> Explanation</div>
                 <p>{{ quizQuestions[currentQuestion()].explanation }}</p>
               </div>
 
               <div class="aq-controls">
                 <button class="btn btn-secondary" (click)="endQuiz()">Exit Quiz</button>
                 <button class="btn btn-primary" (click)="nextQuestion()" [disabled]="!answered()">
-                  {{ currentQuestion() < quizQuestions.length - 1 ? 'Next →' : 'Finish Quiz' }}
+                  <ng-container *ngIf="currentQuestion() < quizQuestions.length - 1">Next <i class="bi bi-arrow-right"></i></ng-container>
+                  <ng-container *ngIf="currentQuestion() >= quizQuestions.length - 1">Finish Quiz</ng-container>
                 </button>
               </div>
             </div>
@@ -161,18 +162,18 @@ import { Quiz } from '../../core/models/models';
           <ng-container *ngIf="showResults()">
             <div class="card results-card">
               <div class="rc-top">
-                <div class="rc-icon">🎉</div>
+                <div class="rc-icon"><i class="bi bi-stars"></i></div>
                 <h2 class="rc-title">Quiz Complete!</h2>
                 <div class="rc-score">{{ quizScore }}%</div>
                 <div class="rc-sub">{{ quizScore >= 80 ? 'Excellent work!' : quizScore >= 60 ? 'Good effort!' : 'Keep practicing!' }}</div>
               </div>
               <div class="rc-breakdown">
                 <div class="rc-bd-item success">
-                  <span>✓</span>
+                  <span><i class="bi bi-check-lg"></i></span>
                   <span>2 Correct</span>
                 </div>
                 <div class="rc-bd-item error">
-                  <span>✗</span>
+                  <span><i class="bi bi-x-lg"></i></span>
                   <span>1 Incorrect</span>
                 </div>
               </div>
@@ -189,7 +190,7 @@ import { Quiz } from '../../core/models/models';
 
           <!-- Empty state -->
           <div class="empty-state" *ngIf="!activeQuiz() && !selectedQuiz() && !showResults()">
-            <div class="empty-state-icon">📝</div>
+            <div class="empty-state-icon"><i class="bi bi-pencil-square"></i></div>
             <h3>Select a quiz</h3>
             <p>Choose from our quiz catalog to start assessing your interview readiness.</p>
           </div>

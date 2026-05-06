@@ -16,6 +16,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
     SELECT 'CREATE DATABASE keycloakdb'
         WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloakdb')\gexec
 
+    SELECT 'CREATE DATABASE communitydb'
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'communitydb')\gexec
+
     SELECT 'CREATE DATABASE mentorship_db'
         WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mentorship_db')\gexec
 
@@ -23,6 +26,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
     GRANT ALL PRIVILEGES ON DATABASE interviewdb TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON DATABASE trainingdb TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON DATABASE keycloakdb TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON DATABASE communitydb TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON DATABASE mentorship_db TO $POSTGRES_USER;
 EOSQL
 
