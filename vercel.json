@@ -2,5 +2,8 @@
   "buildCommand": "cd frontend && npm ci && npm run build -- --configuration production",
   "outputDirectory": "frontend/dist/interv",
   "installCommand": "cd frontend && npm ci",
-  "framework": "angular"
+  "framework": "angular",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
