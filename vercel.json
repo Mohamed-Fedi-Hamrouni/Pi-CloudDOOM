@@ -1,6 +1,6 @@
 {
   "buildCommand": "cd frontend && npm ci && npm run build -- --configuration production",
-  "outputDirectory": "frontend/dist/frontend/browser",
+  "outputDirectory": "frontend/dist/interv",
   "installCommand": "cd frontend && npm ci",
   "framework": "angular"
 }
