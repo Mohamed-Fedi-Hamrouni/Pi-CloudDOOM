@@ -424,6 +424,7 @@ services:
       KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
