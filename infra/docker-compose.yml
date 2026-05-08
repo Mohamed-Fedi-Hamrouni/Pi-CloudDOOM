@@ -89,16 +89,9 @@ services:
     volumes:
       - kafkadata:/var/lib/kafka/data
     healthcheck:
-      test:
-        [
-          "CMD",
-          "kafka-topics",
-          "--bootstrap-server",
-          "localhost:9092",
-          "--list",
-        ]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/29092' 2>/dev/null"]
+      interval: 10s
+      timeout: 5s
       retries: 5
       start_period: 30s
 
@@ -207,11 +200,11 @@ services:
     volumes:
       - whisperdata:/root/.cache/huggingface
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
 
   kokoro:
     build:
@@ -309,6 +302,7 @@ services:
       GROQ_BASE_URL: ${GROQ_BASE_URL:-https://api.groq.com}
       APP_TTS_KOKORO_BASE_URL: http://kokoro:8880
       WHISPER_BASE_URL: http://whisper:8000
+      SPRING_FLYWAY_OUT_OF_ORDER: "true"
 
   quiz-service:
     build:
