@@ -359,38 +359,6 @@ services:
     ports:
       - "${FRONTEND_PORT:-4200}:80"
 
-  community-service:
-    build:
-      context: ../community-service
-      dockerfile: Dockerfile
-    container_name: community-service
-    restart: unless-stopped
-    ports:
-      - "8086:8086"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: communitydb
-      DB_USERNAME: ${POSTGRES_USER:-postgres}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
-      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-myapp-realm}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-devpassword}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
   training-service:
     build:
       context: ../training-service

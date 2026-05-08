@@ -47,7 +47,12 @@ coverage/
 
 # Python / ML
 venv/
+**/.venv/
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pkl
-*.csv
+training_data.csv
+out-tsc/
+**/out-tsc/
+.vercel
