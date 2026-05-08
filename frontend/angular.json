@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "interv": {
+    "interviewpreptn": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -18,7 +18,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/interv",
+            "outputPath": "dist/interviewpreptn",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -67,10 +67,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "interv:build:production"
+              "buildTarget": "interviewpreptn:build:production"
             },
             "development": {
-              "buildTarget": "interv:build:development"
+              "buildTarget": "interviewpreptn:build:development"
             }
           },
           "defaultConfiguration": "development"

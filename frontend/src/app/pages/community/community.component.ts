@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { finalize, forkJoin } from 'rxjs';
+import { catchError, finalize, forkJoin, of } from 'rxjs';
 import { TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock-data';
 import {
   CommunityApiService,
@@ -2096,8 +2096,8 @@ export class CommunityComponent implements OnInit {
 
     forkJoin({
       posts: this.communityApi.getPosts(0, this.pageSize, '', '', 'createdAt,desc'),
-      followers: this.communityApi.getFollowers(),
-      following: this.communityApi.getFollowing(),
+      followers: this.communityApi.getFollowers().pipe(catchError(() => of([] as CommunityFollow[]))),
+      following: this.communityApi.getFollowing().pipe(catchError(() => of([] as CommunityFollow[]))),
     })
       .pipe(finalize(() => { this.isInitialLoading = false; this.cdr.markForCheck(); }))
       .subscribe({

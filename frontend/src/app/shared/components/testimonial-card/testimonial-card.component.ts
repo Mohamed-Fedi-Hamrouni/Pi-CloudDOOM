@@ -16,7 +16,7 @@ import { CommonModule } from '@angular/common';
           <div class="author-role">{{ role }}</div>
         </div>
         <div class="stars" style="margin-left:auto;">
-          <span *ngFor="let s of stars">★</span>
+          <i class="bi bi-star-fill" *ngFor="let s of stars"></i>
         </div>
       </div>
     </div>

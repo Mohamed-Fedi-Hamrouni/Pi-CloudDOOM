@@ -24,11 +24,11 @@ import { UserProfile } from "../../core/services/user-api.service";
                     (click)="toggleSidebar.emit()"
                     aria-label="Toggle menu"
                 >
-                    <span class="menu-icon">☰</span>
+                    <i class="bi bi-list menu-icon"></i>
                 </button>
 
                 <div class="search-wrap">
-                    <span class="search-icon">🔍</span>
+                    <i class="bi bi-search search-icon"></i>
                     <input
                         class="input search-input"
                         type="search"
@@ -40,7 +40,7 @@ import { UserProfile } from "../../core/services/user-api.service";
 
             <div class="topbar-right">
                 <button class="icon-btn notif-btn" title="Notifications">
-                    <span>🔔</span>
+                    <i class="bi bi-bell-fill"></i>
                     <span class="notif-dot"></span>
                 </button>
 

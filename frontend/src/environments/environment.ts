@@ -5,8 +5,8 @@ export const environment = {
   trainingApiUrl: 'http://localhost:8083',
   mentorshipApiUrl: 'http://localhost:8084',
   quizApiUrl: 'http://localhost:8085',
-  resourceApiUrl: 'http://localhost:8087',
   communityApiUrl: 'http://localhost:8086',
+  resourceApiUrl: 'http://localhost:8087',
   kokoroUrl: "/kokoro",
    
   simli: {
