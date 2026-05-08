@@ -86,6 +86,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: "-Xmx256m -Xms128m"
     volumes:
       - kafkadata:/var/lib/kafka/data
     healthcheck:
@@ -147,6 +148,7 @@ services:
       KC_TEMPLATE_CACHE: "false"
       KC_PROXY: edge
       KC_HOSTNAME_URL: "http://localhost:8080"
+      JAVA_OPTS_APPEND: "-Xmx384m -XX:MaxMetaspaceSize=160m"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
       - ./keycloak/themes/interv:/opt/keycloak/themes/interv
@@ -269,7 +271,7 @@ services:
       GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
       GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
       GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
 
   interview-service:
     build:
@@ -304,7 +306,7 @@ services:
       APP_TTS_KOKORO_BASE_URL: http://kokoro:8880
       WHISPER_BASE_URL: http://whisper:8000
       SPRING_FLYWAY_OUT_OF_ORDER: "true"
-      JAVA_TOOL_OPTIONS: "-Xmx384m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
 
   quiz-service:
     build:
@@ -337,7 +339,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       USER_SERVICE_BASE_URL: http://user-service:8081
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -390,7 +392,7 @@ services:
       APP_OLLAMA_BASE_URL: http://ollama:11434
       APP_OLLAMA_MODEL: llama3.2:3b
       APP_OLLAMA_TIMEOUT_SECONDS: 300
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
 
   ai-training-path:
     build:
@@ -428,7 +430,7 @@ services:
       KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -494,7 +496,7 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-stub}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -537,7 +539,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       GROQ_API_URL: "${GROQ_API_URL:-https://api.groq.com/openai/v1/chat/completions}"
-      JAVA_TOOL_OPTIONS: "-Xmx320m -XX:MaxMetaspaceSize=192m"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
 
 volumes:
   pgdata:
