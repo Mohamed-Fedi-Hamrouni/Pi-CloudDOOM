@@ -148,7 +148,7 @@ services:
       KC_TEMPLATE_CACHE: "false"
       KC_PROXY: edge
       KC_HOSTNAME_URL: "http://localhost:8080"
-      JAVA_OPTS_APPEND: "-Xmx384m -XX:MaxMetaspaceSize=160m"
+      JAVA_OPTS_APPEND: "-Xmx512m -XX:MaxMetaspaceSize=192m"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
       - ./keycloak/themes/interv:/opt/keycloak/themes/interv
