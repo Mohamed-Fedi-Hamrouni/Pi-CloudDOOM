@@ -47,6 +47,7 @@ public class UserService {
     private final UserEventProducer eventProducer;
     private final ObjectMapper objectMapper;
     private final CvStorageService cvStorageService;
+    private final KeycloakAdminClient keycloakAdminClient;
 
     private final PdfTextExtractorService pdfTextExtractorService;
 private final CvAiParsingService cvAiParsingService;
@@ -252,6 +253,10 @@ public UserResponse uploadCv(String keycloakId, MultipartFile file) {
         user.setRole(newRole);
         User saved = userRepository.save(user);
         eventProducer.publishUserRoleChanged(saved);
+
+        // Best-effort: keep Keycloak realm-role membership in sync so the user's
+        // next JWT reflects the new role for @PreAuthorize checks across services.
+        keycloakAdminClient.syncUserRealmRole(saved.getKeycloakId(), newRole);
 
         return toResponseWithSkills(saved);
     }

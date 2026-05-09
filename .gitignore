@@ -56,3 +56,6 @@ training_data.csv
 out-tsc/
 **/out-tsc/
 .vercel
+
+# Claude Code session state
+.claude/

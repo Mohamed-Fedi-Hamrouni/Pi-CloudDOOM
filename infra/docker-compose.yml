@@ -187,9 +187,26 @@ services:
     depends_on:
       ollama:
         condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
+    # `ollama pull` resumes interrupted blob downloads, so a retry loop
+    # tolerates flaky networks. Without this, a single hiccup leaves the
+    # volume empty and CV auto-fill silently breaks for new users.
     command: >
-      "sleep 5 && OLLAMA_HOST=http://ollama:11434 ollama pull llama3.2:3b"
+      "sleep 5;
+       attempt=1;
+       until ollama list 2>/dev/null | grep -q '^llama3.2:3b'; do
+         echo \"[ollama-init] pull attempt $$attempt for llama3.2:3b\";
+         ollama pull llama3.2:3b || echo \"[ollama-init] pull failed (will retry)\";
+         attempt=$$((attempt+1));
+         if [ $$attempt -gt 20 ]; then
+           echo '[ollama-init] giving up after 20 attempts';
+           exit 1;
+         fi;
+         sleep 5;
+       done;
+       echo '[ollama-init] llama3.2:3b ready'"
 
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
@@ -260,6 +277,10 @@ services:
       KEYCLOAK_REALM: ${KC_REALM_NAME:-myapp-realm}
       KEYCLOAK_CLIENT_ID: user-service
       KEYCLOAK_CLIENT_SECRET: user-service-secret-change-in-prod
+      # Master-realm admin creds — used by UserService.updateRole to sync
+      # the user's realm role into Keycloak when role changes in our DB.
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       APP_OLLAMA_BASE_URL: http://ollama:11434
       APP_OLLAMA_MODEL: llama3.2:3b
       APP_OLLAMA_TIMEOUT_SECONDS: 300
@@ -271,7 +292,7 @@ services:
       GOOGLE_AI_BASE_URL: ${GOOGLE_AI_BASE_URL:-https://generativelanguage.googleapis.com}
       GOOGLE_AI_TEMPERATURE: ${GOOGLE_AI_TEMPERATURE:-0.4}
       GOOGLE_AI_MAX_OUTPUT_TOKENS: ${GOOGLE_AI_MAX_OUTPUT_TOKENS:-600}
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx384m -XX:MaxMetaspaceSize=320m -XX:+UseSerialGC -Xss512k"
 
   interview-service:
     build:
@@ -306,7 +327,7 @@ services:
       APP_TTS_KOKORO_BASE_URL: http://kokoro:8880
       WHISPER_BASE_URL: http://whisper:8000
       SPRING_FLYWAY_OUT_OF_ORDER: "true"
-      JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
 
   quiz-service:
     build:
@@ -339,7 +360,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       USER_SERVICE_BASE_URL: http://user-service:8081
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -392,7 +413,7 @@ services:
       APP_OLLAMA_BASE_URL: http://ollama:11434
       APP_OLLAMA_MODEL: llama3.2:3b
       APP_OLLAMA_TIMEOUT_SECONDS: 300
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
 
   ai-training-path:
     build:
@@ -430,7 +451,7 @@ services:
       KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/${KC_REALM_NAME:-myapp-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KC_REALM_NAME:-myapp-realm}/protocol/openid-connect/certs
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -496,7 +517,7 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-stub}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
     dns:
       - "8.8.8.8"
       - "8.8.4.4"
@@ -539,7 +560,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       GROQ_API_URL: "${GROQ_API_URL:-https://api.groq.com/openai/v1/chat/completions}"
-      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k"
+      JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k"
 
 volumes:
   pgdata:

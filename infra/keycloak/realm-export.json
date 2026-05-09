@@ -101,6 +101,15 @@
         "attributes": {}
       },
       {
+        "id": "7e9b0e1f-42a8-49bb-822a-a256b92ed232",
+        "name": "ROLE_MENTOR",
+        "description": "Mentorship-service role: grants access to mentor-only endpoints (sessions, requests acceptance/rejection)",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "76cb1abe-a8ae-4820-9af9-de9fcdd9ec6d",
+        "attributes": {}
+      },
+      {
         "id": "a1dee44d-e12b-4f24-a97f-18ac219a7a2e",
         "name": "uma_authorization",
         "description": "${role_uma_authorization}",
