@@ -82,21 +82,21 @@ type AdminTab = "users" | "interviews" | "training";
                     [class.active]="activeTab === 'users'"
                     (click)="setTab('users')"
                 >
-                    👥 Users
+                    <i class="bi bi-people-fill"></i> Users
                 </button>
                 <button
                     class="adm-tab"
                     [class.active]="activeTab === 'interviews'"
                     (click)="setTab('interviews')"
                 >
-                    🎙️ Interviews
+                    <i class="bi bi-mic-fill"></i> Interviews
                 </button>
                 <button
                     class="adm-tab"
                     [class.active]="activeTab === 'training'"
                     (click)="setTab('training')"
                 >
-                    🎯 Training
+                    <i class="bi bi-bullseye"></i> Training
                 </button>
             </div>
 
@@ -109,8 +109,8 @@ type AdminTab = "users" | "interviews" | "training";
                 [class.notice-info]="adminNotice.type === 'info'"
             >
                 <div class="notice-message">{{ adminNotice.message }}</div>
-                <button class="notice-close" (click)="clearNotice()">
-                    ✕
+                <button class="notice-close" (click)="clearNotice()" aria-label="Close notice">
+                    <i class="bi bi-x-lg"></i>
                 </button>
             </div>
 
@@ -137,7 +137,7 @@ type AdminTab = "users" | "interviews" | "training";
 
                 <div class="admin-toolbar">
                     <div class="search-wrap">
-                        <span class="search-icon">🔍</span>
+                        <span class="search-icon"><i class="bi bi-search"></i></span>
                         <input
                             class="input search-input"
                             type="search"
@@ -348,7 +348,7 @@ type AdminTab = "users" | "interviews" | "training";
                     </div>
                     <div class="admin-toolbar">
                         <div class="search-wrap">
-                            <span class="search-icon">🔍</span>
+                            <span class="search-icon"><i class="bi bi-search"></i></span>
                             <input
                                 class="input search-input"
                                 type="search"
@@ -664,7 +664,7 @@ type AdminTab = "users" | "interviews" | "training";
                                     class="action-btn action-btn-red"
                                     (click)="adminDeleteSession(s)"
                                 >
-                                    🗑 Delete
+                                    <i class="bi bi-trash"></i> Delete
                                 </button>
                             </div>
                         </div>
@@ -799,49 +799,49 @@ type AdminTab = "users" | "interviews" | "training";
                             [class.active]="trainingView === 'badges'"
                             (click)="setTrainingView('badges')"
                         >
-                            🏅 Badges
+                            <i class="bi bi-award-fill"></i> Badges
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'paths'"
                             (click)="setTrainingView('paths')"
                         >
-                            🗺️ Paths
+                            <i class="bi bi-map-fill"></i> Paths
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'modules'"
                             (click)="setTrainingView('modules')"
                         >
-                            📚 Modules
+                            <i class="bi bi-collection-fill"></i> Modules
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'lessons'"
                             (click)="setTrainingView('lessons')"
                         >
-                            📄 Lessons
+                            <i class="bi bi-file-text-fill"></i> Lessons
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'xp-trackers'"
                             (click)="setTrainingView('xp-trackers')"
                         >
-                            🧠 XP Trackers
+                            <i class="bi bi-graph-up"></i> XP Trackers
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'activities'"
                             (click)="setTrainingView('activities')"
                         >
-                            📅 Activities
+                            <i class="bi bi-calendar3"></i> Activities
                         </button>
                         <button
                             class="sub-tab"
                             [class.active]="trainingView === 'user-badges'"
                             (click)="setTrainingView('user-badges')"
                         >
-                            🎖️ User Badges
+                            <i class="bi bi-trophy-fill"></i> User Badges
                         </button>
                     </div>
                 </div>
@@ -850,12 +850,12 @@ type AdminTab = "users" | "interviews" | "training";
                     Loading training content...
                 </div>
                 <div class="report-error" *ngIf="!trainingLoading && trainingError">
-                    ⚠️ {{ trainingError }}
+                    <i class="bi bi-exclamation-triangle-fill"></i> {{ trainingError }}
                 </div>
 
                 <div class="admin-toolbar" *ngIf="!trainingLoading">
                     <div class="search-wrap">
-                        <span class="search-icon">🔍</span>
+                        <span class="search-icon"><i class="bi bi-search"></i></span>
                         <input
                             class="input search-input"
                             type="search"
@@ -933,10 +933,10 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
                                             <button class="action-btn action-btn-teal" (click)="editBadge(b)">
-                                                ✏️ Edit
+                                                <i class="bi bi-pencil"></i> Edit
                                             </button>
                                             <button class="action-btn action-btn-red" (click)="deleteBadge(b)">
-                                                🗑 Delete
+                                                <i class="bi bi-trash"></i> Delete
                                             </button>
                                         </div>
                                     </td>
@@ -952,7 +952,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <div class="crud-head">
                             <strong>{{ editingBadgeId ? 'Edit Badge' : 'Create Badge' }}</strong>
                             <button class="action-btn action-btn-neutral" (click)="resetBadgeForm()">
-                                ✕ Clear
+                                <i class="bi bi-x"></i> Clear
                             </button>
                         </div>
                         <div class="crud-grid">
@@ -962,7 +962,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Icon</span>
-                                <input class="input" [(ngModel)]="badgeForm.icon" [ngModelOptions]="{standalone:true}" placeholder="e.g. 🏅" />
+                                <input class="input" [(ngModel)]="badgeForm.icon" [ngModelOptions]="{standalone:true}" placeholder="e.g. bi-award-fill" />
                             </div>
                             <div class="detail-item detail-full">
                                 <span class="detail-label">Description</span>
@@ -992,7 +992,7 @@ type AdminTab = "users" | "interviews" | "training";
                         </div>
                         <div class="crud-actions">
                             <button class="action-btn action-btn-teal" (click)="saveBadge()">
-                                💾 {{ editingBadgeId ? 'Update' : 'Create' }}
+                                <i class="bi bi-floppy-fill"></i> {{ editingBadgeId ? 'Update' : 'Create' }}
                             </button>
                             <button class="action-btn action-btn-neutral" (click)="resetBadgeForm()">
                                 Cancel
@@ -1027,8 +1027,8 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td>{{ p.modules.length }}</td>
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
-                                            <button class="action-btn action-btn-teal" (click)="editPath(p)">✏️ Edit</button>
-                                            <button class="action-btn action-btn-red" (click)="deletePath(p)">🗑 Delete</button>
+                                            <button class="action-btn action-btn-teal" (click)="editPath(p)"><i class="bi bi-pencil"></i> Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deletePath(p)"><i class="bi bi-trash"></i> Delete</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1042,7 +1042,7 @@ type AdminTab = "users" | "interviews" | "training";
                     <div class="crud-card">
                         <div class="crud-head">
                             <strong>{{ editingPathId ? 'Edit Path' : 'Create Path' }}</strong>
-                            <button class="action-btn action-btn-neutral" (click)="resetPathForm()">✕ Clear</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetPathForm()"><i class="bi bi-x"></i> Clear</button>
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
@@ -1066,7 +1066,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="savePath()">💾 {{ editingPathId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-teal" (click)="savePath()"><i class="bi bi-floppy-fill"></i> {{ editingPathId ? 'Update' : 'Create' }}</button>
                             <button class="action-btn action-btn-neutral" (click)="resetPathForm()">Cancel</button>
                         </div>
                     </div>
@@ -1111,7 +1111,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="generateMissingLessonDrafts()">✨ Generate drafts</button>
+                            <button class="action-btn action-btn-teal" (click)="generateMissingLessonDrafts()"><i class="bi bi-magic"></i> Generate drafts</button>
                         </div>
                     </div>
 
@@ -1149,10 +1149,10 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
                                             <button class="action-btn action-btn-teal" (click)="editLesson(l)">
-                                                ✏️ Edit
+                                                <i class="bi bi-pencil"></i> Edit
                                             </button>
                                             <button class="action-btn action-btn-red" (click)="deleteLesson(l)">
-                                                🗑 Disable
+                                                <i class="bi bi-slash-circle"></i> Disable
                                             </button>
                                         </div>
                                     </td>
@@ -1168,7 +1168,7 @@ type AdminTab = "users" | "interviews" | "training";
                         <div class="crud-head">
                             <strong>{{ editingLessonId ? 'Edit Lesson' : 'Create Lesson' }}</strong>
                             <button class="action-btn action-btn-neutral" (click)="resetLessonForm()">
-                                ✕ Clear
+                                <i class="bi bi-x"></i> Clear
                             </button>
                         </div>
 
@@ -1240,7 +1240,7 @@ type AdminTab = "users" | "interviews" | "training";
 
                         <div class="crud-actions">
                             <button class="action-btn action-btn-teal" (click)="saveLesson()">
-                                💾 {{ editingLessonId ? 'Update' : 'Create' }}
+                                <i class="bi bi-floppy-fill"></i> {{ editingLessonId ? 'Update' : 'Create' }}
                             </button>
                             <button class="action-btn action-btn-neutral" (click)="resetLessonForm()">
                                 Cancel
@@ -1282,8 +1282,8 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td>{{ m.xpReward }}</td>
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
-                                            <button class="action-btn action-btn-teal" (click)="editModule(m)">✏️ Edit</button>
-                                            <button class="action-btn action-btn-red" (click)="deleteModule(m)">🗑 Delete</button>
+                                            <button class="action-btn action-btn-teal" (click)="editModule(m)"><i class="bi bi-pencil"></i> Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteModule(m)"><i class="bi bi-trash"></i> Delete</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1297,7 +1297,7 @@ type AdminTab = "users" | "interviews" | "training";
                     <div class="crud-card">
                         <div class="crud-head">
                             <strong>{{ editingModuleId ? 'Edit Module' : 'Create Module' }}</strong>
-                            <button class="action-btn action-btn-neutral" (click)="resetModuleForm()">✕ Clear</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetModuleForm()"><i class="bi bi-x"></i> Clear</button>
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item">
@@ -1349,7 +1349,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="saveModule()">💾 {{ editingModuleId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-teal" (click)="saveModule()"><i class="bi bi-floppy-fill"></i> {{ editingModuleId ? 'Update' : 'Create' }}</button>
                             <button class="action-btn action-btn-neutral" (click)="resetModuleForm()">Cancel</button>
                         </div>
                     </div>
@@ -1387,8 +1387,8 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td>{{ t.lastActivityDate || '-' }}</td>
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
-                                            <button class="action-btn action-btn-teal" (click)="editTracker(t)">✏️ Edit</button>
-                                            <button class="action-btn action-btn-red" (click)="deleteTracker(t)">🗑 Delete</button>
+                                            <button class="action-btn action-btn-teal" (click)="editTracker(t)"><i class="bi bi-pencil"></i> Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteTracker(t)"><i class="bi bi-trash"></i> Delete</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1402,7 +1402,7 @@ type AdminTab = "users" | "interviews" | "training";
                     <div class="crud-card">
                         <div class="crud-head">
                             <strong>{{ editingTrackerId ? 'Edit Tracker' : 'Create Tracker' }}</strong>
-                            <button class="action-btn action-btn-neutral" (click)="resetTrackerForm()">✕ Clear</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetTrackerForm()"><i class="bi bi-x"></i> Clear</button>
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
@@ -1440,7 +1440,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="saveTracker()">💾 {{ editingTrackerId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-teal" (click)="saveTracker()"><i class="bi bi-floppy-fill"></i> {{ editingTrackerId ? 'Update' : 'Create' }}</button>
                             <button class="action-btn action-btn-neutral" (click)="resetTrackerForm()">Cancel</button>
                         </div>
                     </div>
@@ -1480,8 +1480,8 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td>{{ a.quizCount }}</td>
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
-                                            <button class="action-btn action-btn-teal" (click)="editActivity(a)">✏️ Edit</button>
-                                            <button class="action-btn action-btn-red" (click)="deleteActivity(a)">🗑 Delete</button>
+                                            <button class="action-btn action-btn-teal" (click)="editActivity(a)"><i class="bi bi-pencil"></i> Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteActivity(a)"><i class="bi bi-trash"></i> Delete</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1495,7 +1495,7 @@ type AdminTab = "users" | "interviews" | "training";
                     <div class="crud-card">
                         <div class="crud-head">
                             <strong>{{ editingActivityId ? 'Edit Activity' : 'Create Activity' }}</strong>
-                            <button class="action-btn action-btn-neutral" (click)="resetActivityForm()">✕ Clear</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetActivityForm()"><i class="bi bi-x"></i> Clear</button>
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
@@ -1540,7 +1540,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="saveActivity()">💾 {{ editingActivityId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-teal" (click)="saveActivity()"><i class="bi bi-floppy-fill"></i> {{ editingActivityId ? 'Update' : 'Create' }}</button>
                             <button class="action-btn action-btn-neutral" (click)="resetActivityForm()">Cancel</button>
                         </div>
                     </div>
@@ -1572,8 +1572,8 @@ type AdminTab = "users" | "interviews" | "training";
                                     <td>{{ ub.earnedDate || '-' }}</td>
                                     <td (click)="$event.stopPropagation()">
                                         <div class="action-buttons">
-                                            <button class="action-btn action-btn-teal" (click)="editUserBadge(ub)">✏️ Edit</button>
-                                            <button class="action-btn action-btn-red" (click)="deleteUserBadge(ub)">🗑 Delete</button>
+                                            <button class="action-btn action-btn-teal" (click)="editUserBadge(ub)"><i class="bi bi-pencil"></i> Edit</button>
+                                            <button class="action-btn action-btn-red" (click)="deleteUserBadge(ub)"><i class="bi bi-trash"></i> Delete</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1587,7 +1587,7 @@ type AdminTab = "users" | "interviews" | "training";
                     <div class="crud-card">
                         <div class="crud-head">
                             <strong>{{ editingUserBadgeId ? 'Edit User Badge' : 'Create User Badge' }}</strong>
-                            <button class="action-btn action-btn-neutral" (click)="resetUserBadgeForm()">✕ Clear</button>
+                            <button class="action-btn action-btn-neutral" (click)="resetUserBadgeForm()"><i class="bi bi-x"></i> Clear</button>
                         </div>
                         <div class="crud-grid">
                             <div class="detail-item detail-full">
@@ -1612,7 +1612,7 @@ type AdminTab = "users" | "interviews" | "training";
                             </div>
                         </div>
                         <div class="crud-actions">
-                            <button class="action-btn action-btn-teal" (click)="saveUserBadge()">💾 {{ editingUserBadgeId ? 'Update' : 'Create' }}</button>
+                            <button class="action-btn action-btn-teal" (click)="saveUserBadge()"><i class="bi bi-floppy-fill"></i> {{ editingUserBadgeId ? 'Update' : 'Create' }}</button>
                             <button class="action-btn action-btn-neutral" (click)="resetUserBadgeForm()">Cancel</button>
                         </div>
                     </div>
@@ -1769,7 +1769,7 @@ type AdminTab = "users" | "interviews" | "training";
                         class="btn-action btn-red"
                         (click)="deleteUser(selectedUser); closeDetail()"
                     >
-                        🗑 Delete
+                        <i class="bi bi-trash"></i> Delete
                     </button>
                     <button
                         *ngIf="selectedUser.status === 'DELETED'"

@@ -29,8 +29,8 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
           <p>Book 1:1 sessions with verified industry professionals. Get the insider guidance you need.</p>
         </div>
         <div class="mentor-page-stats">
-          <span class="chip chip-teal">🤝 {{ mentors.length }}+ Mentors</span>
-          <span class="chip chip-mint">⭐ 4.8 Avg Rating</span>
+          <span class="chip chip-teal"><i class="bi bi-people-fill"></i> {{ mentors.length }}+ Mentors</span>
+          <span class="chip chip-mint"><i class="bi bi-star-fill"></i> 4.8 Avg Rating</span>
         </div>
       </div>
 
@@ -41,7 +41,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
       <!-- Upcoming SCHEDULED session banner -->
       <div class="card upcoming-session" *ngIf="upcomingSession() && upcomingSession()!.status === 'SCHEDULED'">
         <div class="us-header">
-          <span class="chip chip-teal">📅 Upcoming Session</span>
+          <span class="chip chip-teal"><i class="bi bi-calendar-event-fill"></i> Upcoming Session</span>
         </div>
         <div class="us-body">
           <div class="avatar-placeholder" style="width:52px;height:52px;font-size:1rem;">M</div>
@@ -70,7 +70,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
       <!-- Embedded meeting -->
       <div class="card" *ngIf="activeRoomName()">
-        <app-section-header title="Live Session" icon="🎥"></app-section-header>
+        <app-section-header title="Live Session" icon='<i class="bi bi-camera-video-fill"></i>'></app-section-header>
         <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem;">
           <button class="btn btn-ghost btn-sm" (click)="closeJitsi()">Close</button>
         </div>
@@ -79,10 +79,10 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
       <!-- Calendar -->
       <div class="card">
-        <app-section-header title="My Calendar" icon="🗓️"></app-section-header>
+        <app-section-header title="My Calendar" icon='<i class="bi bi-calendar3"></i>'></app-section-header>
 
         <div class="empty-state" *ngIf="calendarEvents().length === 0">
-          <div class="empty-icon">🗓️</div>
+          <div class="empty-icon"><i class="bi bi-calendar3"></i></div>
           <div class="empty-title">No scheduled sessions</div>
           <div class="empty-desc">Scheduled mentorship sessions will appear here.</div>
         </div>
@@ -92,7 +92,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
       <!-- My requests + sessions -->
       <div class="card" *ngIf="myRequests().length > 0">
-        <app-section-header title="My Mentor Requests" icon="📨"></app-section-header>
+        <app-section-header title="My Mentor Requests" icon='<i class="bi bi-inbox-fill"></i>'></app-section-header>
 
         <div class="admin-table-toolbar" style="justify-content:flex-start;gap:var(--space-3);flex-wrap:wrap;">
           <div class="admin-filter">
@@ -243,14 +243,14 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
       <!-- Empty search result -->
       <div class="empty-state" *ngIf="displayedMentors().length === 0">
-        <div class="empty-icon">🔍</div>
+        <div class="empty-icon"><i class="bi bi-search"></i></div>
         <div class="empty-title">No mentors found</div>
         <div class="empty-desc">Try a different search or filter.</div>
       </div>
 
       <!-- How it works -->
       <div class="card how-mentorship-works">
-        <app-section-header title="How Mentorship Works" icon="💡"></app-section-header>
+        <app-section-header title="How Mentorship Works" icon='<i class="bi bi-lightbulb-fill"></i>'></app-section-header>
         <div class="hmw-steps">
           <div class="hmw-step" *ngFor="let step of howItWorks">
             <div class="hmw-icon">{{ step.icon }}</div>
@@ -263,7 +263,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
       <!-- AI Recommendations -->
       <div class="card recommendations-card">
-        <app-section-header title="Recommended for You" icon="🤖"></app-section-header>
+        <app-section-header title="Recommended for You" icon='<i class="bi bi-robot"></i>'></app-section-header>
         <p class="rec-subtitle">Matched based on your profile and skills</p>
 
         <div class="loading-card" *ngIf="loadingRecommendations()">Loading recommendations…</div>
@@ -271,7 +271,7 @@ type RecChatMessage = { role: 'user' | 'ai'; text: string };
 
         <ng-container *ngIf="!loadingRecommendations() && !recommendationsError()">
           <div class="empty-state" *ngIf="recommendations().length === 0">
-            <div class="empty-icon">🤖</div>
+            <div class="empty-icon"><i class="bi bi-robot"></i></div>
             <div class="empty-title">No recommendations yet</div>
             <div class="empty-desc">Complete your profile (skills/industry) then try again.</div>
             <button class="btn btn-primary btn-sm" (click)="loadRecommendations()">Retry</button>

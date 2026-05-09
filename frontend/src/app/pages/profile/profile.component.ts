@@ -8,6 +8,13 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { HttpClient } from "@angular/common/http";
 import { SectionHeaderComponent } from "../../shared/components/section-header/section-header.component";
+import {
+    BadgeComponent,
+    ButtonComponent,
+    CardComponent,
+    EmptyStateComponent,
+    SkeletonComponent,
+} from "../../shared/components/ui";
 import { environment } from "../../../environments/environment";
 import { Router } from "@angular/router";
 import {
@@ -72,7 +79,16 @@ type ActiveEditSection =
 @Component({
     selector: "app-profile",
     standalone: true,
-    imports: [CommonModule, FormsModule, SectionHeaderComponent],
+    imports: [
+        CommonModule,
+        FormsModule,
+        SectionHeaderComponent,
+        BadgeComponent,
+        ButtonComponent,
+        CardComponent,
+        EmptyStateComponent,
+        SkeletonComponent,
+    ],
     templateUrl: "./profile.component.html",
     styleUrls: ["./profile.component.css"],
 })
@@ -656,6 +672,25 @@ export class ProfileComponent implements OnInit {
 
     getInitials(): string {
         return this.initials;
+    }
+
+    getPlanVariant(): "primary" | "info" | "neutral" {
+        const plan = (this.user?.plan || "").toUpperCase();
+        if (plan === "PREMIUM") return "primary";
+        if (plan === "STUDENT") return "info";
+        return "neutral";
+    }
+
+    getRoleLabel(): string {
+        const role = (this.user?.role || "").replace(/^ROLE_/, "");
+        if (!role) return "";
+        return role.charAt(0) + role.slice(1).toLowerCase();
+    }
+
+    getCompletionTone(): "success" | "primary" | "warning" {
+        if (this.completionScore >= 80) return "success";
+        if (this.completionScore >= 50) return "primary";
+        return "warning";
     }
 
     private computeInitials(firstName?: string | null, lastName?: string | null): string {

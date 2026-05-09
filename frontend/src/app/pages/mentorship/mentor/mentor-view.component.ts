@@ -26,9 +26,9 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
           <p>Manage your mentee requests and upcoming sessions.</p>
         </div>
         <div class="mentor-page-stats">
-          <span class="chip chip-teal">📨 {{ pendingCount() }} Pending</span>
-          <span class="chip chip-mint">⭐ {{ mentorAverageRating() }} ({{ mentorTotalRatings() }} ratings)</span>
-          <span class="chip chip-purple">🎓 Mentor Dashboard</span>
+          <span class="chip chip-teal"><i class="bi bi-inbox-fill"></i> {{ pendingCount() }} Pending</span>
+          <span class="chip chip-mint"><i class="bi bi-star-fill"></i> {{ mentorAverageRating() }} ({{ mentorTotalRatings() }} ratings)</span>
+          <span class="chip chip-purple"><i class="bi bi-mortarboard-fill"></i> Mentor Dashboard</span>
           <button 
             class="btn btn-sm"
             [class.btn-primary]="isAvailable()"
@@ -46,7 +46,7 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
       <!-- Embedded meeting -->
       <div class="card" *ngIf="activeRoomName()">
-        <app-section-header title="Live Session" icon="🎥"></app-section-header>
+        <app-section-header title="Live Session" icon='<i class="bi bi-camera-video-fill"></i>'></app-section-header>
         <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem;">
           <button class="btn btn-ghost btn-sm" (click)="closeJitsi()">Close</button>
         </div>
@@ -55,10 +55,10 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
       <!-- Calendar -->
       <div class="card">
-        <app-section-header title="My Calendar" icon="🗓️"></app-section-header>
+        <app-section-header title="My Calendar" icon='<i class="bi bi-calendar3"></i>'></app-section-header>
 
         <div class="empty-state" *ngIf="calendarEvents().length === 0">
-          <div class="empty-icon">🗓️</div>
+          <div class="empty-icon"><i class="bi bi-calendar3"></i></div>
           <div class="empty-title">No scheduled sessions</div>
           <div class="empty-desc">Scheduled mentorship sessions will appear here.</div>
         </div>
@@ -68,7 +68,7 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
       <!-- Incoming requests -->
       <div class="card">
-        <app-section-header title="Incoming Requests" icon="📨"></app-section-header>
+        <app-section-header title="Incoming Requests" icon='<i class="bi bi-inbox-fill"></i>'></app-section-header>
 
         <div class="admin-table-toolbar" style="justify-content:flex-start;gap:var(--space-3);flex-wrap:wrap;">
           <div class="admin-filter">
@@ -92,14 +92,14 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
         <div class="empty-state"
           *ngIf="!loadingRequests() && incomingRequests().length === 0">
-          <div class="empty-icon">📭</div>
+          <div class="empty-icon"><i class="bi bi-inbox"></i></div>
           <div class="empty-title">No requests yet</div>
           <div class="empty-desc">When users request your mentorship, they'll appear here.</div>
         </div>
 
         <div class="empty-state"
           *ngIf="!loadingRequests() && incomingRequests().length > 0 && displayedIncomingRequests().length === 0">
-          <div class="empty-icon">🔍</div>
+          <div class="empty-icon"><i class="bi bi-search"></i></div>
           <div class="empty-title">No matching requests</div>
           <div class="empty-desc">Try a different search.</div>
         </div>
@@ -254,7 +254,7 @@ import { Observable, catchError, forkJoin, of } from 'rxjs';
 
       <!-- Schedule new session modal -->
       <div class="card schedule-card" *ngIf="schedulingRequestId()">
-        <app-section-header title="Schedule a Session" icon="📅"></app-section-header>
+        <app-section-header title="Schedule a Session" icon='<i class="bi bi-calendar-plus-fill"></i>'></app-section-header>
         <div class="schedule-form">
           <div class="form-group">
             <label class="form-label">Date & Time</label>

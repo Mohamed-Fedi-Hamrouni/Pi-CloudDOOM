@@ -571,13 +571,13 @@ export const MOCK_BADGES: Badge[] = [
 
 // ── Mock Training Modules ──
 export const MOCK_TRAINING: TrainingModule[] = [
-  { id: 't001', title: 'Behavioral Interview Foundations', category: 'Behavioral', progress: 100, xp: 300, lessons: 8, completedLessons: 8, status: 'completed', icon: '<i class="bi bi-chat-fill"></i>' },
-  { id: 't002', title: 'STAR Method Advanced Practice', category: 'Behavioral', progress: 75, xp: 250, lessons: 6, completedLessons: 4, status: 'in-progress', icon: '<i class="bi bi-star-fill"></i>' },
-  { id: 't003', title: 'Technical Communication Skills', category: 'Technical', progress: 40, xp: 200, lessons: 10, completedLessons: 4, status: 'in-progress', icon: '<i class="bi bi-laptop"></i>' },
-  { id: 't004', title: 'System Design Fundamentals', category: 'Technical', progress: 0, xp: 400, lessons: 12, completedLessons: 0, status: 'locked', icon: '<i class="bi bi-diagram-3-fill"></i>' },
-  { id: 't005', title: 'Product Thinking & Strategy', category: 'Product', progress: 20, xp: 300, lessons: 8, completedLessons: 2, status: 'in-progress', icon: '<i class="bi bi-bar-chart-fill"></i>' },
-  { id: 't006', title: 'Confidence & Delivery Mastery', category: 'Soft Skills', progress: 60, xp: 150, lessons: 5, completedLessons: 3, status: 'in-progress', icon: '<i class="bi bi-mic-fill"></i>' },
-  { id: 't007', title: 'Salary Negotiation Playbook', category: 'Career', progress: 0, xp: 200, lessons: 4, completedLessons: 0, status: 'locked', icon: '<i class="bi bi-cash-coin"></i>' }
+  { id: 't001', title: 'Behavioral Interview Foundations', category: 'Behavioral', progress: 100, xp: 300, lessons: 8, completedLessons: 8, status: 'completed', icon: 'bi-chat-fill' },
+  { id: 't002', title: 'STAR Method Advanced Practice', category: 'Behavioral', progress: 75, xp: 250, lessons: 6, completedLessons: 4, status: 'in-progress', icon: 'bi-star-fill' },
+  { id: 't003', title: 'Technical Communication Skills', category: 'Technical', progress: 40, xp: 200, lessons: 10, completedLessons: 4, status: 'in-progress', icon: 'bi-laptop' },
+  { id: 't004', title: 'System Design Fundamentals', category: 'Technical', progress: 0, xp: 400, lessons: 12, completedLessons: 0, status: 'locked', icon: 'bi-diagram-3-fill' },
+  { id: 't005', title: 'Product Thinking & Strategy', category: 'Product', progress: 20, xp: 300, lessons: 8, completedLessons: 2, status: 'in-progress', icon: 'bi-bar-chart-fill' },
+  { id: 't006', title: 'Confidence & Delivery Mastery', category: 'Soft Skills', progress: 60, xp: 150, lessons: 5, completedLessons: 3, status: 'in-progress', icon: 'bi-mic-fill' },
+  { id: 't007', title: 'Salary Negotiation Playbook', category: 'Career', progress: 0, xp: 200, lessons: 4, completedLessons: 0, status: 'locked', icon: 'bi-cash-coin' }
 ];
 
 // ── Mock Pricing ──

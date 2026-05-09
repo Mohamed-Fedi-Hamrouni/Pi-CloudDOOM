@@ -11,6 +11,10 @@ class PathRequest(BaseModel):
     preparationLevel: str = "beginner"
     totalSessionsCompleted: int = 0
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.post("/predict-path")
 def predict_path(request: PathRequest):
     plans = predictor.predict_path(

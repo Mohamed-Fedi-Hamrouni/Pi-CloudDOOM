@@ -1,11 +1,13 @@
-import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header.component';
 import { BadgeCardComponent } from '../../shared/components/badge-card/badge-card.component';
 import { TrainingCoachChatComponent } from '../../shared/components/training-coach-chat/training-coach-chat.component';
 import { MOCK_USER, MOCK_TRAINING, MOCK_BADGES, MOCK_LEADERBOARD } from '../../core/data/mock-data';
 import { AuthService } from '../../core/auth/auth.service';
+import { CurrentUserStoreService } from '../../core/services/current-user-store.service';
 import { TrainingApiService } from '../../core/services/training-api.service';
 import { Badge } from '../../core/models/models';
 import { BadgeResponse, DailyActivityResponse, TrainingPathResponse, TrainingPreferencesRequest, TrainingPreferencesResponse, UserBadgeResponse, UserXPTrackerResponse } from '../../core/models/training.models';
@@ -40,7 +42,7 @@ type DailyGoal = {
           <p>Your personalized learning journey with XP, badges, and daily challenges.</p>
         </div>
         <div class="level-badge">
-          <span>⚡</span>
+          <i class="bi bi-lightning-charge-fill"></i>
           <span>Level {{ user.level }}</span>
         </div>
       </div>
@@ -53,7 +55,18 @@ type DailyGoal = {
       <div class="xp-banner card">
         <div class="xp-left">
           <div class="xp-avatar">
-            <div class="avatar-placeholder avatar-xl" style="font-size:1.1rem; width:64px; height:64px;">{{ user.initials }}</div>
+            <img
+              *ngIf="avatarUrl && !avatarFailed; else xpAvatarFallback"
+              [src]="avatarUrl"
+              alt="Profile photo"
+              class="xp-avatar-img"
+              (error)="onAvatarError()"
+            />
+            <ng-template #xpAvatarFallback>
+              <div class="avatar-placeholder avatar-xl xp-avatar-initials">
+                {{ user.initials }}
+              </div>
+            </ng-template>
             <div class="xp-level-badge">{{ user.level }}</div>
           </div>
           <div class="xp-info">
@@ -73,15 +86,15 @@ type DailyGoal = {
         <div class="xp-right">
           <div class="xp-stat-group">
             <div class="xp-stat">
-              <div class="xp-stat-val">🔥 {{ user.streak }}</div>
+              <div class="xp-stat-val"><i class="bi bi-fire xp-icon-fire"></i> {{ user.streak }}</div>
               <div class="xp-stat-label">Day Streak</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">🏅 {{ earnedCount }}</div>
+              <div class="xp-stat-val"><i class="bi bi-trophy-fill xp-icon-trophy"></i> {{ earnedCount }}</div>
               <div class="xp-stat-label">Badges</div>
             </div>
             <div class="xp-stat">
-              <div class="xp-stat-val">📅 {{ bestStreak }}</div>
+              <div class="xp-stat-val"><i class="bi bi-calendar-check-fill xp-icon-calendar"></i> {{ bestStreak }}</div>
               <div class="xp-stat-label">Best Streak</div>
             </div>
           </div>
@@ -96,10 +109,12 @@ type DailyGoal = {
 
           <!-- Daily Goals -->
           <div class="card daily-goals">
-            <app-section-header title="Today's Goals" icon="🎯" subtitle="Complete all goals to maintain your streak"></app-section-header>
+            <app-section-header title="Today's Goals" icon='<i class="bi bi-bullseye"></i>' subtitle="Complete all goals to maintain your streak"></app-section-header>
             <div class="goals-list">
               <div class="goal-item" *ngFor="let g of dailyGoals" [class.completed]="g.done">
-                <div class="goal-checkbox" [class.checked]="g.done">{{ g.done ? '✓' : '' }}</div>
+                <div class="goal-checkbox" [class.checked]="g.done">
+                  <i class="bi bi-check-lg" *ngIf="g.done"></i>
+                </div>
                 <div class="goal-body">
                   <div class="goal-title">{{ g.title }}</div>
                   <div class="goal-xp">+{{ g.xp }} XP</div>
@@ -119,7 +134,7 @@ type DailyGoal = {
           <div class="card learning-path">
             <app-section-header
               title="Your Learning Path"
-              icon="🗺️"
+              icon='<i class="bi bi-map-fill"></i>'
               subtitle="Personalized based on your goals and performance"
               actionLabel="Preferences"
               (actionClick)="togglePreferences()"
@@ -198,18 +213,24 @@ type DailyGoal = {
               <div class="path-item" *ngFor="let m of modules; let i = index" [class]="'path-' + m.status">
                 <div class="pi-connector" *ngIf="i > 0" [class.done]="modules[i-1].status === 'completed'"></div>
                 <div class="pi-node">
-                  <div class="pi-icon">{{ m.icon }}</div>
+                  <div class="pi-icon"><i class="bi" [ngClass]="m.icon"></i></div>
                 </div>
                 <div class="pi-body">
                   <div class="pi-header">
                     <div class="pi-title">{{ m.title }}</div>
-                    <span class="chip" [class]="statusChip(m.status)">{{ m.status === 'completed' ? '✓ Done' : m.status === 'in-progress' ? 'In Progress' : '🔒 Locked' }}</span>
+                    <span class="chip" [class]="statusChip(m.status)">
+                      <i class="bi"
+                         [class.bi-check-lg]="m.status === 'completed'"
+                         [class.bi-arrow-right-circle-fill]="m.status === 'in-progress'"
+                         [class.bi-lock-fill]="m.status === 'locked'"></i>
+                      {{ m.status === 'completed' ? 'Done' : m.status === 'in-progress' ? 'In Progress' : 'Locked' }}
+                    </span>
                   </div>
                   <div class="pi-meta">{{ m.category }} · {{ m.completedLessons }}/{{ m.lessons }} lessons</div>
 
                   <div class="pi-lessons" *ngIf="(m.moduleLessons?.length ?? 0) > 0; else fallbackLessons">
                     <div class="pi-lesson" *ngFor="let l of m.moduleLessons" [class.done]="l.status === 'COMPLETED'">
-                      <span class="pi-lesson-check">{{ l.status === 'COMPLETED' ? '✓' : '' }}</span>
+                      <span class="pi-lesson-check"><i class="bi bi-check-lg" *ngIf="l.status === 'COMPLETED'"></i></span>
                       <div class="pi-lesson-body">
                         <a
                           *ngIf="l.format === 'VIDEO' && l.videoUrl"
@@ -253,7 +274,7 @@ type DailyGoal = {
                   <ng-template #fallbackLessons>
                     <div class="pi-lessons" *ngIf="m.lessons > 0">
                       <div class="pi-lesson" *ngFor="let n of lessonRange(m.lessons); let idx = index" [class.done]="idx < m.completedLessons">
-                        <span class="pi-lesson-check">{{ idx < m.completedLessons ? '✓' : '' }}</span>
+                        <span class="pi-lesson-check"><i class="bi bi-check-lg" *ngIf="idx < m.completedLessons"></i></span>
                         <span class="pi-lesson-title">Lesson {{ n }}</span>
                       </div>
                     </div>
@@ -277,10 +298,10 @@ type DailyGoal = {
 
           <!-- Challenges -->
           <div class="card challenges-card">
-            <app-section-header title="Weekly Challenges" icon="⚡" subtitle="Earn bonus XP this week"></app-section-header>
+            <app-section-header title="Weekly Challenges" icon='<i class="bi bi-lightning-charge-fill"></i>' subtitle="Earn bonus XP this week"></app-section-header>
             <div class="challenges-list">
               <div class="challenge-item" *ngFor="let c of challenges">
-                <div class="ch-icon">{{ c.icon }}</div>
+                <div class="ch-icon"><i class="bi" [ngClass]="c.icon"></i></div>
                 <div class="ch-body">
                   <div class="ch-title">{{ c.title }}</div>
                   <div class="progress-bar" style="height:5px; margin-top:6px;">
@@ -300,7 +321,7 @@ type DailyGoal = {
 
           <!-- Motivation Banner -->
           <div class="motivation-banner">
-            <div class="mb-icon">🔥</div>
+            <div class="mb-icon"><i class="bi bi-fire"></i></div>
             <div class="mb-text">
               <strong>{{ user.streak }}-day streak!</strong><br>
               <span>You're on a roll. Don't break the chain.</span>
@@ -312,14 +333,14 @@ type DailyGoal = {
 
           <!-- Leaderboard -->
           <div class="card leaderboard-card">
-            <app-section-header title="Leaderboard" icon="🏆" subtitle="This week's top learners"></app-section-header>
+            <app-section-header title="Leaderboard" icon='<i class="bi bi-trophy-fill"></i>' subtitle="This week's top learners"></app-section-header>
             <div class="leaderboard-list">
               <div class="lb-row" *ngFor="let entry of leaderboard" [class.you]="entry.name.includes('You')">
                 <span class="lb-rank" [class]="rankClass(entry.rank)">{{ entry.rank }}</span>
                 <div class="avatar-placeholder" style="width:32px;height:32px;font-size:0.7rem;">{{ entry.initials }}</div>
                 <div class="lb-info">
                   <div class="lb-name">{{ entry.name }}</div>
-                  <div class="lb-streak">🔥 {{ entry.streak }}d streak</div>
+                  <div class="lb-streak"><i class="bi bi-fire"></i> {{ entry.streak }}d streak</div>
                 </div>
                 <div class="lb-xp">{{ entry.xp.toLocaleString() }} XP</div>
               </div>
@@ -331,7 +352,7 @@ type DailyGoal = {
             <div id="badges-section">
               <app-section-header
                 title="Badges"
-                icon="🏅"
+                icon='<i class="bi bi-award-fill"></i>'
                 subtitle="{{ earnedCount }}/{{ allBadges.length }} earned"
                 actionLabel="All Badges"
                 (actionClick)="onAllBadgesClick()"
@@ -358,37 +379,77 @@ type DailyGoal = {
       font-size: var(--text-sm);
       border: 1px solid;
     }
-    .status-loading { background: var(--neutral-50); border-color: var(--neutral-200); color: var(--neutral-700); }
-    .status-error { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
-    .status-info { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .status-loading { background: var(--color-bg-alt); border-color: var(--color-border); color: var(--color-text-muted); }
+    .status-error { background: var(--error-50); border-color: var(--error-500); color: var(--error-500); }
+    .status-info { background: var(--sky-50); border-color: var(--sky-200); color: var(--teal-700); }
+    [data-theme="dark"] .status-error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
+    [data-theme="dark"] .status-info { background: rgba(20,184,166,0.1); border-color: rgba(20,184,166,0.3); color: var(--teal-300); }
 
     .level-badge {
-      display: flex; align-items: center; gap: var(--space-2);
+      display: inline-flex; align-items: center; gap: var(--space-2);
       background: linear-gradient(135deg, var(--teal-500), var(--cyan-400));
-      color: white; padding: var(--space-2) var(--space-5);
-      border-radius: var(--radius-full); font-weight: 700;
-      font-family: var(--font-display); font-size: var(--text-lg);
+      color: var(--color-text-inverse);
+      padding: var(--space-2) var(--space-5);
+      border-radius: var(--radius-full);
+      font-weight: var(--weight-bold);
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      letter-spacing: -0.01em;
       box-shadow: var(--shadow-teal);
     }
+    .level-badge i { font-size: 1rem; }
 
     /* XP Banner */
     .xp-banner {
-      background: linear-gradient(135deg, var(--teal-50) 0%, var(--cyan-50) 60%, white 100%);
-      border-color: var(--teal-100);
+      background:
+        radial-gradient(120% 120% at 0% 0%, var(--color-primary-light) 0%, transparent 55%),
+        radial-gradient(100% 100% at 100% 100%, var(--cyan-50) 0%, transparent 60%),
+        var(--color-surface);
+      border-color: var(--color-primary-mid);
       display: flex; align-items: center; justify-content: space-between; gap: var(--space-8);
+      transition: box-shadow var(--duration-base) var(--ease-out);
+    }
+    .xp-banner:hover { box-shadow: var(--shadow-md); }
+    [data-theme="dark"] .xp-banner {
+      background:
+        radial-gradient(120% 120% at 0% 0%, rgba(20,184,166,0.14) 0%, transparent 55%),
+        radial-gradient(100% 100% at 100% 100%, rgba(34,211,238,0.10) 0%, transparent 60%),
+        var(--color-surface);
     }
 
     .xp-left { display: flex; align-items: center; gap: var(--space-5); flex: 1; }
 
-    .xp-avatar { position: relative; }
+    .xp-avatar { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+    .xp-avatar-img {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-full);
+      object-fit: cover;
+      border: 3px solid var(--color-surface);
+      box-shadow: var(--shadow-md);
+      display: block;
+    }
+    .xp-avatar-initials {
+      width: 64px;
+      height: 64px;
+      font-size: 1.1rem;
+      border: 3px solid var(--color-surface);
+      box-shadow: var(--shadow-md);
+    }
     .xp-level-badge {
       position: absolute; bottom: -4px; right: -4px;
-      width: 22px; height: 22px; border-radius: var(--radius-full);
-      background: var(--teal-500); color: white;
-      font-size: 0.7rem; font-weight: 700;
+      width: 24px; height: 24px; border-radius: var(--radius-full);
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+      font-size: 0.7rem;
+      font-weight: var(--weight-bold);
       display: flex; align-items: center; justify-content: center;
-      border: 2px solid white;
+      border: 2px solid var(--color-surface);
+      box-shadow: var(--shadow-xs);
     }
+    .xp-icon-fire     { color: #f97316; }
+    .xp-icon-trophy   { color: var(--warning-500); }
+    .xp-icon-calendar { color: var(--color-primary); }
 
     .xp-name { font-size: var(--text-lg); font-weight: 700; margin-bottom: 2px; }
     .xp-title { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-3); }
@@ -411,26 +472,40 @@ type DailyGoal = {
     .training-main, .training-side { display: flex; flex-direction: column; gap: var(--space-5); }
 
     /* Daily goals */
-    .goals-list { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+    .goals-list { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
     .goal-item {
       display: flex; align-items: center; gap: var(--space-3);
       padding: var(--space-3); border-radius: var(--radius-md);
-      transition: background var(--transition-fast);
+      border: 1px solid transparent;
+      transition:
+        background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
     }
-    .goal-item.completed { opacity: 0.7; }
-    .goal-item:hover { background: var(--neutral-50); }
+    .goal-item.completed { opacity: 0.75; }
+    .goal-item:hover { background: var(--color-bg-alt); border-color: var(--color-border); }
 
     .goal-checkbox {
-      width: 22px; height: 22px; border-radius: var(--radius-sm);
-      border: 2px solid var(--color-border); display: flex;
-      align-items: center; justify-content: center;
-      font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+      width: 24px; height: 24px;
+      border-radius: var(--radius-sm);
+      border: 2px solid var(--color-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem;
+      font-weight: var(--weight-bold);
+      flex-shrink: 0;
+      transition:
+        background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
     }
-    .goal-checkbox.checked { background: var(--teal-500); border-color: var(--teal-500); color: white; }
+    .goal-checkbox.checked {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: var(--color-text-inverse);
+    }
+    .goal-checkbox i { line-height: 1; }
 
-    .goal-body { flex: 1; }
-    .goal-title { font-size: var(--text-sm); font-weight: var(--weight-medium); }
-    .goal-xp { font-size: var(--text-xs); color: var(--teal-600); font-weight: 600; }
+    .goal-body { flex: 1; min-width: 0; }
+    .goal-title { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text); }
+    .goal-xp { font-size: var(--text-xs); color: var(--color-primary); font-weight: var(--weight-semibold); }
 
     .goals-progress {
       display: flex; align-items: center; gap: var(--space-3);
@@ -447,13 +522,28 @@ type DailyGoal = {
     .pi-connector.done { background: var(--teal-400); }
 
     .pi-node {
-      width: 32px; height: 32px; border-radius: var(--radius-full);
+      width: 36px; height: 36px; border-radius: var(--radius-full);
       border: 2px solid var(--color-border);
       display: flex; align-items: center; justify-content: center;
-      background: white; flex-shrink: 0; font-size: 1rem;
+      background: var(--color-surface); flex-shrink: 0; font-size: 1rem;
+      color: var(--color-text-muted);
+      transition: all var(--duration-fast) var(--ease-out);
     }
-    .path-completed .pi-node { border-color: var(--teal-400); background: var(--teal-50); }
-    .path-in-progress .pi-node { border-color: var(--cyan-400); background: var(--cyan-50); box-shadow: 0 0 0 4px rgba(34,211,238,0.15); }
+    .pi-icon { display: inline-flex; align-items: center; justify-content: center; }
+    .pi-icon i { font-size: 1rem; line-height: 1; }
+    .path-completed .pi-node {
+      border-color: var(--color-primary);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+    }
+    .path-in-progress .pi-node {
+      border-color: var(--color-accent);
+      background: var(--cyan-50);
+      color: var(--color-accent);
+      box-shadow: 0 0 0 4px rgba(34,211,238,0.15);
+    }
+    [data-theme="dark"] .path-completed .pi-node { background: rgba(20,184,166,0.12); }
+    [data-theme="dark"] .path-in-progress .pi-node { background: rgba(34,211,238,0.12); }
     .path-locked .pi-node { opacity: 0.5; }
 
     .pi-body {
@@ -478,14 +568,23 @@ type DailyGoal = {
       color: var(--color-text-muted);
       padding: 4px 8px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--color-border-light);
-      background: white;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      transition:
+        background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out);
     }
 
     .pi-lesson.done {
       color: var(--teal-700);
-      border-color: var(--teal-100);
-      background: var(--teal-50);
+      border-color: var(--color-primary-mid);
+      background: var(--color-primary-light);
+    }
+    [data-theme="dark"] .pi-lesson.done {
+      color: var(--teal-300);
+      border-color: rgba(20,184,166,0.3);
+      background: rgba(20,184,166,0.12);
     }
 
     .pi-lesson-check {
@@ -515,10 +614,10 @@ type DailyGoal = {
     }
     .pi-lesson-sub { font-size: 11px; color: var(--color-text-muted); }
     .pi-lesson-content {
-      border-top: 1px dashed var(--color-border-light);
+      border-top: 1px dashed var(--color-border);
       padding-top: 6px;
       margin-top: 4px;
-      color: var(--neutral-800);
+      color: var(--color-text);
     }
     .pi-lesson-markdown {
       margin: 0;
@@ -527,26 +626,35 @@ type DailyGoal = {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 11px;
       line-height: 1.35;
-      color: var(--neutral-800);
+      color: var(--color-text);
     }
     .pi-progress { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 4px; }
     .pi-pct { font-size: var(--text-xs); font-weight: 600; color: var(--teal-600); white-space: nowrap; }
     .pi-xp { font-size: var(--text-xs); color: var(--teal-600); }
     .pi-actions { margin-top: var(--space-2); }
     .module-action {
-      border: 1px solid var(--teal-200);
-      background: var(--teal-50);
+      border: 1px solid var(--color-primary-mid);
+      background: var(--color-primary-light);
       color: var(--teal-700);
       font-size: var(--text-xs);
-      font-weight: 600;
+      font-weight: var(--weight-semibold);
       border-radius: var(--radius-sm);
-      padding: 4px 10px;
+      padding: 5px 12px;
       cursor: pointer;
-      transition: background var(--transition-fast), color var(--transition-fast);
+      transition:
+        background var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out),
+        transform var(--duration-fast) var(--ease-out);
     }
     .module-action:hover:not(:disabled) {
-      background: var(--teal-100);
-      color: var(--teal-800);
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+      transform: translateY(-1px);
+    }
+    [data-theme="dark"] .module-action {
+      background: rgba(20,184,166,0.15);
+      color: var(--teal-300);
+      border-color: rgba(20,184,166,0.3);
     }
     .module-action:disabled {
       opacity: 0.6;
@@ -556,11 +664,11 @@ type DailyGoal = {
 
     /* Preferences editor */
     .prefs-editor {
-      border: 1px solid var(--color-border-light);
+      border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       padding: var(--space-4);
       margin-bottom: var(--space-4);
-      background: var(--neutral-50);
+      background: var(--color-bg-alt);
     }
     .prefs-grid {
       display: grid;
@@ -583,8 +691,8 @@ type DailyGoal = {
       gap: var(--space-3);
       padding: var(--space-2) var(--space-3);
       border-radius: var(--radius-md);
-      border: 1px solid var(--color-border-light);
-      background: white;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
     }
     .prefs-history-left { display: flex; align-items: center; gap: var(--space-3); }
     .prefs-history-date { font-size: var(--text-xs); color: var(--color-text-muted); }
@@ -592,12 +700,34 @@ type DailyGoal = {
 
     /* Challenges */
     .challenges-list { display: flex; flex-direction: column; gap: var(--space-4); }
-    .challenge-item { display: flex; align-items: flex-start; gap: var(--space-3); }
-    .ch-icon { font-size: 1.5rem; width: 44px; height: 44px; background: var(--neutral-50); border-radius: var(--radius-md); border: 1px solid var(--color-border-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .ch-body { flex: 1; }
-    .ch-title { font-size: var(--text-sm); font-weight: 600; }
+    .challenge-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      transition: background var(--duration-fast) var(--ease-out);
+    }
+    .challenge-item:hover { background: var(--color-bg-alt); }
+    .ch-icon {
+      width: 44px; height: 44px;
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-primary-mid);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .ch-icon i { font-size: 1.2rem; line-height: 1; }
+    [data-theme="dark"] .ch-icon {
+      background: rgba(20,184,166,0.15);
+      border-color: rgba(20,184,166,0.3);
+      color: var(--teal-300);
+    }
+    .ch-body { flex: 1; min-width: 0; }
+    .ch-title { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text); }
     .ch-meta { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 4px; }
-    .ch-xp { font-size: var(--text-xs); font-weight: 700; color: var(--teal-600); white-space: nowrap; }
+    .ch-xp { font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--color-primary); white-space: nowrap; }
 
     /* Motivation banner */
     .motivation-banner {
@@ -606,47 +736,125 @@ type DailyGoal = {
       border-radius: var(--radius-lg);
       padding: var(--space-4) var(--space-5);
       display: flex; align-items: center; gap: var(--space-4);
+      transition: box-shadow var(--duration-fast) var(--ease-out);
     }
-    .mb-icon { font-size: 2rem; }
-    .mb-text { font-size: var(--text-sm); color: #c2410c; line-height: var(--leading-snug); }
-    .mb-text strong { font-size: var(--text-base); }
+    .motivation-banner:hover { box-shadow: var(--shadow-sm); }
+    [data-theme="dark"] .motivation-banner {
+      background: linear-gradient(135deg, rgba(249,115,22,0.12), rgba(245,158,11,0.08));
+      border-color: rgba(249,115,22,0.25);
+    }
+    .mb-icon {
+      width: 44px; height: 44px;
+      background: rgba(249,115,22,0.18);
+      border-radius: var(--radius-full);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .mb-icon i { font-size: 1.4rem; color: #f97316; }
+    .mb-text { font-size: var(--text-sm); color: var(--color-text); line-height: var(--leading-snug); }
+    .mb-text strong { font-size: var(--text-base); color: var(--color-text); font-family: var(--font-display); }
+    .mb-text span { color: var(--color-text-muted); }
 
     /* Leaderboard */
     .leaderboard-list { display: flex; flex-direction: column; gap: var(--space-2); }
     .lb-row {
       display: flex; align-items: center; gap: var(--space-3);
-      padding: var(--space-3) var(--space-3);
+      padding: var(--space-3);
       border-radius: var(--radius-md);
-      transition: background var(--transition-fast);
+      border: 1px solid transparent;
+      transition:
+        background var(--duration-fast) var(--ease-out),
+        border-color var(--duration-fast) var(--ease-out);
     }
-    .lb-row:hover { background: var(--neutral-50); }
-    .lb-row.you { background: var(--teal-50); border: 1px solid var(--teal-100); }
+    .lb-row:hover { background: var(--color-bg-alt); }
+    .lb-row.you {
+      background: var(--color-primary-light);
+      border-color: var(--color-primary-mid);
+    }
+    [data-theme="dark"] .lb-row.you {
+      background: rgba(20,184,166,0.12);
+      border-color: rgba(20,184,166,0.3);
+    }
 
-    .lb-rank { font-family: var(--font-display); font-size: var(--text-base); font-weight: 700; width: 24px; text-align: center; }
-    .rank-1 { color: #f59e0b; }
-    .rank-2 { color: var(--neutral-500); }
+    .lb-rank {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: var(--weight-bold);
+      width: 28px;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+    .rank-1 { color: var(--warning-500); }
+    .rank-2 { color: var(--neutral-400); }
     .rank-3 { color: #b45309; }
 
-    .lb-info { flex: 1; }
-    .lb-name { font-size: var(--text-sm); font-weight: 600; }
-    .lb-streak { font-size: var(--text-xs); color: var(--color-text-muted); }
-    .lb-xp { font-size: var(--text-xs); font-weight: 700; color: var(--teal-600); white-space: nowrap; }
+    .lb-info { flex: 1; min-width: 0; }
+    .lb-name { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--color-text); }
+    .lb-streak {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .lb-streak i { color: #f97316; }
+    .lb-xp { font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--color-primary); white-space: nowrap; }
 
     .badges-grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: var(--space-2); }
 
     @media (max-width: 1024px) {
       .training-grid { grid-template-columns: 1fr; }
-      .xp-banner { flex-direction: column; align-items: flex-start; }
+      .xp-banner { flex-direction: column; align-items: stretch; gap: var(--space-5); }
       .prefs-grid { grid-template-columns: 1fr; }
+      .pi-lessons { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .xp-left { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+      .xp-bar-wrap { width: 100%; min-width: 0; }
+      .xp-right { width: 100%; }
+      .xp-stat-group { width: 100%; justify-content: space-between; gap: var(--space-3); }
+      .pi-lessons { grid-template-columns: 1fr; }
+      .badges-grid-2 { grid-template-columns: 1fr; }
+      .path-item { gap: var(--space-3); }
+      .pi-header { flex-wrap: wrap; gap: var(--space-2); }
+      .pi-header .chip { font-size: var(--text-xs); }
+      .challenge-item { gap: var(--space-2); }
+      .ch-icon { width: 38px; height: 38px; }
+      .lb-row { padding: var(--space-2); }
+      .prefs-actions { flex-direction: column; align-items: stretch; }
+      .prefs-actions .btn { width: 100%; }
+      .level-badge { font-size: var(--text-base); padding: var(--space-1) var(--space-3); }
+    }
+
+    @media (max-width: 480px) {
+      .xp-banner { padding: var(--space-4); }
+      .xp-name { font-size: var(--text-base); }
+      .xp-title { font-size: var(--text-xs); }
+      .xp-stat-group { flex-wrap: wrap; }
+      .xp-stat { flex: 1 0 30%; }
+      .xp-stat-val { font-size: var(--text-base); }
+      .motivation-banner { padding: var(--space-3); gap: var(--space-3); }
+      .mb-icon { width: 36px; height: 36px; }
+      .mb-text { font-size: var(--text-xs); }
+      .mb-text strong { font-size: var(--text-sm); }
+      .goal-item { padding: var(--space-2); }
+      .goal-title { font-size: var(--text-xs); }
     }
   `]
 })
 export class TrainingGamificationComponent implements OnInit {
   private authService = inject(AuthService);
   private trainingApi = inject(TrainingApiService);
+  private currentUserStore = inject(CurrentUserStoreService);
+  private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
 
   user = MOCK_USER;
+  /** Real avatar URL pulled from CurrentUserStoreService — empty falls back to initials. */
+  avatarUrl = '';
+  /** Set to true when the <img> 404s so we can drop back to the initials placeholder. */
+  avatarFailed = false;
   modules = MOCK_TRAINING;
   allBadges: Badge[] = MOCK_BADGES;
   leaderboard: LeaderboardEntry[] = MOCK_LEADERBOARD;
@@ -693,7 +901,37 @@ export class TrainingGamificationComponent implements OnInit {
   bestStreak = 0;
 
   ngOnInit(): void {
+    this.currentUserStore.currentUser$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((u) => {
+        if (!u) return;
+        const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+        if (fullName) {
+          this.user.name = fullName;
+          this.user.initials = this.computeInitials(fullName);
+        }
+        const url = (u.avatarUrl || '').trim();
+        if (url !== this.avatarUrl) {
+          this.avatarUrl = url;
+          this.avatarFailed = false;
+        }
+        this.cdr.markForCheck();
+      });
+
+    if (!this.currentUserStore.initialized) {
+      this.currentUserStore
+        .loadCurrentUser()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe();
+    }
+
     this.loadTrainingData();
+  }
+
+  /** Hide the broken <img> when its src 404s; the initials placeholder takes over. */
+  onAvatarError(): void {
+    this.avatarFailed = true;
+    this.cdr.markForCheck();
   }
 
   lessonRange(total: number): number[] {
@@ -732,10 +970,10 @@ export class TrainingGamificationComponent implements OnInit {
   get completedGoals() { return this.dailyGoals.filter(g => g.done).length; }
 
   challenges = [
-    { icon: '🎙️', title: '5-Session Sprint',     current: 4, total: 5,  xp: 500, desc: 'Complete 5 sessions this week' },
-    { icon: '📝', title: 'Quiz Champion',         current: 2, total: 3,  xp: 300, desc: 'Score 80%+ on 3 quizzes' },
-    { icon: '🔥', title: 'Streak Master',         current: 7, total: 10, xp: 750, desc: '10-day study streak' },
-    { icon: '📚', title: 'Resource Explorer',     current: 3, total: 5,  xp: 200, desc: 'Save 5 library resources' },
+    { icon: 'bi-mic-fill',          title: '5-Session Sprint',     current: 4, total: 5,  xp: 500, desc: 'Complete 5 sessions this week' },
+    { icon: 'bi-pencil-square',     title: 'Quiz Champion',        current: 2, total: 3,  xp: 300, desc: 'Score 80%+ on 3 quizzes' },
+    { icon: 'bi-fire',              title: 'Streak Master',        current: 7, total: 10, xp: 750, desc: '10-day study streak' },
+    { icon: 'bi-book-half',         title: 'Resource Explorer',    current: 3, total: 5,  xp: 200, desc: 'Save 5 library resources' },
   ];
 
   statusChip(s: string): string {
@@ -1251,12 +1489,12 @@ export class TrainingGamificationComponent implements OnInit {
   }
 
   private iconForCategory(category: string): string {
-    if (category === 'COMMUNICATION') return '🗣️';
-    if (category === 'STRESS_MANAGEMENT') return '🧘';
-    if (category === 'CONTENT_PREP') return '📝';
-    if (category === 'BODY_LANGUAGE') return '💼';
-    if (category === 'INDUSTRY_SPECIFIC') return '🏢';
-    return '📘';
+    if (category === 'COMMUNICATION') return 'bi-chat-dots-fill';
+    if (category === 'STRESS_MANAGEMENT') return 'bi-heart-pulse-fill';
+    if (category === 'CONTENT_PREP') return 'bi-pencil-square';
+    if (category === 'BODY_LANGUAGE') return 'bi-person-fill';
+    if (category === 'INDUSTRY_SPECIFIC') return 'bi-building-fill';
+    return 'bi-book-fill';
   }
 
   private displayUser(userId: string): string {

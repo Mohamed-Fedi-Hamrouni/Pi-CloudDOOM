@@ -60,7 +60,7 @@ import { observeOn, shareReplay } from "rxjs/operators";
                 flex-direction: column;
                 min-width: 0;
                 margin-left: var(--sidebar-width);
-                transition: margin-left var(--transition-base);
+                transition: margin-left var(--duration-base) var(--ease-out);
             }
 
             .shell.sidebar-collapsed .shell-content {
@@ -87,9 +87,15 @@ import { observeOn, shareReplay } from "rxjs/operators";
                     display: block;
                     position: fixed;
                     inset: 0;
-                    background: rgba(15, 23, 42, 0.4);
-                    z-index: 40;
-                    backdrop-filter: blur(2px);
+                    background: var(--surface-overlay);
+                    z-index: calc(var(--z-sticky) - 1);
+                    backdrop-filter: var(--blur-sm);
+                    -webkit-backdrop-filter: var(--blur-sm);
+                    animation: scrim-in var(--duration-fast) var(--ease-out);
+                }
+                @keyframes scrim-in {
+                    from { opacity: 0; }
+                    to   { opacity: 1; }
                 }
 
                 .main-content {

@@ -34,8 +34,12 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                 </button>
             </div>
 
-            <div class="saved-toast" *ngIf="saved">✓ Changes saved!</div>
-            <div class="error-toast" *ngIf="saveError">✗ {{ saveError }}</div>
+            <div class="saved-toast" *ngIf="saved">
+                <i class="bi bi-check-circle-fill"></i> Changes saved!
+            </div>
+            <div class="error-toast" *ngIf="saveError">
+                <i class="bi bi-exclamation-circle-fill"></i> {{ saveError }}
+            </div>
 
             <div class="loading-state" *ngIf="loading">
                 <div class="loading-spinner"></div>
@@ -51,7 +55,7 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                         [class.active]="activeTab() === tab.key"
                         (click)="setTab(tab.key)"
                     >
-                        <span>{{ tab.icon }}</span>
+                        <i class="bi sn-icon" [ngClass]="tab.icon"></i>
                         <span>{{ tab.label }}</span>
                     </button>
                 </div>
@@ -162,7 +166,8 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                             <div class="info-item">
                                 <div class="info-label">Karma Points</div>
                                 <div class="info-value">
-                                    ⚡ {{ user?.karmaPoints ?? 0 }}
+                                    <i class="bi bi-lightning-charge-fill info-icon-karma"></i>
+                                    {{ user?.karmaPoints ?? 0 }}
                                 </div>
                             </div>
                             <div class="info-item">
@@ -183,11 +188,14 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                             <div class="info-item">
                                 <div class="info-label">Verified</div>
                                 <div class="info-value">
-                                    {{
-                                        user?.isVerified
-                                            ? "✅ Yes"
-                                            : "⏳ Pending"
-                                    }}
+                                    <ng-container *ngIf="user?.isVerified; else verifyPending">
+                                        <i class="bi bi-check-circle-fill info-icon-ok"></i>
+                                        Yes
+                                    </ng-container>
+                                    <ng-template #verifyPending>
+                                        <i class="bi bi-hourglass-split info-icon-pending"></i>
+                                        Pending
+                                    </ng-template>
                                 </div>
                             </div>
                         </div>
@@ -250,7 +258,7 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                                     <div class="sm-name">Google</div>
                                     <div class="sm-sub">Social sign-in</div>
                                 </div>
-                                <span class="sm-badge">✓ Connected</span>
+                                <span class="sm-badge"><i class="bi bi-check-circle-fill"></i> Connected</span>
                             </div>
                             <div class="signin-method">
                                 <div class="sm-icon">
@@ -270,7 +278,7 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                                     <div class="sm-name">GitHub</div>
                                     <div class="sm-sub">Social sign-in</div>
                                 </div>
-                                <span class="sm-badge">✓ Connected</span>
+                                <span class="sm-badge"><i class="bi bi-check-circle-fill"></i> Connected</span>
                             </div>
                         </div>
 
@@ -331,12 +339,14 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                                         class="btn-passkey-setup"
                                         (click)="setupPasskey()"
                                     >
-                                        🔑 Set up passkey
+                                        <i class="bi bi-key-fill"></i>
+                                        Set up passkey
                                     </button>
                                     <ng-container *ngIf="passkeyRegistered">
-                                        <span class="pk-badge-ok"
-                                            >✓ Registered</span
-                                        >
+                                        <span class="pk-badge-ok">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            Registered
+                                        </span>
                                         <button
                                             class="btn btn-secondary btn-sm"
                                             (click)="managePasskeys()"
@@ -347,7 +357,7 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                                 </div>
                             </div>
                             <div class="pk-hint" *ngIf="!passkeyRegistered">
-                                <span>💡</span>
+                                <i class="bi bi-lightbulb-fill"></i>
                                 <span
                                     >Passkeys are safer than passwords — they
                                     can't be stolen or phished.</span
@@ -360,7 +370,9 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                         <div class="security-section">
                             <div class="ss-label">Current Session</div>
                             <div class="signin-method">
-                                <span style="font-size:1.3rem;">💻</span>
+                                <div class="sm-icon device-icon">
+                                    <i class="bi bi-laptop"></i>
+                                </div>
                                 <div class="sm-info">
                                     <div class="sm-name">This device</div>
                                     <div class="sm-sub">
@@ -442,8 +454,9 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                                 <span
                                     class="theme-check"
                                     *ngIf="currentTheme === t.value"
-                                    >✓</span
                                 >
+                                    <i class="bi bi-check-lg"></i>
+                                </span>
                             </button>
                         </div>
 
@@ -648,8 +661,8 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                             </div>
                             <div class="fc-row" *ngFor="let f of features">
                                 <span>{{ f.name }}</span>
-                                <span>{{ f.free }}</span>
-                                <span class="fc-premium">{{ f.premium }}</span>
+                                <span [innerHTML]="f.free"></span>
+                                <span class="fc-premium" [innerHTML]="f.premium"></span>
                             </div>
                         </div>
                     </div>
@@ -748,10 +761,42 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                 color: var(--color-text);
             }
             .sn-item.active {
-                background: var(--teal-50);
-                color: var(--teal-700);
+                background: var(--color-primary-light);
+                color: var(--color-primary);
                 font-weight: 600;
             }
+            .sn-icon {
+                font-size: 1rem;
+                width: 18px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--color-text-muted);
+                transition: color var(--duration-fast) var(--ease-out);
+            }
+            .sn-item:hover .sn-icon { color: var(--color-text); }
+            .sn-item.active .sn-icon { color: var(--color-primary); }
+            [data-theme="dark"] .sn-item.active {
+                background: rgba(20,184,166,0.15);
+                color: var(--teal-300);
+            }
+            [data-theme="dark"] .sn-item.active .sn-icon { color: var(--teal-300); }
+
+            /* Info value icons (account tab) */
+            .info-value { display: inline-flex; align-items: center; gap: 0.4rem; }
+            .info-icon-karma { color: var(--warning-500); }
+            .info-icon-ok { color: var(--success-500); }
+            .info-icon-pending { color: var(--warning-500); }
+
+            /* Device-icon container in current-session row */
+            .device-icon {
+                background: var(--color-bg-alt);
+                color: var(--color-text-muted);
+            }
+
+            /* Feature comparison check/cross */
+            .fc-yes { color: var(--success-500); font-size: 1.1rem; }
+            .fc-no  { color: var(--neutral-400); font-size: 1.1rem; }
 
             .settings-content {
                 background: var(--color-surface);
@@ -1369,6 +1414,11 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                     flex-direction: row;
                     flex-wrap: wrap;
                     position: static;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+                .settings-nav .sn-item {
+                    flex-shrink: 0;
                 }
                 .form-grid,
                 .info-grid {
@@ -1378,8 +1428,52 @@ import { ThemeService, Theme } from "../../core/services/theme.service";
                     flex-direction: column;
                     align-items: flex-start;
                 }
+                .pk-actions {
+                    width: 100%;
+                    flex-wrap: wrap;
+                }
                 .theme-grid {
                     flex-wrap: wrap;
+                }
+            }
+
+            @media (max-width: 640px) {
+                .settings-content {
+                    padding: var(--space-4);
+                }
+                .signin-method,
+                .appear-row {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: var(--space-2);
+                }
+                .signin-method .sm-badge {
+                    align-self: flex-start;
+                }
+                .features-compare .fc-row {
+                    grid-template-columns: 1.4fr 0.8fr 0.8fr;
+                    font-size: var(--text-xs);
+                }
+                .features-compare .fc-row > span {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .plan-card {
+                    padding: var(--space-4);
+                }
+                .info-item {
+                    padding: var(--space-3);
+                }
+            }
+
+            @media (max-width: 420px) {
+                .settings-nav .sn-item {
+                    padding: var(--space-2) var(--space-3);
+                    font-size: var(--text-xs);
+                }
+                .saved-toast,
+                .error-toast {
+                    font-size: var(--text-sm);
                 }
             }
         `,
@@ -1434,20 +1528,23 @@ export class SettingsComponent implements OnInit {
     ];
 
     tabs = [
-        { key: "account", icon: "👤", label: "Account" },
-        { key: "security", icon: "🔑", label: "Security" },
-        { key: "notifications", icon: "🔔", label: "Notifications" },
-        { key: "appearance", icon: "🎨", label: "Appearance" },
-        { key: "subscription", icon: "⭐", label: "Subscription" },
+        { key: "account", icon: "bi-person-fill", label: "Account" },
+        { key: "security", icon: "bi-shield-lock-fill", label: "Security" },
+        { key: "notifications", icon: "bi-bell-fill", label: "Notifications" },
+        { key: "appearance", icon: "bi-palette-fill", label: "Appearance" },
+        { key: "subscription", icon: "bi-stars", label: "Subscription" },
     ];
+
+    private readonly FC_NO = '<i class="bi bi-x-circle-fill fc-no"></i>';
+    private readonly FC_YES = '<i class="bi bi-check-circle-fill fc-yes"></i>';
 
     features = [
         { name: "Mock Sessions / month", free: "3", premium: "Unlimited" },
         { name: "AI Feedback Reports", free: "Basic", premium: "Detailed" },
-        { name: "Mentor Sessions", free: "❌", premium: "✅" },
-        { name: "Community Access", free: "✅", premium: "✅" },
+        { name: "Mentor Sessions", free: this.FC_NO, premium: this.FC_YES },
+        { name: "Community Access", free: this.FC_YES, premium: this.FC_YES },
         { name: "Resource Library", free: "Limited", premium: "Full" },
-        { name: "Priority Support", free: "❌", premium: "✅" },
+        { name: "Priority Support", free: this.FC_NO, premium: this.FC_YES },
     ];
 
     get currentTheme(): Theme {

@@ -147,11 +147,52 @@
     --content-max: 1280px;
     --page-padding: 2rem;
 
-    /* Transitions */
+    /* Transitions (legacy compound — kept for backwards compat) */
     --transition-fast: 150ms ease;
     --transition-base: 250ms ease;
     --transition-slow: 400ms ease;
     --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Motion — durations (use with eases below) */
+    --duration-instant: 80ms;
+    --duration-fast: 160ms;
+    --duration-base: 220ms;
+    --duration-slow: 360ms;
+    --duration-slower: 560ms;
+
+    /* Motion — eases */
+    --ease-linear: linear;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);          /* fast start, soft land — UI default */
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);      /* balanced — for entries that exit */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* slight overshoot — toggles, pops */
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);      /* element entering view */
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);      /* element leaving view */
+
+    /* Elevation — semantic surfaces (light theme) */
+    --surface-1: var(--neutral-0);                      /* base card */
+    --surface-2: var(--neutral-50);                     /* raised — header bars, hover */
+    --surface-3: #ffffff;                               /* prominent — modals, popovers */
+    --surface-sunken: var(--neutral-100);               /* recessed — input bg, code blocks */
+    --surface-overlay: rgba(15, 23, 42, 0.4);           /* modal backdrop */
+
+    /* Z-index scale */
+    --z-base: 1;
+    --z-raised: 10;
+    --z-sticky: 100;
+    --z-overlay: 1000;
+    --z-modal: 1100;
+    --z-popover: 1200;
+    --z-toast: 1300;
+
+    /* Focus ring — accessible, visible in both themes */
+    --ring-color: rgba(20, 184, 166, 0.5);
+    --ring-offset: 2px;
+    --ring-width: 3px;
+
+    /* Backdrop blur for glass effects */
+    --blur-sm: blur(8px);
+    --blur-md: blur(16px);
+    --blur-lg: blur(24px);
 }
 
 /* ── Reset ── */
@@ -800,6 +841,15 @@ h6 {
     margin-bottom: var(--space-2);
 }
 
+/* ── Page header utility — pages often use a row with title + action button ── */
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
     :root {
@@ -817,34 +867,120 @@ h6 {
     .grid-4 {
         grid-template-columns: 1fr;
     }
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    /* Make buttons easier to tap on touch devices */
+    .btn {
+        min-height: 40px;
+    }
+    .btn-sm {
+        min-height: 36px;
+    }
+    .input {
+        min-height: 40px;
+    }
+    /* Default to horizontal scroll for any wide table that doesn't have its own wrapper */
+    table {
+        max-width: 100%;
+    }
+    .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
-/* ── Dark Mode ── */
+@media (max-width: 480px) {
+    :root {
+        --page-padding: 0.75rem;
+    }
+    body {
+        font-size: 0.95rem;
+    }
+    h1 {
+        font-size: clamp(1.5rem, 6vw, 2rem);
+    }
+    h2 {
+        font-size: clamp(1.25rem, 5vw, 1.5rem);
+    }
+    .card {
+        padding: var(--space-4);
+        border-radius: var(--radius-md);
+    }
+    /* Avoid wide kbd / chip / badge clusters from blowing past viewport */
+    .chip,
+    .badge {
+        max-width: 100%;
+    }
+    /* Buttons: full width primary CTAs in narrow column footers */
+    .btn-block,
+    .form-group .btn,
+    .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* ── Dark Mode ──
+   Pro dark theme principles:
+   1. Tinted blacks (slight blue cast — feels deliberate, not "off")
+   2. Surface elevation via tinted layers — deeper = darker, raised = lighter
+   3. Reduced primary saturation (full teal would scream against dark)
+   4. Borders softer, shadows blacker (depth comes from contrast, not blur)
+   5. Text sits at ~92% / ~70% / ~50% white for primary/muted/light
+   ────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
-    --color-bg: #0f172a;
-    --color-bg-alt: #1e293b;
-    --color-surface: #1e293b;
-    --color-border: #334155;
-    --color-border-light: #293548;
+    /* Backgrounds — slightly warmer than slate, less than midnight */
+    --color-bg: #0a0f1c;            /* deepest — body */
+    --color-bg-alt: #0f1729;        /* adjacent — sidebar bg, page sections */
+    --color-surface: #131c33;       /* base card — elevated 1 */
+    --color-border: #1f2a44;        /* default border */
+    --color-border-light: #18223a;  /* subtle dividers */
 
-    --color-text: #f1f5f9;
-    --color-text-muted: #94a3b8;
-    --color-text-light: #64748b;
-    --color-text-inverse: #0f172a;
+    /* Surface elevation — used by primitives for proper z-stacking */
+    --surface-1: #131c33;            /* base card */
+    --surface-2: #182240;            /* raised — hover, secondary cards */
+    --surface-3: #1c2849;            /* prominent — modals, popovers */
+    --surface-sunken: #0a0f1c;       /* recessed — inputs */
+    --surface-overlay: rgba(0, 0, 0, 0.7);
 
-    --neutral-0: #1e293b;
-    --neutral-50: #1e293b;
-    --neutral-100: #293548;
-    --neutral-200: #334155;
-    --neutral-300: #475569;
-    --neutral-400: #64748b;
+    /* Text — high contrast on dark */
+    --color-text: #e8edf5;           /* primary text — 92% white tinted */
+    --color-text-muted: #94a3b8;     /* secondary */
+    --color-text-light: #64748b;     /* tertiary, hints */
+    --color-text-inverse: #0a0f1c;
 
-    --color-primary-light: rgba(20, 184, 166, 0.15);
-    --color-primary-mid: rgba(20, 184, 166, 0.2);
+    /* Re-map neutrals so utility classes still work in dark */
+    --neutral-0: #131c33;
+    --neutral-50: #0f1729;
+    --neutral-100: #18223a;
+    --neutral-200: #1f2a44;
+    --neutral-300: #2d3a5c;
+    --neutral-400: #475569;
+    --neutral-500: #64748b;
 
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-teal: 0 4px 14px rgba(20, 184, 166, 0.2);
+    /* Primary — slightly desaturated for dark backgrounds */
+    --color-primary: #2dd4bf;        /* teal-400 instead of 500 — softer glow */
+    --color-primary-hover: #14b8a6;  /* on hover, brighten back to teal-500 */
+    --color-primary-light: rgba(45, 212, 191, 0.12);
+    --color-primary-mid: rgba(45, 212, 191, 0.2);
+    --color-accent: #67e8f9;         /* cyan-300 instead of 400 */
+
+    /* Shadows — black, more depth, less blur (dark mode trick) */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.55), 0 4px 8px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6), 0 12px 16px rgba(0, 0, 0, 0.4);
+    --shadow-teal: 0 4px 18px rgba(45, 212, 191, 0.25);
+
+    /* Focus ring — brighter cyan in dark for visibility */
+    --ring-color: rgba(45, 212, 191, 0.55);
+}
+
+/* Auto dark mode if user prefers, until they explicitly pick a theme */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+    }
 }

@@ -33,7 +33,7 @@ type SessionGroup = {
 					<p>Admin dashboard to monitor mentorship requests and sessions.</p>
 				</div>
 				<div class="mentor-page-stats">
-					<span class="chip chip-purple">🛡 Admin Dashboard</span>
+					<span class="chip chip-purple"><i class="bi bi-shield-lock-fill"></i> Admin Dashboard</span>
 				</div>
 			</div>
 
@@ -65,16 +65,16 @@ type SessionGroup = {
 					<div class="admin-stat-label">Total sessions</div>
 					<div class="admin-stat-value">{{ totalSessions() }}</div>
 					<div class="admin-stat-sub">
-						<span class="chip chip-neutral">📅 {{ sessionCount('SCHEDULED') }} Scheduled</span>
-						<span class="chip chip-teal">✅ {{ sessionCount('COMPLETED') }} Completed</span>
-						<span class="chip chip-error">🛑 {{ sessionCount('CANCELLED') }} Cancelled</span>
+						<span class="chip chip-neutral"><i class="bi bi-calendar3"></i> {{ sessionCount('SCHEDULED') }} Scheduled</span>
+						<span class="chip chip-teal"><i class="bi bi-check-circle-fill"></i> {{ sessionCount('COMPLETED') }} Completed</span>
+						<span class="chip chip-error"><i class="bi bi-x-circle-fill"></i> {{ sessionCount('CANCELLED') }} Cancelled</span>
 					</div>
 				</div>
 			</div>
 
 			<!-- Charts -->
 			<div class="card" *ngIf="!loading()">
-				<app-section-header title="Overview Charts" icon="📊"></app-section-header>
+				<app-section-header title="Overview Charts" icon='<i class="bi bi-bar-chart-fill"></i>'></app-section-header>
 
 				<div class="admin-charts">
 					<div class="admin-chart-card">
@@ -139,7 +139,7 @@ type SessionGroup = {
 
 			<!-- Requests history table -->
 			<div class="card" *ngIf="!loading()">
-				<app-section-header title="Requests History" icon="📨"></app-section-header>
+				<app-section-header title="Requests History" icon='<i class="bi bi-inbox-fill"></i>'></app-section-header>
 
 				<div class="admin-table-toolbar">
 					<div class="admin-filter">
@@ -171,7 +171,7 @@ type SessionGroup = {
 				</div>
 
 				<div class="empty-state" *ngIf="filteredRequests().length === 0">
-					<div class="empty-icon">📭</div>
+					<div class="empty-icon"><i class="bi bi-inbox"></i></div>
 					<div class="empty-title">No requests found</div>
 					<div class="empty-desc">Try changing the status filter.</div>
 				</div>
@@ -254,7 +254,7 @@ type SessionGroup = {
 
 			<!-- Sessions history table -->
 			<div class="card" *ngIf="!loading()">
-				<app-section-header title="Sessions History" icon="🎥"></app-section-header>
+				<app-section-header title="Sessions History" icon='<i class="bi bi-camera-video-fill"></i>'></app-section-header>
 
 				<div class="admin-table-toolbar">
 					<div class="admin-filter">
@@ -286,7 +286,7 @@ type SessionGroup = {
 				</div>
 
 				<div class="empty-state" *ngIf="sessionGroups().length === 0">
-					<div class="empty-icon">🎬</div>
+					<div class="empty-icon"><i class="bi bi-camera-video"></i></div>
 					<div class="empty-title">No sessions found</div>
 					<div class="empty-desc">Try changing the status filter.</div>
 				</div>

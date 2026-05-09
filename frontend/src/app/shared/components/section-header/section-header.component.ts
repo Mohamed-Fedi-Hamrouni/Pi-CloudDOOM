@@ -8,7 +8,7 @@ import { CommonModule } from "@angular/common";
     template: `
         <div class="section-header">
             <div class="section-header-left">
-                <span class="section-icon" *ngIf="icon">{{ icon }}</span>
+                <span class="section-icon" *ngIf="icon" [innerHTML]="icon"></span>
                 <div>
                     <h2 class="section-title">{{ title }}</h2>
                     <p class="section-subtitle" *ngIf="subtitle">

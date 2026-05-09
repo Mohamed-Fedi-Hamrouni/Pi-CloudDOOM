@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
-import { TRENDING_TOPICS, WHO_TO_FOLLOW } from '../../core/data/mock-data';
 import {
   CommunityApiService,
   CommunityComment,
@@ -1349,7 +1348,7 @@ export class CommunityComponent implements OnInit {
   activeTab: 'all' | 'mine' | 'following' | 'bookmarks' = 'all';
   bookmarkedPostIds = new Set<number>();
   bookmarkAnimating = new Set<number>();
-  trendingTopics = TRENDING_TOPICS;
+  trendingTopics: { tag: string; posts: number }[] = [];
   whoToFollow: CommunitySuggestion[] = [];
   followers: CommunityFollow[] = [];
   following: CommunityFollow[] = [];
@@ -1445,12 +1444,6 @@ export class CommunityComponent implements OnInit {
   ngOnInit(): void {
     this.currentUserKeycloakId = this.authService.getKeycloakId();
     this.currentUserInitials = this.getInitials(this.currentUserKeycloakId || this.authService.getFullName() || 'You');
-    this.whoToFollow = WHO_TO_FOLLOW.map((person) => ({
-      ...person,
-      keycloakId: this.buildMockSuggestionKeycloakId(person.name),
-      following: false,
-      loading: false,
-    }));
     this.loadInitialData();
     this.loadBookmarkedIds();
 
@@ -1459,6 +1452,7 @@ export class CommunityComponent implements OnInit {
         this.leaderboard = data;
         this.karmaByUser = {};
         data.forEach((entry) => { this.karmaByUser[entry.keycloakId] = entry.totalKarma; });
+        this.refreshWhoToFollow();
         this.cdr.markForCheck();
       },
       error: () => {},
@@ -1495,6 +1489,7 @@ export class CommunityComponent implements OnInit {
       this.communityApi.searchPosts(this.searchQuery.trim()).subscribe({
         next: (res) => {
           this.posts = res.content;
+          this.refreshTrendingTopics();
           this.totalPages = res.totalPages;
           this.totalPosts = res.totalElements;
           this.hasMore = false;
@@ -1539,6 +1534,7 @@ export class CommunityComponent implements OnInit {
     this.activeTab = tab;
     this.currentPage = 0;
     this.posts = [];
+    this.refreshTrendingTopics();
     this.errorMessage = '';
     this.isInitialLoading = true;
     this.cdr.markForCheck();
@@ -1581,6 +1577,7 @@ export class CommunityComponent implements OnInit {
           .subscribe({
             next: (response) => {
               this.posts = response.data;
+              this.refreshTrendingTopics();
               this.totalPosts = response.total;
               this.totalPages = 1;
               this.currentPage = 0;
@@ -1659,6 +1656,7 @@ export class CommunityComponent implements OnInit {
             updated,
             ...this.posts.slice(idx + 1),
           ];
+          this.refreshTrendingTopics();
         }
         this.editingPostId = null;
         this.submittingEdit = false;
@@ -1707,6 +1705,7 @@ export class CommunityComponent implements OnInit {
       .subscribe({
         next: (post) => {
           this.posts = [post, ...this.posts];
+          this.refreshTrendingTopics();
           this.totalPosts += 1;
           this.showCreateForm = false;
           this.createPostForm = {
@@ -1769,6 +1768,7 @@ export class CommunityComponent implements OnInit {
     this.communityApi.deletePost(postId).subscribe({
       next: () => {
         this.posts = this.posts.filter((post) => post.id !== postId);
+        this.refreshTrendingTopics();
         this.totalPosts = Math.max(0, this.totalPosts - 1);
         this.cdr.markForCheck();
       },
@@ -2105,7 +2105,7 @@ export class CommunityComponent implements OnInit {
           this.applyPostsResponse(posts, false);
           this.followers = followers;
           this.following = following;
-          this.syncWhoToFollow(following);
+          this.refreshWhoToFollow();
           this.cdr.markForCheck();
         },
         error: (error) => {
@@ -2151,6 +2151,7 @@ export class CommunityComponent implements OnInit {
     this.totalPosts = response.totalElements;
     this.totalPages = response.totalPages;
     this.hasMore = response.number + 1 < response.totalPages;
+    this.refreshTrendingTopics();
   }
 
   private loadComments(postId: number): void {
@@ -2186,10 +2187,13 @@ export class CommunityComponent implements OnInit {
           followedAt: new Date().toISOString(),
         },
       ];
-      return;
+    } else {
+      this.following = this.following.filter(
+        (follow) => follow.followingKeycloakId !== targetKeycloakId,
+      );
     }
-
-    this.following = this.following.filter((follow) => follow.followingKeycloakId !== targetKeycloakId);
+    // Re-derive Who to follow so the just-followed user disappears from the panel.
+    this.refreshWhoToFollow();
   }
 
   private syncWhoToFollow(following: CommunityFollow[]): void {
@@ -2200,8 +2204,68 @@ export class CommunityComponent implements OnInit {
     }));
   }
 
-  private buildMockSuggestionKeycloakId(name: string): string {
-    return `mock-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  /**
+   * Build "Who to follow" from the live karma leaderboard.
+   * Excludes the current user and anyone we already follow.
+   */
+  private refreshWhoToFollow(): void {
+    if (!this.leaderboard?.length) {
+      this.whoToFollow = [];
+      return;
+    }
+    const followingIds = new Set(
+      (this.following || []).map((f) => f.followingKeycloakId),
+    );
+    this.whoToFollow = this.leaderboard
+      .filter(
+        (entry) =>
+          entry.keycloakId &&
+          entry.keycloakId !== this.currentUserKeycloakId &&
+          !followingIds.has(entry.keycloakId),
+      )
+      .slice(0, 5)
+      .map((entry) => {
+        const name =
+          (entry.displayName && entry.displayName.trim()) ||
+          this.truncateKeycloakId(entry.keycloakId);
+        const postsLabel =
+          entry.postsCount === 1 ? '1 post' : `${entry.postsCount} posts`;
+        return {
+          name,
+          initials: this.getInitials(name),
+          title: `${entry.totalKarma} karma · ${postsLabel}`,
+          keycloakId: entry.keycloakId,
+          following: false,
+          loading: false,
+        };
+      });
+  }
+
+  /**
+   * Compute trending topics from the tags of currently-loaded posts.
+   * Falls back to an empty list when there are no tagged posts yet.
+   */
+  private refreshTrendingTopics(): void {
+    const counts = new Map<string, number>();
+    for (const post of this.posts) {
+      if (!post?.tags) continue;
+      const raw = String(post.tags);
+      const tags = raw
+        .split(/[,#\s]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length > 1 && t.length < 32);
+      for (const t of tags) {
+        const key = t.toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    this.trendingTopics = Array.from(counts.entries())
+      .map(([tag, posts]) => ({
+        tag: tag.replace(/\b\w/g, (c) => c.toUpperCase()),
+        posts,
+      }))
+      .sort((a, b) => b.posts - a.posts)
+      .slice(0, 5);
   }
 
   private truncateKeycloakId(keycloakId: string): string {
