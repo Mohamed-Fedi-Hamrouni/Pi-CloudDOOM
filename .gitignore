@@ -59,3 +59,5 @@ out-tsc/
 
 # Claude Code session state
 .claude/
+infra/.env
+infra/.env
