@@ -97,6 +97,28 @@ spec:
                   name: app-secrets
                   key: GROQ_API_KEY
 
+            - name: AI_MODEL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: AI_MODEL_URL
+
+            - name: APP_OLLAMA_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_OLLAMA_BASE_URL
+            - name: APP_OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_OLLAMA_MODEL
+            - name: APP_OLLAMA_TIMEOUT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_OLLAMA_TIMEOUT_SECONDS
+
           resources:
             requests:
               cpu: "200m"
