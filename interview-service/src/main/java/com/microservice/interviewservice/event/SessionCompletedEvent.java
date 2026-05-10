@@ -1,7 +1,5 @@
 package com.microservice.interviewservice.event;
 
-import java.time.LocalDateTime;
-
 import com.microservice.interviewservice.ennum.InterviewTypeEnum;
 import com.microservice.interviewservice.ennum.PreparationLevelEnum;
 
@@ -22,5 +20,5 @@ public class SessionCompletedEvent {
     private Double            globalScore;
     private PreparationLevelEnum preparationLevel;
     private Integer           totalSessionsCompleted;
-    private LocalDateTime     generatedAt;
+    private String            generatedAt;
 }

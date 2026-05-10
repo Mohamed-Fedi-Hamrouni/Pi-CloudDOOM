@@ -132,7 +132,7 @@ public class InterviewSessionServiceImpl implements InterviewSessionService {
                 .globalScore(report.getGlobalScore())
                 .preparationLevel(report.getPreparationLevel())
                 .totalSessionsCompleted(tracker.getTotalSessionsCompleted())
-                .generatedAt(report.getGeneratedAt())
+                .generatedAt(report.getGeneratedAt() != null ? report.getGeneratedAt().toString() : null)
                 .build());
 
         return mapper.toResponse(saved);
