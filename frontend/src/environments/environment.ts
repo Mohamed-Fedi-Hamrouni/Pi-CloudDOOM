@@ -7,7 +7,7 @@ export const environment = {
   quizApiUrl: 'http://localhost:8085',
   communityApiUrl: 'http://localhost:8086',
   resourceApiUrl: 'http://localhost:8087',
-  kokoroUrl: "/kokoro",
+  kokoroUrl: "https://kokoro.yellowocean-356174e3.francecentral.azurecontainerapps.io",
    
   simli: {
     enabled: true,
