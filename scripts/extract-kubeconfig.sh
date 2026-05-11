@@ -1,14 +1,27 @@
 #!/usr/bin/env bash
-# Mint a kubeconfig for the cicd-deployer ServiceAccount in the
-# piclouddoom namespace. Run on k8s-cp1 (or any host with kubectl
-# access to the cluster). Output goes to stdout — redirect to a file
-# then paste the contents into the GitHub repo secret KUBECONFIG_PROD.
+# Mint a kubeconfig for the cicd-deployer ServiceAccount.
+# Run on k8s-cp1 (or any host with kubectl access). Stdout is the kubeconfig
+# — redirect to a file, paste the contents into a GitHub secret, then shred.
 #
-# Usage:
+# Common cases:
+#
+#   # Local / LAN reachable (cluster API on private IP):
 #   bash scripts/extract-kubeconfig.sh > /tmp/kubeconfig-prod.yaml
-#   cat /tmp/kubeconfig-prod.yaml            # inspect once
-#   # Then SCP off the box and paste into GitHub Actions secrets
-#   shred -u /tmp/kubeconfig-prod.yaml       # clean up
+#
+#   # Public hostname via Cloudflare Tunnel — recommended for GitHub Actions:
+#   API_SERVER=https://k8s-api.interviewprep-tn.me \
+#   PUBLIC_API=true \
+#     bash scripts/extract-kubeconfig.sh > /tmp/kubeconfig-prod.yaml
+#
+#   # Dev namespace:
+#   NAMESPACE=piclouddoom-dev \
+#   API_SERVER=https://k8s-api.interviewprep-tn.me PUBLIC_API=true \
+#     bash scripts/extract-kubeconfig.sh > /tmp/kubeconfig-dev.yaml
+#
+# PUBLIC_API=true → omits the internal K8s CA so kubectl validates the
+# Cloudflare edge cert against the system trust store. Without this flag,
+# kubectl would refuse to connect because the internal CA doesn't sign
+# the Cloudflare-fronted hostname.
 
 set -euo pipefail
 
@@ -41,9 +54,21 @@ TOKEN="$(echo "$TOKEN_B64" | base64 -d)"
 CA_B64="$(kubectl -n "$NAMESPACE" get secret "$SECRET" -o jsonpath='{.data.ca\.crt}')"
 
 # API server URL — must be reachable from GitHub Actions runners.
-# The current cluster's API listens on the cp1 floating IP at port 6443.
-# Override with API_SERVER=https://... if needed.
+# Default: read from existing admin kubeconfig (internal cluster IP).
+# For public access via Cloudflare Tunnel, override:
+#   API_SERVER=https://k8s-api.interviewprep-tn.me PUBLIC_API=true
 API_SERVER="${API_SERVER:-$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.server}')}"
+PUBLIC_API="${PUBLIC_API:-false}"
+
+# When fronted by a public hostname (Cloudflare etc.), kubectl needs to
+# validate the edge cert against system trust roots, NOT the internal K8s CA.
+# Omit certificate-authority-data in that case.
+if [ "$PUBLIC_API" = "true" ]; then
+  CLUSTER_BLOCK="    server: ${API_SERVER}"
+else
+  CLUSTER_BLOCK="    server: ${API_SERVER}
+      certificate-authority-data: ${CA_B64}"
+fi
 
 cat <<EOF
 apiVersion: v1
@@ -51,8 +76,7 @@ kind: Config
 clusters:
   - name: ${CLUSTER_NAME}
     cluster:
-      server: ${API_SERVER}
-      certificate-authority-data: ${CA_B64}
+${CLUSTER_BLOCK}
 contexts:
   - name: ${CONTEXT_NAME}
     context:
