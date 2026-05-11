@@ -5,6 +5,7 @@
 // ✅ Same teal palette: #E0F5EE → #99E6D9 → #2DD4BF → #14B8A6 → #0D9488 → #0F766E → #0A5E58
 // ✅ Logic & data flow unchanged
 
+import { environment } from '../../../environments/environment';
 import {
   Component, Input, Output, EventEmitter,
   signal, computed, OnChanges, SimpleChanges, inject, OnDestroy
@@ -1039,7 +1040,7 @@ export class QuizEvaluationReportComponent implements OnChanges, OnDestroy {
 
     try {
       if (this.userId && this.moduleId) {
-        const url  = `http://localhost:8680/api/report/${this.userId}?module_id=${this.moduleId}`;
+        const url  = `${environment.quizApiUrl}/api/report/${this.userId}?module_id=${this.moduleId}`;
         const data = await this.http.get<any>(url).toPromise();
         if (data && !data.error) { this.report.set(data); this.reportDate.set(new Date()); return; }
         console.warn('Report API unavailable, using local fallback:', data?.error);

@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { Component, signal, inject, OnInit } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -1679,7 +1680,7 @@ export class SettingsComponent implements OnInit {
     }
     managePasskeys(): void {
         window.open(
-            "http://localhost:8080/realms/myapp-realm/account/#/security/signing-in",
+            `${environment.keycloak.url}/realms/${environment.keycloak.realm}/account/#/security/signing-in`,
             "_blank",
         );
     }

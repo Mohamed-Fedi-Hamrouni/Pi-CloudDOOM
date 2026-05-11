@@ -3,6 +3,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable ,throwError} from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface OralEvalRequest {
   questionText: string;
@@ -21,7 +22,7 @@ export interface OralEvalResponse {
 export class QuizService {
   private http = inject(HttpClient);
   
-  private apiUrl = 'http://localhost:8085/api';
+  private apiUrl = `${environment.quizApiUrl}/api`;
 
   // --- Gestion des Quiz (QuizController) ---
 

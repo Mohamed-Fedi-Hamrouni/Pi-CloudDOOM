@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import {
   Component, Input, Output, EventEmitter,
   signal, computed, OnDestroy, OnChanges, SimpleChanges
@@ -23,8 +24,8 @@ export interface QuestionResponse {
 type Phase = 'CONNECTING' | 'AI_SPEAKING' | 'LISTENING' | 'PROCESSING';
 
 // Backend proxies — no CORS issues
-const TTS_URL         = 'http://localhost:8085/api/quizzes/ai/tts';
-const TRANSCRIBE_URL  = 'http://localhost:8085/api/quizzes/ai/transcribe';
+const TTS_URL         = `${environment.quizApiUrl}/api/quizzes/ai/tts`;
+const TRANSCRIBE_URL  = `${environment.quizApiUrl}/api/quizzes/ai/transcribe`;
 
 @Component({
   selector: 'app-oral-quiz',

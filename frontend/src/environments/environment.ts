@@ -1,12 +1,12 @@
 export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8081',
-  interviewApiUrl: 'http://localhost:8082',
-  trainingApiUrl: 'http://localhost:8083',
-  mentorshipApiUrl: 'http://localhost:8084',
-  quizApiUrl: 'http://localhost:8085',
-  communityApiUrl: 'http://localhost:8086',
-  resourceApiUrl: 'http://localhost:8087',
+  production: true,
+  apiUrl: 'https://api.interviewprep-tn.me',
+  interviewApiUrl: 'https://api.interviewprep-tn.me',
+  trainingApiUrl: 'https://api.interviewprep-tn.me',
+  mentorshipApiUrl: 'https://api.interviewprep-tn.me',
+  quizApiUrl: 'https://api.interviewprep-tn.me',
+  communityApiUrl: 'https://api.interviewprep-tn.me',
+  resourceApiUrl: 'https://api.interviewprep-tn.me',
   kokoroUrl: "/kokoro",
    
   simli: {
@@ -15,7 +15,7 @@ export const environment = {
     faceId: "cace3ef7-a4c4-425d-a8cf-a5358eb0c427",
   },
   keycloak: {
-    url: 'http://localhost:8080',
+    url: 'https://auth.interviewprep-tn.me',
     realm: 'myapp-realm',
     clientId: 'angular-client'
   }
