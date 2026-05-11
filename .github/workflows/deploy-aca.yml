@@ -1,12 +1,29 @@
 name: Deploy — Azure Container Apps
 
+# ─────────────────────────────────────────────────────────────────────────
+# NOTE — Auto-trigger disabled (2026-05-11)
+#
+# This workflow needs AZURE_CREDENTIALS, but the esprit.tn Entra ID tenant
+# admin must first grant the "Application Developer" role to create the
+# service principal (`az ad sp create-for-rbac` fails with "Insufficient
+# privileges" today). Until then:
+#
+#   - workflow_dispatch only (manual) — won't auto-fire and fail after every
+#     image build
+#   - scripts/deploy-aca.sh is the manual fallback you can run from a laptop
+#     with `az login` as a user with Contributor on rg-piclouddoom
+#
+# Once AZURE_CREDENTIALS is set, restore the workflow_run block below:
+#
+#   workflow_run:
+#     workflows: ["Build & Push images"]
+#     types: [completed]
+#     branches:
+#       - main
+#       - deployment/hybrid-openstack-azure-vercel
+# ─────────────────────────────────────────────────────────────────────────
+
 on:
-  workflow_run:
-    workflows: ["Build & Push images"]
-    types: [completed]
-    branches:
-      - main
-      - deployment/hybrid-openstack-azure-vercel
   workflow_dispatch:
     inputs:
       sha:
