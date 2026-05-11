@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy config scan (Kubernetes manifests)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: k8s/
@@ -41,7 +41,7 @@ jobs:
           exit-code: "0"                # report only — don't block PRs on day 1
 
       - name: Trivy config scan (OpenStack Heat + docker-compose)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: infra/
