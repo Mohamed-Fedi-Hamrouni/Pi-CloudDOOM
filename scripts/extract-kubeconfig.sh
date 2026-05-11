@@ -64,9 +64,9 @@ PUBLIC_API="${PUBLIC_API:-false}"
 # validate the edge cert against system trust roots, NOT the internal K8s CA.
 # Omit certificate-authority-data in that case.
 if [ "$PUBLIC_API" = "true" ]; then
-  CLUSTER_BLOCK="    server: ${API_SERVER}"
+  CLUSTER_BLOCK="      server: ${API_SERVER}"
 else
-  CLUSTER_BLOCK="    server: ${API_SERVER}
+  CLUSTER_BLOCK="      server: ${API_SERVER}
       certificate-authority-data: ${CA_B64}"
 fi
 
