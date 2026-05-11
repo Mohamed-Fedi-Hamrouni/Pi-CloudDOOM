@@ -33,20 +33,24 @@ ONLY_APP="${2:-}"
 command -v az >/dev/null || { echo "az CLI not found" >&2; exit 1; }
 az account show --query "{sub:name, user:user.name}" -o table
 
-# app-name → image-name (no -service suffix on ACA apps)
+# app-name → image-name. Bash 3.2-compatible (no associative arrays —
+# macOS still ships bash 3.2 by default).
 APPS_KEYS=("ai-training-path" "kokoro" "ollama")
-declare -A APPS=(
-  [ai-training-path]="${REGISTRY}/${IMAGE_PREFIX}-ai-training-path"
-  [kokoro]="${REGISTRY}/${IMAGE_PREFIX}-kokoro"
-  [ollama]="${REGISTRY}/${IMAGE_PREFIX}-ollama"
-)
+image_for() {
+  case "$1" in
+    ai-training-path) echo "${REGISTRY}/${IMAGE_PREFIX}-ai-training-path" ;;
+    kokoro)           echo "${REGISTRY}/${IMAGE_PREFIX}-kokoro" ;;
+    ollama)           echo "${REGISTRY}/${IMAGE_PREFIX}-ollama" ;;
+    *) echo "unknown-app:$1" >&2; return 1 ;;
+  esac
+}
 
 failures=0
 for app in "${APPS_KEYS[@]}"; do
   if [ -n "$ONLY_APP" ] && [ "$ONLY_APP" != "$app" ]; then
     continue
   fi
-  image="${APPS[$app]}:sha-${SHORT}"
+  image="$(image_for "$app"):sha-${SHORT}"
   rev="sha-${SHORT}"
 
   echo ""
