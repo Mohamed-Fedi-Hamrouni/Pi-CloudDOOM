@@ -7,7 +7,7 @@ export const environment = {
   quizApiUrl: 'https://api.interviewprep-tn.me',
   communityApiUrl: 'https://api.interviewprep-tn.me',
   resourceApiUrl: 'https://api.interviewprep-tn.me',
-  kokoroUrl: "/kokoro",
+  kokoroUrl: "https://kokoro.yellowocean-356174e3.francecentral.azurecontainerapps.io",
    
   simli: {
     enabled: true,
