@@ -163,9 +163,11 @@ jobs:
         id: rollout
         run: |
           set +e
+          # 10m — resource-service JVM-startup measured at ~142s; under-5m
+          # was too tight once readiness + dependency health checks stacked.
           kubectl -n "${{ needs.gate.outputs.namespace }}" rollout status \
             "deployment/${{ matrix.service }}" \
-            --timeout=5m
+            --timeout=10m
           rc=$?
           set -e
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
