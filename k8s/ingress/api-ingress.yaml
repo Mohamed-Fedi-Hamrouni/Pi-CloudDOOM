@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   name: api-ingress
   namespace: piclouddoom
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: piclouddoom-cors-headers@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:

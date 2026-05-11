@@ -6,7 +6,7 @@ providers:
   kubernetesIngress:
     enabled: true
   kubernetesCRD:
-    enabled: false
+    enabled: true
   kubernetesGateway:
     enabled: false
 
@@ -28,3 +28,8 @@ ports:
 
 nodeSelector:
   ingress-node: "true"
+
+
+deployment:
+  strategy:
+    type: Recreate
