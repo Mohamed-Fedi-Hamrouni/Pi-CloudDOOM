@@ -5,7 +5,7 @@ metadata:
   namespace: piclouddoom
 data:
   # Shared internal service endpoints
-  KEYCLOAK_ISSUER_URI: "http://keycloak:8080/realms/myapp-realm"
+  KEYCLOAK_ISSUER_URI: "https://auth.interviewprep-tn.me/realms/myapp-realm"
   KEYCLOAK_JWK_SET_URI: "http://keycloak:8080/realms/myapp-realm/protocol/openid-connect/certs"
   KEYCLOAK_SERVER_URL: "http://keycloak:8080"
   KEYCLOAK_REALM: "myapp-realm"
