@@ -102,6 +102,9 @@ spec:
             - name: APP_UPLOADS_DIR
               value: "/app/uploads"
 
+            # Legacy Ollama vars — kept for rollback safety. The current
+            # CvAiParsingService uses Groq (below). Remove these once Groq
+            # has been verified in prod.
             - name: APP_OLLAMA_BASE_URL
               valueFrom:
                 configMapKeyRef:
@@ -117,6 +120,17 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: APP_OLLAMA_TIMEOUT_SECONDS
+
+            # Groq — primary AI provider for CV parsing
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GROQ_API_KEY
+            - name: GROQ_BASE_URL
+              value: "https://api.groq.com"
+            - name: GROQ_MODEL
+              value: "llama-3.3-70b-versatile"
 
             - name: GOOGLE_AI_API_KEY
               valueFrom:

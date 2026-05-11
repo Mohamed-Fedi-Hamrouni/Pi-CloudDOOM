@@ -11,12 +11,19 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.microservice.userservice.config.OllamaProperties;
+import com.microservice.userservice.config.GroqProperties;
 import com.microservice.userservice.dto.ParsedCvDto;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Extracts structured CV data (bio, skills, education, experiences) from raw text
+ * by calling Groq's OpenAI-compatible chat-completions endpoint.
+ *
+ * Replaces the previous local-Ollama implementation. Public API ({@link #parse(String)})
+ * is unchanged so callers keep working.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,15 +31,19 @@ public class CvAiParsingService {
 
     private static final int MAX_TEXT_LENGTH = 3_500;
 
-    private final OllamaProperties ollamaProperties;
+    private final GroqProperties groqProperties;
     private final ObjectMapper objectMapper;
 
     private HttpClient httpClient;
 
     @jakarta.annotation.PostConstruct
     void init() {
+        if (groqProperties.getApiKey() == null || groqProperties.getApiKey().isBlank()) {
+            log.warn("GROQ_API_KEY is not set — CV AI parsing will fail at request time. "
+                    + "Set it in env (or app-secrets ConfigMap) before relying on CV parsing.");
+        }
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()))
+                .connectTimeout(Duration.ofSeconds(groqProperties.getTimeoutSeconds()))
                 .build();
     }
 
@@ -44,11 +55,11 @@ public class CvAiParsingService {
         String normalizedText = rawText.trim();
         String truncatedText = truncateText(normalizedText);
 
-        log.info("Sending CV text to Ollama ({} chars) using model {}",
-                truncatedText.length(), ollamaProperties.getModel());
+        log.info("Sending CV text to Groq ({} chars) using model {}",
+                truncatedText.length(), groqProperties.getModel());
 
         String requestBody = buildRequestBody(truncatedText);
-        String responseBody = callOllamaApi(requestBody);
+        String responseBody = callGroqApi(requestBody);
 
         return extractParsedCv(responseBody);
     }
@@ -64,13 +75,12 @@ public class CvAiParsingService {
         return rawText.substring(0, MAX_TEXT_LENGTH);
     }
 
-private String buildPrompt(String cvText) {
-    return """
-            Extract the following CV into ONE valid JSON object only.
+    private static final String SYSTEM_PROMPT = """
+            You extract CVs into ONE valid JSON object.
             No markdown. No explanation. No text before or after JSON.
             Never invent facts. Preserve the CV language where possible.
 
-            Required JSON:
+            Required JSON schema:
             {
               "bio": "string or null",
               "skills": ["string"],
@@ -102,45 +112,49 @@ private String buildPrompt(String cvText) {
             - If only a year is known, use YYYY-01.
             - Keep descriptions short.
             - Extract skills from any section.
-
-            CV TEXT:
-            ---
-            %s
-            ---
-            """.formatted(cvText);
-}
-
+            """;
 
     private String buildRequestBody(String cvText) {
         try {
-            String prompt = buildPrompt(cvText);
-
             var root = objectMapper.createObjectNode();
-            root.put("model", ollamaProperties.getModel());
-            root.put("prompt", prompt);
-            root.put("stream", false);
-            root.put("format", "json");
+            root.put("model", groqProperties.getModel());
+            root.put("temperature", groqProperties.getTemperature());
+            root.put("max_tokens", groqProperties.getMaxTokens());
 
-            var options = objectMapper.createObjectNode();
-            options.put("temperature", 0.1);
-            options.put("num_predict", 450);
-            options.put("num_ctx", 2048);
-            root.set("options", options);
+            // Groq requires response_format=json_object → guarantees the model returns valid JSON
+            var responseFormat = objectMapper.createObjectNode();
+            responseFormat.put("type", "json_object");
+            root.set("response_format", responseFormat);
+
+            var messages = objectMapper.createArrayNode();
+
+            var sys = objectMapper.createObjectNode();
+            sys.put("role", "system");
+            sys.put("content", SYSTEM_PROMPT);
+            messages.add(sys);
+
+            var user = objectMapper.createObjectNode();
+            user.put("role", "user");
+            user.put("content", "CV TEXT:\n---\n" + cvText + "\n---");
+            messages.add(user);
+
+            root.set("messages", messages);
 
             return objectMapper.writeValueAsString(root);
         } catch (Exception ex) {
-            throw new CvParsingException("Failed to build Ollama request body", ex);
+            throw new CvParsingException("Failed to build Groq request body", ex);
         }
     }
 
-    private String callOllamaApi(String requestBody) {
-        String url = ollamaProperties.getBaseUrl() + "/api/generate";
+    private String callGroqApi(String requestBody) {
+        String url = groqProperties.getBaseUrl() + "/openai/v1/chat/completions";
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
-                    .timeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()))
+                    .header("Authorization", "Bearer " + groqProperties.getApiKey())
+                    .timeout(Duration.ofSeconds(groqProperties.getTimeoutSeconds()))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
 
@@ -148,35 +162,36 @@ private String buildPrompt(String cvText) {
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                log.error("Ollama API returned HTTP {} with body: {}",
-                        response.statusCode(), response.body());
-                throw new CvParsingException("Ollama API error — HTTP " + response.statusCode());
+                log.error("Groq API returned HTTP {} with body: {}",
+                        response.statusCode(), truncateForLog(response.body()));
+                throw new CvParsingException("Groq API error — HTTP " + response.statusCode());
             }
 
-            log.debug("Ollama response received ({} chars)", response.body().length());
+            log.debug("Groq response received ({} chars)", response.body().length());
             return response.body();
 
         } catch (CvParsingException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new CvParsingException("Failed to call Ollama API: " + ex.getMessage(), ex);
+            throw new CvParsingException("Failed to call Groq API: " + ex.getMessage(), ex);
         }
     }
 
-    private ParsedCvDto extractParsedCv(String ollamaResponseBody) {
+    private ParsedCvDto extractParsedCv(String groqResponseBody) {
         try {
-            JsonNode root = objectMapper.readTree(ollamaResponseBody);
-            JsonNode responseNode = root.path("response");
+            JsonNode root = objectMapper.readTree(groqResponseBody);
+            JsonNode content = root.path("choices").path(0).path("message").path("content");
 
-            if (responseNode.isMissingNode() || responseNode.isNull() || responseNode.asText().isBlank()) {
-                log.error("Ollama response missing 'response' field. Raw body: {}", truncateForLog(ollamaResponseBody));
-                throw new CvParsingException("Could not locate valid response text in Ollama response.");
+            if (content.isMissingNode() || content.isNull() || content.asText().isBlank()) {
+                log.error("Groq response missing choices[0].message.content. Raw body: {}",
+                        truncateForLog(groqResponseBody));
+                throw new CvParsingException("Could not locate valid response text in Groq response.");
             }
 
-            String jsonText = responseNode.asText().trim();
-            log.debug("Raw Ollama model output ({} chars): {}", jsonText.length(), truncateForLog(jsonText));
+            String jsonText = content.asText().trim();
+            log.debug("Raw Groq model output ({} chars): {}", jsonText.length(), truncateForLog(jsonText));
 
-            // Strip markdown code blocks if present
+            // Strip markdown code blocks if the model sneaks them in (rare with json_object mode)
             if (jsonText.startsWith("```")) {
                 jsonText = jsonText
                         .replaceAll("^```(?:json)?\\s*", "")
@@ -184,7 +199,8 @@ private String buildPrompt(String cvText) {
                         .trim();
             }
 
-            // Extract the first complete JSON object from the text — handles prose before/after JSON
+            // Extract the first complete JSON object — defensive even though json_object mode
+            // should already guarantee a clean JSON payload.
             String extracted = findFirstJsonObject(jsonText);
             if (extracted != null) {
                 jsonText = extracted;
@@ -196,7 +212,7 @@ private String buildPrompt(String cvText) {
             if (dto.getEducations() == null) dto.setEducations(new ArrayList<>());
             if (dto.getExperiences() == null) dto.setExperiences(new ArrayList<>());
 
-            log.info("Ollama parsed CV — bio={}, skills={}, educations={}, experiences={}",
+            log.info("Groq parsed CV — bio={}, skills={}, educations={}, experiences={}",
                     dto.getBio() != null ? "present" : "absent",
                     dto.getSkills().size(),
                     dto.getEducations().size(),
@@ -207,9 +223,9 @@ private String buildPrompt(String cvText) {
         } catch (CvParsingException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("Failed to deserialize Ollama response into ParsedCvDto", ex);
+            log.error("Failed to deserialize Groq response into ParsedCvDto", ex);
             throw new CvParsingException(
-                    "Ollama returned invalid JSON for CV parsing: " + ex.getMessage(), ex);
+                    "Groq returned invalid JSON for CV parsing: " + ex.getMessage(), ex);
         }
     }
 

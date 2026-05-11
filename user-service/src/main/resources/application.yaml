@@ -78,10 +78,21 @@ logging:
 app:
     uploads-dir: ${APP_UPLOADS_DIR:uploads}
 
+    # ── Legacy local-Ollama config — kept for backward compatibility / rollback.
+    # New code path (CvAiParsingService) uses Groq below. Safe to delete after
+    # Groq is verified in prod.
     ollama:
         base-url: ${APP_OLLAMA_BASE_URL:http://127.0.0.1:11434}
         model: ${APP_OLLAMA_MODEL:llama3.2:3b}
         timeout-seconds: ${APP_OLLAMA_TIMEOUT_SECONDS:120}
+
+groq:
+    api-key: ${GROQ_API_KEY:}
+    base-url: ${GROQ_BASE_URL:https://api.groq.com}
+    model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+    timeout-seconds: ${GROQ_TIMEOUT_SECONDS:60}
+    max-tokens: ${GROQ_MAX_TOKENS:1024}
+    temperature: ${GROQ_TEMPERATURE:0.1}
 
 googleai:
     base-url: ${GOOGLE_AI_BASE_URL:https://generativelanguage.googleapis.com}
