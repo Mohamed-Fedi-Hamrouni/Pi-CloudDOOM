@@ -134,16 +134,16 @@ Postman collections at the repo root: [PI-user.postman_collection.json](PI-user.
 
 ## Deployment
 
-This branch (`integration/final`) is the integration target. Production deployment is hybrid:
+Production deployment is hybrid:
 
 | Component                        | Platform                  |
 | -------------------------------- | ------------------------- |
-| Spring microservices, Keycloak, Postgres, Redis, Kafka, MinIO | OpenStack Kubernetes |
-| AI services (`ai-training-path`, optional Whisper/Kokoro) | Azure Container Apps |
+| Spring microservices, Keycloak, Postgres, Redis, Kafka, MinIO | OpenStack Kubernetes (`piclouddoom` namespace) |
+| AI services (`ai-training-path`, Whisper, Kokoro, Ollama) | Azure Container Apps (France Central) |
 | Angular frontend                 | Vercel                    |
-| Container images                 | DockerHub (`piclouddoom/*`) |
+| Container images                 | DockerHub (`docker.io/azizbna/pi-clouddoom-*`) |
 
-Deployment manifests (`k8s/`, `azure/`, GitHub Actions CI) land in subsequent phases of this branch. The full target architecture is described in the Hybrid Deployment Guide (shared separately).
+CI/CD is fully automated via GitHub Actions — see [**`docs/cicd/README.md`**](docs/cicd/README.md) for the pipeline diagram, workflow index, secret matrix, and runbook. OpenStack cluster IaC lives at [`infra/openstack/heat-cluster.yaml`](infra/openstack/heat-cluster.yaml).
 
 ## Branch structure
 - `main` — released code
