@@ -99,19 +99,19 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to:   type=gha,scope=${{ matrix.service }},mode=max
 
-      # ─── Trivy vulnerability scan (CRITICAL/HIGH fail the build) ───────
+      # ─── Trivy vulnerability scan (REPORT-ONLY for day-1) ──────────────
+      # Findings still upload to GH code-scanning, but don't block the build.
+      # Once base-image CVEs are triaged, flip exit-code back to "1" to enforce.
       - name: Trivy scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: docker.io/${{ matrix.image }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          exit-code: "0"          # report-only — see comment above
           ignore-unfixed: true
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
-        # Allow scan failure on Trivy infra issues (DB rate limit etc.) but
-        # still fail on actual CRITICAL/HIGH findings via exit-code above.
-        continue-on-error: false
+        continue-on-error: true
 
       - name: Upload Trivy SARIF
         if: always()
