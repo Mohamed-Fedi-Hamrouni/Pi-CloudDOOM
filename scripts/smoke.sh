@@ -55,17 +55,27 @@ check_http() {
 
 check_kubectl() {
   local name="$1" port="$2" path="$3"
-  local code
-  # Use kubectl exec on the pod itself — no port-forward dance.
-  code="$(KUBECONFIG="$KUBECONFIG_PATH" kubectl -n "$NAMESPACE" exec \
-    deploy/"$name" -- \
-    sh -c "curl -sk -o /dev/null -w '%{http_code}' --max-time $TIMEOUT http://127.0.0.1:${port}${path}" 2>/dev/null || echo 000)"
-  if [ "$code" = "200" ]; then
-    echo "  ✓ $name (in-cluster :$port$path) → $code"
-  else
-    echo "  ✗ $name (in-cluster :$port$path) → $code"
-    return 1
+  # Spring containers run on eclipse-temurin:21-jre which has no curl.
+  # Use kubectl wait instead — Available=True means K8s readiness probe
+  # is passing, which IS an httpGet on /actuator/health per the manifests.
+  # Same validation, no in-container curl needed.
+  if KUBECONFIG="$KUBECONFIG_PATH" kubectl -n "$NAMESPACE" wait \
+       --for=condition=Available \
+       --timeout="${TIMEOUT}s" \
+       "deployment/$name" >/dev/null 2>&1; then
+    # Also confirm at least 1 replica is Ready
+    local ready
+    ready="$(KUBECONFIG="$KUBECONFIG_PATH" kubectl -n "$NAMESPACE" get \
+      deployment/"$name" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)"
+    if [ "${ready:-0}" -ge 1 ]; then
+      echo "  ✓ $name (Available, readyReplicas=$ready, port=$port)"
+      return 0
+    fi
   fi
+  echo "  ✗ $name (deployment not Available within ${TIMEOUT}s)"
+  KUBECONFIG="$KUBECONFIG_PATH" kubectl -n "$NAMESPACE" get \
+    deployment/"$name" -o wide 2>/dev/null | sed 's/^/    /'
+  return 1
 }
 
 echo "── Pi-CloudDOOM smoke test ──"
