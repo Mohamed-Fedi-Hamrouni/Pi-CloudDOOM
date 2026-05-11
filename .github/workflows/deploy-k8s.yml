@@ -9,6 +9,12 @@ on:
       - deployment/hybrid-openstack-azure-vercel
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        default: prod
+        options: [dev, prod]
       sha:
         description: "Commit SHA to deploy (full or 7-char). Leave blank to use HEAD of selected ref."
         type: string
@@ -29,14 +35,14 @@ on:
           - resource-service
 
 concurrency:
-  group: deploy-k8s-prod
+  # Distinct group per env so dev + prod can deploy simultaneously
+  group: deploy-k8s-${{ inputs.environment || 'prod' }}
   cancel-in-progress: false       # never kill a rollout mid-flight
 
 permissions:
   contents: read
 
 env:
-  NAMESPACE: piclouddoom
   REGISTRY_NS: docker.io/azizbna
   IMAGE_PREFIX: pi-clouddoom
 
@@ -50,16 +56,19 @@ jobs:
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')
     outputs:
-      sha:       ${{ steps.resolve.outputs.sha }}
-      sha_short: ${{ steps.resolve.outputs.sha_short }}
+      sha:         ${{ steps.resolve.outputs.sha }}
+      sha_short:   ${{ steps.resolve.outputs.sha_short }}
+      environment: ${{ steps.resolve.outputs.environment }}
+      namespace:   ${{ steps.resolve.outputs.namespace }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - id: resolve
-        name: Resolve commit SHA
+        name: Resolve commit SHA + environment
         run: |
+          # SHA
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             sha="${{ github.event.workflow_run.head_sha }}"
           elif [ -n "${{ inputs.sha }}" ]; then
@@ -68,9 +77,27 @@ jobs:
             sha="${{ github.sha }}"
           fi
           short="${sha:0:7}"
-          echo "sha=$sha"           >> "$GITHUB_OUTPUT"
-          echo "sha_short=$short"   >> "$GITHUB_OUTPUT"
-          echo "Deploying tag: sha-$short"
+
+          # Environment
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            env_name="${{ inputs.environment }}"
+          else
+            # workflow_run: main and the active deployment branch both → prod.
+            env_name="prod"
+          fi
+          case "$env_name" in
+            dev)  ns="piclouddoom-dev"  ;;
+            prod) ns="piclouddoom"      ;;
+            *)    echo "::error::Unknown environment $env_name"; exit 1 ;;
+          esac
+
+          {
+            echo "sha=$sha"
+            echo "sha_short=$short"
+            echo "environment=$env_name"
+            echo "namespace=$ns"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deploying tag sha-$short → env=$env_name namespace=$ns"
 
   # ─── Rolling update each Spring service ─────────────────────────────────
   deploy:
@@ -79,8 +106,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
-      name: production
-      url: https://api.interviewprep-tn.me
+      name: ${{ needs.gate.outputs.environment == 'prod' && 'production' || 'dev' }}
+      url: ${{ needs.gate.outputs.environment == 'prod' && 'https://api.interviewprep-tn.me' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -107,19 +134,26 @@ jobs:
           version: "v1.29.15"        # match cluster version
 
       - name: Configure kubeconfig
+        env:
+          KCFG_PROD: ${{ secrets.KUBECONFIG_PROD }}
+          KCFG_DEV:  ${{ secrets.KUBECONFIG_DEV }}
         run: |
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.KUBECONFIG_PROD }}" > "$HOME/.kube/config"
+          if [ "${{ needs.gate.outputs.environment }}" = "prod" ]; then
+            printf '%s' "$KCFG_PROD" > "$HOME/.kube/config"
+          else
+            printf '%s' "$KCFG_DEV"  > "$HOME/.kube/config"
+          fi
           chmod 600 "$HOME/.kube/config"
           kubectl config current-context
-          kubectl -n "${NAMESPACE}" get deploy "${{ matrix.service }}"
+          kubectl -n "${{ needs.gate.outputs.namespace }}" get deploy "${{ matrix.service }}"
 
       - name: Set image to sha-${{ needs.gate.outputs.sha_short }}
         id: setimg
         run: |
           IMAGE="${REGISTRY_NS}/${IMAGE_PREFIX}-${{ matrix.service }}:sha-${{ needs.gate.outputs.sha_short }}"
           echo "Pinning ${{ matrix.service }} → ${IMAGE}"
-          kubectl -n "${NAMESPACE}" set image \
+          kubectl -n "${{ needs.gate.outputs.namespace }}" set image \
             "deployment/${{ matrix.service }}" \
             "${{ matrix.service }}=${IMAGE}" \
             --record=false
@@ -129,7 +163,7 @@ jobs:
         id: rollout
         run: |
           set +e
-          kubectl -n "${NAMESPACE}" rollout status \
+          kubectl -n "${{ needs.gate.outputs.namespace }}" rollout status \
             "deployment/${{ matrix.service }}" \
             --timeout=5m
           rc=$?
@@ -137,9 +171,9 @@ jobs:
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           if [ "$rc" -ne 0 ]; then
             echo "::warning::Rollout did not converge in 5 minutes — collecting diagnostics."
-            kubectl -n "${NAMESPACE}" describe "deployment/${{ matrix.service }}" || true
-            kubectl -n "${NAMESPACE}" get pods -l app=${{ matrix.service }} -o wide || true
-            kubectl -n "${NAMESPACE}" logs --tail=80 -l app=${{ matrix.service }} || true
+            kubectl -n "${{ needs.gate.outputs.namespace }}" describe "deployment/${{ matrix.service }}" || true
+            kubectl -n "${{ needs.gate.outputs.namespace }}" get pods -l app=${{ matrix.service }} -o wide || true
+            kubectl -n "${{ needs.gate.outputs.namespace }}" logs --tail=80 -l app=${{ matrix.service }} || true
           fi
           exit $rc
 
@@ -147,31 +181,82 @@ jobs:
         if: failure() && steps.setimg.outcome == 'success'
         run: |
           echo "::error::Rollout failed — rolling back ${{ matrix.service }} to previous revision."
-          kubectl -n "${NAMESPACE}" rollout undo "deployment/${{ matrix.service }}"
-          kubectl -n "${NAMESPACE}" rollout status "deployment/${{ matrix.service }}" --timeout=3m || true
+          kubectl -n "${{ needs.gate.outputs.namespace }}" rollout undo "deployment/${{ matrix.service }}"
+          kubectl -n "${{ needs.gate.outputs.namespace }}" rollout status "deployment/${{ matrix.service }}" --timeout=3m || true
 
       - name: Deploy summary
         if: always()
         run: |
           {
-            echo "## ${{ matrix.service }}"
+            echo "## ${{ matrix.service }} (${{ needs.gate.outputs.environment }})"
+            echo "- Namespace: \`${{ needs.gate.outputs.namespace }}\`"
             echo "- Image pinned: \`${{ steps.setimg.outputs.image }}\`"
             echo "- Rollout exit code: \`${{ steps.rollout.outputs.rc }}\`"
             echo "- Pods now:"
             echo '```'
-            kubectl -n "${NAMESPACE}" get pods -l app=${{ matrix.service }} -o wide 2>&1 || true
+            kubectl -n "${{ needs.gate.outputs.namespace }}" get pods -l app=${{ matrix.service }} -o wide 2>&1 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # ─── Post-deploy smoke test ─────────────────────────────────────────────
+  smoke:
+    name: smoke test
+    needs: [gate, deploy]
+    runs-on: ubuntu-latest
+    if: needs.deploy.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.29.15"
+
+      - name: Configure kubeconfig
+        env:
+          KCFG_PROD: ${{ secrets.KUBECONFIG_PROD }}
+          KCFG_DEV:  ${{ secrets.KUBECONFIG_DEV }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          if [ "${{ needs.gate.outputs.environment }}" = "prod" ]; then
+            printf '%s' "$KCFG_PROD" > "$HOME/.kube/config"
+          else
+            printf '%s' "$KCFG_DEV"  > "$HOME/.kube/config"
+          fi
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Run smoke tests (in-cluster)
+        id: smoke
+        run: |
+          bash scripts/smoke.sh \
+            --kubeconfig="$HOME/.kube/config" \
+            --namespace="${{ needs.gate.outputs.namespace }}"
+
+      - name: Roll back ALL services if smoke fails
+        if: failure()
+        run: |
+          echo "::error::Smoke test failed — rolling back all 7 services in ${{ needs.gate.outputs.namespace }}."
+          for svc in user-service interview-service training-service mentorship-service quiz-service community-service resource-service; do
+            kubectl -n "${{ needs.gate.outputs.namespace }}" rollout undo "deployment/$svc" || true
+          done
+          for svc in user-service interview-service training-service mentorship-service quiz-service community-service resource-service; do
+            kubectl -n "${{ needs.gate.outputs.namespace }}" rollout status "deployment/$svc" --timeout=2m || true
+          done
 
   # ─── Aggregate gate ─────────────────────────────────────────────────────
   deploy-summary:
     name: deploy-summary
     runs-on: ubuntu-latest
-    needs: deploy
+    needs: [deploy, smoke]
     if: always()
     steps:
       - name: Check matrix outcome
         run: |
-          result='${{ needs.deploy.result }}'
-          echo "Matrix result: $result"
-          [ "$result" = "failure" ] && exit 1 || echo "All deploys converged."
+          deploy_result='${{ needs.deploy.result }}'
+          smoke_result='${{ needs.smoke.result }}'
+          echo "Deploy matrix: $deploy_result"
+          echo "Smoke test:    $smoke_result"
+          if [ "$deploy_result" = "failure" ] || [ "$smoke_result" = "failure" ]; then
+            exit 1
+          fi
+          echo "All deploys converged and smoke passed."
