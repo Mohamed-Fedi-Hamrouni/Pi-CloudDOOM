@@ -7,6 +7,11 @@ spec:
   headers:
     customRequestHeaders:
       Origin: ""
+    customResponseHeaders:
+      Access-Control-Allow-Origin: "https://interviewprep-tn.me"
+      Access-Control-Allow-Credentials: "true"
+      Access-Control-Expose-Headers: "Authorization,Content-Type"
+      Vary: "Origin"
     accessControlAllowMethods:
       - GET
       - POST
