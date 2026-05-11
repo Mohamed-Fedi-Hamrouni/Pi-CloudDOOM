@@ -5,6 +5,8 @@ metadata:
   namespace: piclouddoom
 spec:
   headers:
+    customRequestHeaders:
+      Origin: ""
     accessControlAllowMethods:
       - GET
       - POST
@@ -19,7 +21,16 @@ spec:
       - "https://auth.interviewprep-tn.me"
       - "http://localhost:4200"
     accessControlAllowHeaders:
-      - "*"
+      - Authorization
+      - Content-Type
+      - Accept
+      - Origin
+      - X-Requested-With
+      - Cache-Control
+      - Pragma
+    accessControlExposeHeaders:
+      - Authorization
+      - Content-Type
     accessControlAllowCredentials: true
     accessControlMaxAge: 100
     addVaryHeader: true
