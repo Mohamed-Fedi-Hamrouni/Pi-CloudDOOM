@@ -45,7 +45,7 @@ export class AntiCheatService implements OnDestroy {
   private attemptId = '';
 
   // Seuils
-  private readonly PYTHON_URL = 'http://localhost:8686/api/anticheat';
+  private readonly PYTHON_URL = ''; // Disabled in public deployment: Python anti-cheat service is not exposed
   private devtoolsCheckInterval: any = null;
 
   constructor(
@@ -213,6 +213,10 @@ this.listeners.push(() => document.removeEventListener('paste', onPaste as any))
   // ── Notification backend Python ───────────────────────────────
 
   private notifyPython(event: CheatEvent) {
+    if (!this.PYTHON_URL) {
+      return;
+    }
+
     this.http.post(`${this.PYTHON_URL}/event`, {
       attemptId: event.attemptId,
       type: event.type,
@@ -227,6 +231,10 @@ this.listeners.push(() => document.removeEventListener('paste', onPaste as any))
 
  /** Demande au backend Python de vérifier les processus actifs */
 async checkProcesses(): Promise<{ suspicious: boolean; processes: string[] }> {
+  if (!this.PYTHON_URL) {
+    return { suspicious: false, processes: [] };
+  }
+
   try {
     const request = this.http.post<{ suspicious: boolean; processes: string[] }>(
       `${this.PYTHON_URL}/check-processes`, 

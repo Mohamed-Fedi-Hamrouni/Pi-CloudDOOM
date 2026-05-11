@@ -33,6 +33,13 @@ spec:
                 name: user-service
                 port:
                   number: 8081
+          - path: /api/ai
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
           - path: /uploads
             pathType: Prefix
             backend:
