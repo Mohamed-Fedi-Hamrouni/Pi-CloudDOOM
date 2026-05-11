@@ -21,7 +21,7 @@ data:
   # AI service endpoints inside the future cluster/hybrid architecture
   APP_OLLAMA_BASE_URL: "https://ollama.yellowocean-356174e3.francecentral.azurecontainerapps.io"
   APP_OLLAMA_MODEL: "llama3.2:3b"
-  APP_OLLAMA_TIMEOUT_SECONDS: "120"
+  APP_OLLAMA_TIMEOUT_SECONDS: "300"
 
   KOKORO_URL: "https://kokoro.yellowocean-356174e3.francecentral.azurecontainerapps.io"
   APP_TTS_KOKORO_BASE_URL: "https://kokoro.yellowocean-356174e3.francecentral.azurecontainerapps.io"
@@ -45,5 +45,5 @@ data:
   APP_EMAIL_FROM: "no-reply@pi-clouddoom.local"
 
   # Spring overrides needed especially for mentorship-service, because its YAML has localhost values
-  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://keycloak:8080/realms/myapp-realm"
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "https://auth.interviewprep-tn.me/realms/myapp-realm"
   SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: "http://keycloak:8080/realms/myapp-realm/protocol/openid-connect/certs"

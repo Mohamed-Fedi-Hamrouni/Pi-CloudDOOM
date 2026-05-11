@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CvAiParsingService {
 
-    private static final int MAX_TEXT_LENGTH = 12_000;
+    private static final int MAX_TEXT_LENGTH = 3_500;
 
     private final OllamaProperties ollamaProperties;
     private final ObjectMapper objectMapper;
@@ -66,44 +66,11 @@ public class CvAiParsingService {
 
 private String buildPrompt(String cvText) {
     return """
-            You are a professional CV parser.
+            Extract the following CV into ONE valid JSON object only.
+            No markdown. No explanation. No text before or after JSON.
+            Never invent facts. Preserve the CV language where possible.
 
-            Return ONLY one valid JSON object. Nothing else.
-            Do not explain. Do not write code. Do not add markdown. Do not add any text before or after the JSON.
-            Do not include any fields other than: bio, skills, educations, experiences.
-            Do not include name. Never invent facts.
-            If a field is missing or unclear, use null.
-            All list fields must always be arrays, never null.
-
-            Skills may be extracted from anywhere in the CV, even if there is no dedicated skills section.
-            Extract bio only if a clear summary, profile, about, or objective section exists.
-            Preserve the original language of extracted values where possible.
-
-            Dates must be returned separately as startDate and endDate. Use YYYY-MM format whenever possible.
-            If only a year is known, use YYYY-01.
-            If the CV says Present, Current, Présent, or en cours: set endDate to null AND set current to true.
-            If a position has ended (has an explicit end date or year): set current to false.
-            If endDate is unknown for a past position, set endDate to null and current to false.
-
-            For experiences:
-            - jobTitle should contain the role title
-            - company should contain the employer/organization name
-            - description should summarize missions, responsibilities, or achievements (1 to 3 sentences max)
-            For education:
-            - degree should contain the diploma/program name
-            - institution should contain the school/university name
-            - description may contain specialization, honors, or additional study details if clearly present
-
-            Do not merge any two fields into one. Split date ranges into startDate and endDate.
-
-            The CV may be in English or French.
-            Recognize headings and synonyms such as:
-            - Skills / Competencies / Compétences / Technologies / Outils
-            - Education / Formation / Études / Diplômes
-            - Experience / Expérience / Parcours professionnel
-            - Profile / Summary / Profil / À propos / Objectif
-
-            Required JSON schema:
+            Required JSON:
             {
               "bio": "string or null",
               "skills": ["string"],
@@ -129,51 +96,12 @@ private String buildPrompt(String cvText) {
               ]
             }
 
-            Example:
-            Input:
-            HYDATIS - Software Engineering Intern
-            06/2025 – 08/2025
-            Migrated mapping services from Google Maps to OpenStreetMap.
-
-            Output:
-            {
-              "bio": null,
-              "skills": [],
-              "educations": [],
-              "experiences": [
-                {
-                  "jobTitle": "Software Engineering Intern",
-                  "company": "HYDATIS",
-                  "startDate": "2025-06",
-                  "endDate": "2025-08",
-                  "current": false,
-                  "description": "Migrated mapping services from Google Maps to OpenStreetMap."
-                }
-              ]
-            }
-
-            Example:
-            Input:
-            ESPRIT – Engineering Degree in IT and Computer Science
-            2022 – Present
-            Specialization: Cloud Computing
-
-            Output:
-            {
-              "bio": null,
-              "skills": [],
-              "educations": [
-                {
-                  "degree": "Engineering Degree in IT and Computer Science",
-                  "institution": "ESPRIT",
-                  "startDate": "2022-01",
-                  "endDate": null,
-                  "current": true,
-                  "description": "Specialization: Cloud Computing"
-                }
-              ],
-              "experiences": []
-            }
+            Rules:
+            - skills, educations, experiences must always be arrays.
+            - If date says Present, Current, Présent, or en cours: endDate=null and current=true.
+            - If only a year is known, use YYYY-01.
+            - Keep descriptions short.
+            - Extract skills from any section.
 
             CV TEXT:
             ---
@@ -181,6 +109,7 @@ private String buildPrompt(String cvText) {
             ---
             """.formatted(cvText);
 }
+
 
     private String buildRequestBody(String cvText) {
         try {
@@ -191,6 +120,12 @@ private String buildPrompt(String cvText) {
             root.put("prompt", prompt);
             root.put("stream", false);
             root.put("format", "json");
+
+            var options = objectMapper.createObjectNode();
+            options.put("temperature", 0.1);
+            options.put("num_predict", 450);
+            options.put("num_ctx", 2048);
+            root.set("options", options);
 
             return objectMapper.writeValueAsString(root);
         } catch (Exception ex) {
