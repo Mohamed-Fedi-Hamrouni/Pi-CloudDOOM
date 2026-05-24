@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - deployment/azure-vercel
     paths:
       - "frontend/**"
       - "vercel.json"
