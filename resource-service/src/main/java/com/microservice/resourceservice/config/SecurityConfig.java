@@ -24,7 +24,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:*}")
+    @Value("${cors.allowed-origins:http://localhost:*,https://interviewprep-tn.me,https://www.interviewprep-tn.me}")
     private String corsAllowedOrigins;
 
     @Bean
