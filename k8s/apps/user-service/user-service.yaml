@@ -31,7 +31,7 @@ spec:
       enableServiceLinks: false
       containers:
         - name: user-service
-          image: docker.io/azizbna/pi-clouddoom-user-service:cv-ollama-fast-v2
+          image: docker.io/azizbna/pi-clouddoom-user-service:sha-372ed81
           imagePullPolicy: Always
           ports:
             - name: http
