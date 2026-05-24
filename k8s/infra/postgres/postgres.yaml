@@ -45,6 +45,10 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: POSTGRES_PASSWORD
+            # Azure managed-csi disks create a lost+found dir at mount root.
+            # PGDATA must point to a subdirectory to avoid initdb failure.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
