@@ -106,7 +106,7 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: "v1.29.15"
+          version: "v1.33.1"
 
       - name: Configure kubeconfig (AKS)
         env:
@@ -177,7 +177,7 @@ jobs:
 
       - uses: azure/setup-kubectl@v4
         with:
-          version: "v1.29.15"
+          version: "v1.33.1"
 
       - name: Configure kubeconfig (AKS)
         env:
