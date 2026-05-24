@@ -1,12 +1,7 @@
 name: Deploy — OpenStack K8s
 
+# Auto-trigger disabled on deployment/azure-vercel — backend deploys via deploy-aks.yml on this branch.
 on:
-  workflow_run:
-    workflows: ["Build & Push images"]
-    types: [completed]
-    branches:
-      - main
-      - deployment/hybrid-openstack-azure-vercel
   workflow_dispatch:
     inputs:
       environment:

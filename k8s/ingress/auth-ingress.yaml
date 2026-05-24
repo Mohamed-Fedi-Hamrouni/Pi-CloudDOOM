@@ -4,7 +4,7 @@ metadata:
   name: auth-ingress
   namespace: piclouddoom
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
     - host: auth.interviewprep-tn.me
       http:

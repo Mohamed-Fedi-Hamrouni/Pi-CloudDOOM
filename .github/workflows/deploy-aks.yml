@@ -1,0 +1,221 @@
+name: Deploy — Azure AKS
+
+# Deploys all 7 Spring microservices to AKS (Azure Kubernetes Service).
+# Auth: KUBECONFIG_AKS secret — generate locally with:
+#   az aks get-credentials --name <cluster> --resource-group rg-piclouddoom --file ./aks-kubeconfig
+#   cat ./aks-kubeconfig  →  store raw YAML as GitHub secret KUBECONFIG_AKS
+# No Service Principal required — avoids the esprit.tn tenant admin blocker.
+
+on:
+  workflow_run:
+    workflows: ["Build & Push images"]
+    types: [completed]
+    branches:
+      - deployment/azure-vercel
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA (full or 7-char). Blank = HEAD of ref."
+        type: string
+        required: false
+      service:
+        description: "Deploy only one service (blank = all 7)"
+        type: choice
+        required: false
+        default: ""
+        options:
+          - ""
+          - user-service
+          - interview-service
+          - training-service
+          - mentorship-service
+          - quiz-service
+          - community-service
+          - resource-service
+
+concurrency:
+  group: deploy-aks-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY_NS: docker.io/azizbna
+  IMAGE_PREFIX: pi-clouddoom
+  NAMESPACE: piclouddoom
+
+jobs:
+  gate:
+    name: precheck
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    outputs:
+      sha:       ${{ steps.resolve.outputs.sha }}
+      sha_short: ${{ steps.resolve.outputs.sha_short }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            sha="${{ github.event.workflow_run.head_sha }}"
+          elif [ -n "${{ inputs.sha }}" ]; then
+            sha="${{ inputs.sha }}"
+          else
+            sha="${{ github.sha }}"
+          fi
+          short="${sha:0:7}"
+          echo "sha=$sha"         >> "$GITHUB_OUTPUT"
+          echo "sha_short=$short" >> "$GITHUB_OUTPUT"
+          echo "Deploying sha-$short to AKS"
+
+  deploy:
+    name: rollout-${{ matrix.service }}
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://api.interviewprep-tn.me
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - interview-service
+          - training-service
+          - mentorship-service
+          - quiz-service
+          - community-service
+          - resource-service
+    steps:
+      - name: Skip if single-service dispatch and not matched
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.service != '' && inputs.service != matrix.service }}
+        run: |
+          echo "Skipped: dispatch targeted '${{ inputs.service }}', this job is '${{ matrix.service }}'."
+          exit 0
+
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.29.15"
+
+      - name: Configure kubeconfig (AKS)
+        env:
+          KUBECONFIG_AKS: ${{ secrets.KUBECONFIG_AKS }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_AKS" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl config current-context
+          kubectl -n "${{ env.NAMESPACE }}" get deploy "${{ matrix.service }}"
+
+      - name: Pin image to sha-${{ needs.gate.outputs.sha_short }}
+        id: setimg
+        run: |
+          IMAGE="${REGISTRY_NS}/${IMAGE_PREFIX}-${{ matrix.service }}:sha-${{ needs.gate.outputs.sha_short }}"
+          echo "Pinning ${{ matrix.service }} → ${IMAGE}"
+          kubectl -n "${{ env.NAMESPACE }}" set image \
+            "deployment/${{ matrix.service }}" \
+            "${{ matrix.service }}=${IMAGE}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for rollout
+        id: rollout
+        run: |
+          set +e
+          kubectl -n "${{ env.NAMESPACE }}" rollout status \
+            "deployment/${{ matrix.service }}" \
+            --timeout=10m
+          rc=$?
+          set -e
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          if [ "$rc" -ne 0 ]; then
+            echo "::warning::Rollout did not converge — collecting diagnostics."
+            kubectl -n "${{ env.NAMESPACE }}" describe "deployment/${{ matrix.service }}" || true
+            kubectl -n "${{ env.NAMESPACE }}" get pods -l app=${{ matrix.service }} -o wide || true
+            kubectl -n "${{ env.NAMESPACE }}" logs --tail=80 -l app=${{ matrix.service }} || true
+          fi
+          exit $rc
+
+      - name: Auto-rollback on failure
+        if: failure() && steps.setimg.outcome == 'success'
+        run: |
+          echo "::error::Rollout failed — rolling back ${{ matrix.service }}."
+          kubectl -n "${{ env.NAMESPACE }}" rollout undo "deployment/${{ matrix.service }}"
+          kubectl -n "${{ env.NAMESPACE }}" rollout status "deployment/${{ matrix.service }}" --timeout=3m || true
+
+      - name: Deploy summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ matrix.service }}"
+            echo "- Image: \`${{ steps.setimg.outputs.image }}\`"
+            echo "- Rollout exit code: \`${{ steps.rollout.outputs.rc }}\`"
+            echo "- Pods now:"
+            echo '```'
+            kubectl -n "${{ env.NAMESPACE }}" get pods -l app=${{ matrix.service }} -o wide 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  smoke:
+    name: smoke test
+    needs: [gate, deploy]
+    runs-on: ubuntu-latest
+    if: needs.deploy.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.29.15"
+
+      - name: Configure kubeconfig (AKS)
+        env:
+          KUBECONFIG_AKS: ${{ secrets.KUBECONFIG_AKS }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_AKS" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Run smoke tests
+        run: |
+          bash scripts/smoke.sh \
+            --kubeconfig="$HOME/.kube/config" \
+            --namespace="${{ env.NAMESPACE }}"
+
+      - name: Roll back ALL services if smoke fails
+        if: failure()
+        run: |
+          echo "::error::Smoke test failed — rolling back all 7 services."
+          for svc in user-service interview-service training-service mentorship-service quiz-service community-service resource-service; do
+            kubectl -n "${{ env.NAMESPACE }}" rollout undo "deployment/$svc" || true
+          done
+          for svc in user-service interview-service training-service mentorship-service quiz-service community-service resource-service; do
+            kubectl -n "${{ env.NAMESPACE }}" rollout status "deployment/$svc" --timeout=2m || true
+          done
+
+  deploy-summary:
+    name: deploy-summary
+    runs-on: ubuntu-latest
+    needs: [deploy, smoke]
+    if: always()
+    steps:
+      - run: |
+          deploy_result='${{ needs.deploy.result }}'
+          smoke_result='${{ needs.smoke.result }}'
+          echo "Deploy matrix: $deploy_result"
+          echo "Smoke test:    $smoke_result"
+          if [ "$deploy_result" = "failure" ] || [ "$smoke_result" = "failure" ]; then
+            exit 1
+          fi
+          echo "All AKS deploys converged and smoke passed."
