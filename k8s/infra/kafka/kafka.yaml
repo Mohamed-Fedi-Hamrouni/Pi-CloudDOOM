@@ -18,6 +18,8 @@ metadata:
   namespace: piclouddoom
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: kafka
@@ -27,6 +29,8 @@ spec:
         app: kafka
     spec:
       enableServiceLinks: false
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.5.0
