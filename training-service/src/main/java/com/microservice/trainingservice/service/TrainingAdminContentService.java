@@ -41,7 +41,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -59,11 +60,13 @@ public class TrainingAdminContentService {
     private final AiMissingLessonGenerationService aiMissingLessonGenerationService;
 
     @Transactional(readOnly = true)
-    public List<TrainingLessonResponse> getAllLessons(Boolean active) {
-        List<TrainingLesson> lessons = (active == null)
-            ? trainingLessonRepository.findAll()
-            : (active ? trainingLessonRepository.findByActiveTrueOrderByIdAsc() : trainingLessonRepository.findAll());
-        return lessons.stream().map(trainingMapper::trainingLessonToResponse).toList();
+    public Page<TrainingLessonResponse> getAllLessons(Boolean active, Pageable pageable) {
+        if (Boolean.TRUE.equals(active)) {
+            return trainingLessonRepository.findByActiveTrue(pageable)
+                .map(trainingMapper::trainingLessonToResponse);
+        }
+        return trainingLessonRepository.findAll(pageable)
+            .map(trainingMapper::trainingLessonToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -98,8 +101,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrainingPathResponse> getAllPaths() {
-        return trainingPathRepository.findAll().stream().map(trainingMapper::trainingPathToResponse).toList();
+    public Page<TrainingPathResponse> getAllPaths(Pageable pageable) {
+        return trainingPathRepository.findAll(pageable).map(trainingMapper::trainingPathToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -155,8 +158,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<BadgeResponse> getAllBadges() {
-        return badgeRepository.findAll().stream().map(trainingMapper::badgeToResponse).toList();
+    public Page<BadgeResponse> getAllBadges(Pageable pageable) {
+        return badgeRepository.findAll(pageable).map(trainingMapper::badgeToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -187,8 +190,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrainingModuleResponse> getAllModules() {
-        return trainingModuleRepository.findAll().stream().map(trainingMapper::trainingModuleToResponse).toList();
+    public Page<TrainingModuleResponse> getAllModules(Pageable pageable) {
+        return trainingModuleRepository.findAll(pageable).map(trainingMapper::trainingModuleToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -219,8 +222,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserBadgeResponse> getAllUserBadges() {
-        return userBadgeRepository.findAll().stream().map(trainingMapper::userBadgeToResponse).toList();
+    public Page<UserBadgeResponse> getAllUserBadges(Pageable pageable) {
+        return userBadgeRepository.findAll(pageable).map(trainingMapper::userBadgeToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -275,8 +278,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserXPTrackerResponse> getAllTrackers() {
-        return userXPTrackerRepository.findAll().stream().map(trainingMapper::userXPTrackerToResponse).toList();
+    public Page<UserXPTrackerResponse> getAllTrackers(Pageable pageable) {
+        return userXPTrackerRepository.findAll(pageable).map(trainingMapper::userXPTrackerToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -333,8 +336,8 @@ public class TrainingAdminContentService {
     }
 
     @Transactional(readOnly = true)
-    public List<DailyActivityResponse> getAllActivities() {
-        return dailyActivityRepository.findAll().stream().map(trainingMapper::dailyActivityToResponse).toList();
+    public Page<DailyActivityResponse> getAllActivities(Pageable pageable) {
+        return dailyActivityRepository.findAll(pageable).map(trainingMapper::dailyActivityToResponse);
     }
 
     @Transactional(readOnly = true)

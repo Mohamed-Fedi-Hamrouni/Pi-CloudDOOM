@@ -229,31 +229,34 @@ public class CommunityService {
         return followRepository.existsByFollowerKeycloakIdAndFollowingKeycloakId(followerKeycloakId, followingKeycloakId);
     }
 
-    public List<FollowResponse> getFollowers(String keycloakId) {
-        return followRepository.findByFollowingKeycloakId(keycloakId)
-                .stream().map(this::toFollowResponse).collect(Collectors.toList());
+    public PageResponse<FollowResponse> getFollowers(String keycloakId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "followedAt"));
+        Page<Follow> result = followRepository.findByFollowingKeycloakId(keycloakId, pageable);
+        return PageResponse.<FollowResponse>builder()
+                .content(result.getContent().stream().map(this::toFollowResponse).collect(Collectors.toList()))
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .build();
     }
 
-    public List<FollowResponse> getFollowing(String keycloakId) {
-        return followRepository.findByFollowerKeycloakId(keycloakId)
-                .stream().map(this::toFollowResponse).collect(Collectors.toList());
+    public PageResponse<FollowResponse> getFollowing(String keycloakId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "followedAt"));
+        Page<Follow> result = followRepository.findByFollowerKeycloakId(keycloakId, pageable);
+        return PageResponse.<FollowResponse>builder()
+                .content(result.getContent().stream().map(this::toFollowResponse).collect(Collectors.toList()))
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .build();
     }
 
     @Transactional(readOnly = true)
     public PageResponse<PostResponse> getFollowingFeed(String followerKeycloakId, int page, int size) {
-        List<String> followingIds = followRepository.findByFollowerKeycloakId(followerKeycloakId)
-                .stream()
-                .map(Follow::getFollowingKeycloakId)
-                .collect(Collectors.toList());
-
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        Page<Post> result;
-        if (followingIds.isEmpty()) {
-            result = Page.empty(pageable);
-        } else {
-            result = postRepository.findByAuthorKeycloakIdIn(followingIds, pageable);
-        }
+        Page<Post> result = postRepository.findFeedByFollowee(followerKeycloakId, pageable);
 
         return PageResponse.<PostResponse>builder()
                 .content(result.getContent().stream().map(this::toPostResponse).collect(Collectors.toList()))
@@ -319,8 +322,8 @@ public class CommunityService {
         KarmaScore karma = karmaRepository.findByKeycloakId(keycloakId)
                 .orElse(KarmaScore.builder().keycloakId(keycloakId).totalKarma(0).build());
 
-        long followersCount = followRepository.findByFollowingKeycloakId(keycloakId).size();
-        long followingCount = followRepository.findByFollowerKeycloakId(keycloakId).size();
+        long followersCount = followRepository.countByFollowingKeycloakId(keycloakId);
+        long followingCount = followRepository.countByFollowerKeycloakId(keycloakId);
 
         Page<Post> recentPostsPage = postRepository
                 .findByAuthorKeycloakIdOrderByCreatedAtDesc(keycloakId, PageRequest.of(0, 5));

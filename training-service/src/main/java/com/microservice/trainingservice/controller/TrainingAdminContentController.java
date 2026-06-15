@@ -19,6 +19,9 @@ import com.microservice.trainingservice.dto.UserXPTrackerUpsertRequest;
 import com.microservice.trainingservice.service.TrainingAdminContentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,8 +35,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/admin/training")
 @RequiredArgsConstructor
@@ -43,8 +44,10 @@ public class TrainingAdminContentController {
     private final TrainingAdminContentService trainingAdminContentService;
 
     @GetMapping("/badges")
-    public List<BadgeResponse> getAllBadges() {
-        return trainingAdminContentService.getAllBadges();
+    public Page<BadgeResponse> getAllBadges(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllBadges(PageRequest.of(page, size));
     }
 
     @GetMapping("/badges/{id}")
@@ -70,13 +73,18 @@ public class TrainingAdminContentController {
     }
 
     @GetMapping("/modules")
-    public List<TrainingModuleResponse> getAllModules() {
-        return trainingAdminContentService.getAllModules();
+    public Page<TrainingModuleResponse> getAllModules(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllModules(PageRequest.of(page, size));
     }
 
     @GetMapping("/lessons")
-    public List<TrainingLessonResponse> getAllLessons(@RequestParam(required = false) Boolean active) {
-        return trainingAdminContentService.getAllLessons(active);
+    public Page<TrainingLessonResponse> getAllLessons(
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllLessons(active, PageRequest.of(page, size));
     }
 
     @GetMapping("/lessons/{id}")
@@ -130,8 +138,10 @@ public class TrainingAdminContentController {
     }
 
     @GetMapping("/paths")
-    public List<TrainingPathResponse> getAllPaths() {
-        return trainingAdminContentService.getAllPaths();
+    public Page<TrainingPathResponse> getAllPaths(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllPaths(PageRequest.of(page, size));
     }
 
     @GetMapping("/paths/{id}")
@@ -157,8 +167,10 @@ public class TrainingAdminContentController {
     }
 
     @GetMapping("/user-badges")
-    public List<UserBadgeResponse> getAllUserBadges() {
-        return trainingAdminContentService.getAllUserBadges();
+    public Page<UserBadgeResponse> getAllUserBadges(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllUserBadges(PageRequest.of(page, size));
     }
 
     @GetMapping("/user-badges/{id}")
@@ -184,8 +196,10 @@ public class TrainingAdminContentController {
     }
 
     @GetMapping("/xp-trackers")
-    public List<UserXPTrackerResponse> getAllTrackers() {
-        return trainingAdminContentService.getAllTrackers();
+    public Page<UserXPTrackerResponse> getAllTrackers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllTrackers(PageRequest.of(page, size));
     }
 
     @GetMapping("/xp-trackers/{id}")
@@ -211,8 +225,10 @@ public class TrainingAdminContentController {
     }
 
     @GetMapping("/activities")
-    public List<DailyActivityResponse> getAllActivities() {
-        return trainingAdminContentService.getAllActivities();
+    public Page<DailyActivityResponse> getAllActivities(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return trainingAdminContentService.getAllActivities(PageRequest.of(page, size));
     }
 
     @GetMapping("/activities/{id}")

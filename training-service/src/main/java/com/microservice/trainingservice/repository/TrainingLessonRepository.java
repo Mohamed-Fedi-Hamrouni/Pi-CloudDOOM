@@ -2,6 +2,8 @@ package com.microservice.trainingservice.repository;
 
 import com.microservice.trainingservice.model.TrainingCategory;
 import com.microservice.trainingservice.model.TrainingLesson;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +26,6 @@ public interface TrainingLessonRepository extends JpaRepository<TrainingLesson, 
     List<TrainingLesson> findByActiveTrueAndCategoryOrderByIdAsc(TrainingCategory category);
 
     List<TrainingLesson> findByActiveTrueOrderByIdAsc();
+
+    Page<TrainingLesson> findByActiveTrue(Pageable pageable);
 }
